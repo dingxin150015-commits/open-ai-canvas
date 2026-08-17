@@ -62,8 +62,10 @@ func (s *Service) FetchChannelModelCatalogWithPlugin(ctx context.Context, actor 
 	// 1. 匹配插件
 	headers := s.headersToMap(input.Headers)
 	discovery := provider.MatchProvider(baseURL, headers)
+
+	// 如果没有匹配的插件，回退到原有实现（支持 Gemini 等）
 	if discovery == nil {
-		return nil, fmt.Errorf("未找到匹配的服务商插件，请检查 Base URL")
+		return s.fetchChannelModelCatalogLegacy(ctx, actor, input)
 	}
 
 	// 2. 构建配置
