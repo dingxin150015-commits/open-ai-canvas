@@ -765,8 +765,11 @@ func (s *Service) channelFromRequest(req ChannelRequest, channel model.ModelChan
 	if req.SecretKey != "" {
 		channel.SecretKey = req.SecretKey
 	}
-	// 系统渠道只保存地址与凭证；实际协议和鉴权方式由所选模型决定。
-	channel.APIFormat = "openai"
+	// 使用请求中指定的 API 格式，默认为 openai
+	channel.APIFormat = strings.ToLower(strings.TrimSpace(req.APIFormat))
+	if channel.APIFormat == "" {
+		channel.APIFormat = "openai"
+	}
 	if req.UseGlobalConcurrency != nil && *req.UseGlobalConcurrency {
 		channel.ConcurrencyLimit = 0
 	} else if req.ConcurrencyLimit != nil {

@@ -18,7 +18,7 @@ import { AdminPageFrame } from "../components/admin-shell";
 import { AdminRowActions, AdminTableEmpty, AdminTableSkeleton, configuredSecretText } from "../components/admin-ui";
 import { ChannelModelManager } from "../components/channel-model-manager";
 
-type ChannelFormValues = { name: string; baseUrl: string; allowLocalChannel?: boolean; apiKey?: string; secretKey?: string; headers?: ChannelHeader[]; useGlobalConcurrency?: boolean; concurrencyLimit?: number; enabled?: boolean };
+type ChannelFormValues = { name: string; baseUrl: string; allowLocalChannel?: boolean; apiKey?: string; secretKey?: string; apiFormat?: "openai" | "gemini"; headers?: ChannelHeader[]; useGlobalConcurrency?: boolean; concurrencyLimit?: number; enabled?: boolean };
 
 export function adminLocalChannelFormOwner(desktopLocalChannelsEnabled: boolean, hostname: string, requestedAllowLocalChannel?: boolean) {
     const state = desktopLocalChannelFormState(desktopLocalChannelsEnabled, hostname, requestedAllowLocalChannel);
@@ -50,6 +50,7 @@ export function adminChannelSavePayload(values: ChannelFormValues, desktopLocalC
         allowLocalChannel: adminLocalChannelFormOwner(desktopLocalChannelsEnabled, hostname, values.allowLocalChannel).payloadValue,
         apiKey: values.apiKey?.trim() || "",
         secretKey: values.secretKey?.trim() || "",
+        apiFormat: values.apiFormat || "openai",
         headers: values.headers || [],
         useGlobalConcurrency: values.useGlobalConcurrency !== false,
         concurrencyLimit: values.useGlobalConcurrency === false ? values.concurrencyLimit : undefined,
@@ -126,7 +127,7 @@ export default function ChannelsPage() {
     const openDrawer = (channel?: ModelChannel) => {
         setEditingChannel(channel || null);
         form.resetFields();
-        form.setFieldsValue(channel ? { name: channel.name, baseUrl: channel.baseUrl, allowLocalChannel: adminLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, channel.allowLocalChannel).checked, apiKey: "", secretKey: "", headers: channel.headers || [], useGlobalConcurrency: !channel.concurrencyLimit, concurrencyLimit: channel.concurrencyLimit || undefined, enabled: channel.enabled !== false } : { name: "", baseUrl: "", allowLocalChannel: false, apiKey: "", secretKey: "", headers: [], useGlobalConcurrency: true, concurrencyLimit: undefined, enabled: true });
+        form.setFieldsValue(channel ? { name: channel.name, baseUrl: channel.baseUrl, allowLocalChannel: adminLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, channel.allowLocalChannel).checked, apiKey: "", secretKey: "", apiFormat: channel.apiFormat || "openai", headers: channel.headers || [], useGlobalConcurrency: !channel.concurrencyLimit, concurrencyLimit: channel.concurrencyLimit || undefined, enabled: channel.enabled !== false } : { name: "", baseUrl: "", allowLocalChannel: false, apiKey: "", secretKey: "", apiFormat: "openai", headers: [], useGlobalConcurrency: true, concurrencyLimit: undefined, enabled: true });
         setDrawerOpen(true);
     };
 
@@ -214,6 +215,9 @@ export default function ChannelsPage() {
                 <Form form={form} layout="vertical" requiredMark={false}>
                     <Form.Item name="name" label="渠道名称" rules={[{ required: true, message: "请填写渠道名称" }]}><Input placeholder="例如：OpenAI 官方渠道" /></Form.Item>
                     <AdminLocalChannelFields visible={showDesktopLocalChannelControl} checked={allowLocalChannel} form={form} />
+                    <Form.Item name="apiFormat" label="API 格式" extra="仅用于拉取模型目录；模型能力和请求协议在模型管理中统一配置。" rules={[{ required: true, message: "请选择 API 格式" }]}>
+                        <Select placeholder="选择 API 格式" options={[{ label: "OpenAI 兼容", value: "openai" }, { label: "Gemini 原生", value: "gemini" }]} />
+                    </Form.Item>
                     <Form.Item name="apiKey" label={editingChannel ? `API Key / Access Key（${configuredSecretText}）` : "API Key / Access Key"} rules={editingChannel ? [] : [{ required: true, message: "请填写 API Key 或 Access Key" }]} extra="OpenAI 兼容协议填写 API Key；即梦官方协议填写 IAM Access Key。"><Input.Password autoComplete="new-password" placeholder={editingChannel ? "留空保留原凭证" : "API Key 或 Access Key"} /></Form.Item>
                     <Form.Item name="secretKey" label={editingChannel ? `Secret Key（${channelSecretText(editingChannel)}）` : "Secret Key（可选）"} extra="仅即梦官方等 AK/SK 签名协议需要；其他渠道留空。"><Input.Password autoComplete="new-password" placeholder={editingChannel ? "留空保留原 Secret Key" : "IAM Secret Key"} /></Form.Item>
                     <div className="mb-6"><Form.Item name="headers" noStyle><ChannelHeadersEditor /></Form.Item></div>
