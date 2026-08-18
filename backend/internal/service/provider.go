@@ -667,6 +667,9 @@ func runImageTask(ctx context.Context, input canvasGenerationInput) (map[string]
 	if input.Config.InterfaceType == string(model.ChannelInterfaceVolcengineArkImage) {
 		return runVolcengineArkImageTask(ctx, input)
 	}
+	if input.Config.InterfaceType == string(model.ChannelInterfaceDashScopeImage) {
+		return runDashScopeImageTask(ctx, input)
+	}
 	var payload imageResponse
 	if input.Mask != nil {
 		// 蒙版编辑是强校验写路径：协议能力不明确时必须失败，不能静默退化为整图重绘。
@@ -2232,7 +2235,7 @@ func validateGenerationInterface(mode string, interfaceType string) error {
 	}
 	allowed := map[string]map[string]bool{
 		"text":  {"chat-completion": true, "openai-response": true},
-		"image": {"openai-image": true, "grok-image": true, "volcengine-ark-image": true, "volcengine-jimeng-image": true},
+		"image": {"openai-image": true, "grok-image": true, "volcengine-ark-image": true, "volcengine-jimeng-image": true, "dashscope-image": true},
 		"video": {"newapi": true, "newapi-channel-1": true, "newapi-channel-2": true, "xai-video": true, "volcengine-ark-video": true, "volcengine-jimeng-video": true, "gemini-veo": true, "novita-video": true},
 		"audio": {"openai-audio": true, "async-audio": true},
 	}

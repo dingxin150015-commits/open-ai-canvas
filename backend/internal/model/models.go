@@ -74,6 +74,7 @@ const (
 	ChannelInterfaceVolcengineJiMengVideo ChannelInterfaceType = "volcengine-jimeng-video"
 	ChannelInterfaceGeminiVeo             ChannelInterfaceType = "gemini-veo"
 	ChannelInterfaceNovitaVideo           ChannelInterfaceType = "novita-video"
+	ChannelInterfaceDashScopeImage        ChannelInterfaceType = "dashscope-image"
 
 	ApiCallStatusSucceeded ApiCallStatus = "succeeded"
 	ApiCallStatusFailed    ApiCallStatus = "failed"

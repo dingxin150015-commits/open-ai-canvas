@@ -5,6 +5,7 @@ export type ModelProtocol =
     | "grok-image"
     | "volcengine-ark-image"
     | "volcengine-jimeng-image"
+    | "dashscope-image"
     | "openai-audio"
     | "async-audio"
     | "newapi"
@@ -35,6 +36,7 @@ export const MODEL_PROTOCOLS: ModelProtocolDefinition[] = [
     { value: "grok-image", label: "Grok Images", capability: "image", create: "POST /v1/images/generations / edits", contentType: "application/json", media: "文生图与单张 URL 参考图，不支持蒙版" },
     { value: "volcengine-ark-image", label: "火山方舟图片", capability: "image", create: "POST /api/v3/images/generations", contentType: "application/json", media: "文生图与 image 参考图，不支持蒙版" },
     { value: "volcengine-jimeng-image", label: "即梦官方图片", capability: "image", create: "POST CVSync2AsyncSubmitTask", poll: "POST CVSync2AsyncGetResult", contentType: "application/json + AK/SK 签名", media: "0-14 张参考图，模型标识填写 req_key" },
+    { value: "dashscope-image", label: "DashScope 图片", capability: "image", create: "POST /api/v1/services/aigc/multimodal-generation/generation", poll: "GET /api/v1/tasks/{task_id}", contentType: "application/json + X-DashScope-Async", media: "文生图与参考图，异步轮询" },
     { value: "openai-audio", label: "OpenAI Audio", capability: "audio", create: "POST /v1/audio/speech", contentType: "application/json", media: "文本转语音" },
     { value: "async-audio", label: "异步音频任务", capability: "audio", create: "POST /v1/audio/tasks", poll: "GET /v1/audio/tasks/{task_id}", contentType: "application/json", media: "语音、音效与音乐生成" },
     { value: "newapi", label: "OpenAI / NewAPI Videos", capability: "video", create: "POST /v1/videos", poll: "GET /v1/videos/{task_id}", contentType: "multipart/form-data", media: "input_reference[] 参考图" },

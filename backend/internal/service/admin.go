@@ -88,6 +88,7 @@ type ChannelRequest struct {
 	AllowLocalChannel    *bool            `json:"allowLocalChannel"`
 	APIKey               string           `json:"apiKey"`
 	SecretKey            string           `json:"secretKey"`
+	APIFormat            string           `json:"apiFormat"`
 	ConcurrencyLimit     *int             `json:"concurrencyLimit"`
 	UseGlobalConcurrency *bool            `json:"useGlobalConcurrency"`
 	Models               []string         `json:"models"`
@@ -810,7 +811,7 @@ func mergeChannelRequest(req ChannelRequest, channel model.ModelChannel) Channel
 
 func validChannelInterfaceType(value model.ChannelInterfaceType) bool {
 	switch value {
-	case model.ChannelInterfaceChatCompletion, model.ChannelInterfaceOpenAIResponse, model.ChannelInterfaceOpenAIImage, model.ChannelInterfaceGrokImage, model.ChannelInterfaceVolcengineArkImage, model.ChannelInterfaceVolcengineJiMengImage, model.ChannelInterfaceOpenAIAudio, model.ChannelInterfaceAsyncAudio, model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo:
+	case model.ChannelInterfaceChatCompletion, model.ChannelInterfaceOpenAIResponse, model.ChannelInterfaceOpenAIImage, model.ChannelInterfaceGrokImage, model.ChannelInterfaceVolcengineArkImage, model.ChannelInterfaceVolcengineJiMengImage, model.ChannelInterfaceOpenAIAudio, model.ChannelInterfaceAsyncAudio, model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo, model.ChannelInterfaceNovitaVideo, model.ChannelInterfaceDashScopeImage:
 		return true
 	default:
 		return false
