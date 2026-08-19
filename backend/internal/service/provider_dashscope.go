@@ -9,121 +9,134 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 )
 
-// runDashScopeImageTask 实现百炼（DashScope）图片生成协议
+// runDashScopeImageTask 实现百炼（DashScope）图片生成协议（同步模式）
 // API 文档：https://help.aliyun.com/zh/model-studio/developer-reference/text-to-image-api
 func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
 	if input.Mask != nil {
 		return nil, errors.New("DashScope 图片协议不支持蒙版编辑，请移除蒙版后重试")
 	}
 
-	// 构建请求体
-	body := map[string]interface{}{
-		"model": input.Config.Model,
-		"input": map[string]interface{}{
-			"prompt": withSystemPrompt(input.Config, input.Prompt),
-		},
-		"parameters": map[string]interface{}{},
+	// 构建多模态 content 数组（DashScope 图片生成使用多模态消息格式）
+	content := []map[string]interface{}{}
+
+	// 1. 添加文本内容
+	promptText := strings.TrimSpace(input.Prompt)
+	if systemPrompt := strings.TrimSpace(input.Config.SystemPrompt); systemPrompt != "" {
+		// System prompt 和 user prompt 合并
+		promptText = systemPrompt + "\n\n" + promptText
+	}
+	if promptText != "" {
+		content = append(content, map[string]interface{}{
+			"text": promptText,
+		})
 	}
 
-	// 设置图片尺寸
-	if size := normalizeDashScopeImageSize(input.Config.Size); size != "" {
-		body["parameters"].(map[string]interface{})["size"] = size
-	}
-
-	// 处理参考图（DashScope 支持参考图）
+	// 2. 处理参考图（添加到 content 数组）
 	if len(input.ReferenceImages) > 0 {
 		if len(input.ReferenceImages) > 1 {
 			return nil, errors.New("DashScope 图片协议当前只支持 1 张参考图")
 		}
-		// 将参考图转为 base64
 		raw, _, err := mediaBytes(input.ReferenceImages[0])
 		if err != nil {
 			return nil, fmt.Errorf("读取 DashScope 参考图失败：%w", err)
 		}
-		body["input"].(map[string]interface{})["ref_img"] = base64.StdEncoding.EncodeToString(raw)
+		// 参考图作为独立 content 对象（使用 data URL 格式）
+		content = append(content, map[string]interface{}{
+			"image": "data:image/png;base64," + base64.StdEncoding.EncodeToString(raw),
+		})
 	}
 
-	// 提交异步任务
-	taskID, err := submitDashScopeTask(ctx, input.Config, body)
-	if err != nil {
+	// 3. 构建请求体（多模态消息格式）
+	body := map[string]interface{}{
+		"model": input.Config.Model,
+		"input": map[string]interface{}{
+			"messages": []map[string]interface{}{
+				{
+					"role":    "user",
+					"content": content, // content 必须是对象数组
+				},
+			},
+		},
+		"parameters": map[string]interface{}{},
+	}
+
+	// 4. 设置图片尺寸
+	if size := normalizeDashScopeImageSize(input.Config.Size); size != "" {
+		body["parameters"].(map[string]interface{})["size"] = size
+	}
+
+	// 5. 同步调用（不使用异步模式）
+	var response dashScopeResponse
+	if err := postDashScopeJSONSync(ctx, input.Config, "/api/v1/services/aigc/multimodal-generation/generation", body, &response); err != nil {
 		return nil, err
 	}
 
-	// 轮询任务状态
-	for deadline := providerPollingDeadline(ctx); time.Now().Before(deadline); {
-		result, err := pollDashScopeTask(ctx, input.Config, taskID)
+	// 6. 检查响应格式并提取图片 URL
+	// 同步模式返回 choices 格式
+	if len(response.Output.Choices) > 0 && len(response.Output.Choices[0].Message.Content) > 0 {
+		images, err := dashScopeImageDataURLs(ctx, input.Config, response)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("DashScope 图片结果处理失败：%w", err)
 		}
-
-		status := strings.ToLower(strings.TrimSpace(result.Output.TaskStatus))
-		switch status {
-		case "succeeded":
-			// 下载图片 URL 并转为 data URL（避免 24h 过期）
-			images, err := dashScopeImageDataURLs(ctx, input.Config, result)
-			if err != nil {
-				return nil, fmt.Errorf("DashScope 图片任务 %s 结果处理失败：%w", taskID, err)
-			}
-			return map[string]interface{}{"mode": "image", "images": images}, nil
-		case "failed":
-			errorMsg := "DashScope 图片生成失败"
-			if result.Output.Message != "" {
-				errorMsg = fmt.Sprintf("DashScope 图片生成失败：%s", result.Output.Message)
-			}
-			return nil, errors.New(errorMsg)
-		case "pending", "running":
-			// 继续轮询
-		default:
-			return nil, fmt.Errorf("DashScope 返回未知状态：%s", status)
-		}
-
-		if err := sleepContext(ctx, 3*time.Second); err != nil {
-			return nil, err
-		}
+		return map[string]interface{}{"mode": "image", "images": images}, nil
 	}
 
-	return nil, fmt.Errorf("DashScope 图片生成超时（任务 %s）", taskID)
+	// 回退：检查异步模式的响应格式（保留兼容性）
+	status := strings.ToLower(strings.TrimSpace(response.Output.TaskStatus))
+	if status == "failed" || (status == "" && len(response.Output.Results) == 0) {
+		errorMsg := "DashScope 图片生成失败"
+		if response.Output.Message != "" {
+			errorMsg = fmt.Sprintf("DashScope 图片生成失败：%s", response.Output.Message)
+		}
+		return nil, errors.New(errorMsg)
+	}
+
+	// 异步模式的图片处理（如果上面的 choices 格式失败）
+	images, err := dashScopeImageDataURLs(ctx, input.Config, response)
+	if err != nil {
+		return nil, fmt.Errorf("DashScope 图片结果处理失败：%w", err)
+	}
+
+	return map[string]interface{}{"mode": "image", "images": images}, nil
 }
 
-// submitDashScopeTask 提交 DashScope 异步任务
-func submitDashScopeTask(ctx context.Context, config providerConfig, body map[string]interface{}) (string, error) {
-	if resumed := resumedProviderRequestID(ctx); resumed != "" {
-		return resumed, nil
-	}
-
-	var response dashScopeResponse
-	if err := postDashScopeJSON(withProviderRequestKind(ctx, "create"), config, "/api/v1/services/aigc/multimodal-generation/generation", body, &response); err != nil {
-		return "", err
-	}
-
-	taskID := strings.TrimSpace(response.Output.TaskID)
-	if taskID == "" {
-		return "", errors.New("DashScope 接口没有返回任务 ID")
-	}
-
-	return taskID, nil
-}
-
-// pollDashScopeTask 轮询 DashScope 任务状态
-func pollDashScopeTask(ctx context.Context, config providerConfig, taskID string) (dashScopeResponse, error) {
-	var response dashScopeResponse
-	if err := getDashScopeJSON(withProviderRequestKind(ctx, "poll"), config, "/api/v1/tasks/"+taskID, &response); err != nil {
-		return response, err
-	}
-	return response, nil
-}
 
 // dashScopeImageDataURLs 下载 DashScope 图片 URL 并转为 data URL
 func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response dashScopeResponse) ([]string, error) {
+	images := make([]string, 0)
+
+	// 优先处理同步模式的 choices 格式
+	if len(response.Output.Choices) > 0 {
+		for _, choice := range response.Output.Choices {
+			for _, item := range choice.Message.Content {
+				imageURL := strings.TrimSpace(item.Image)
+				if imageURL == "" {
+					continue
+				}
+
+				// 下载图片并转为 data URL（DashScope 返回的 URL 有效期仅 24 小时）
+				data, mimeType, err := getExternalBinary(withProviderRequestKind(ctx, "download"), imageURL)
+				if err != nil {
+					return nil, fmt.Errorf("DashScope 图片下载失败：%w", err)
+				}
+				mimeType = normalizedMediaMimeType(mimeType, data)
+				images = append(images, dataURL(mimeType, data))
+			}
+		}
+
+		if len(images) > 0 {
+			return images, nil
+		}
+	}
+
+	// 回退：处理异步模式的 results 格式
 	results := response.Output.Results
 	if len(results) == 0 {
 		return nil, errors.New("DashScope 接口没有返回图片")
 	}
 
-	images := make([]string, 0, len(results))
 	for _, result := range results {
 		imageURL := strings.TrimSpace(result.URL)
 		if imageURL == "" {
@@ -166,17 +179,43 @@ func normalizeDashScopeImageSize(value string) string {
 	}
 }
 
-// DashScope API 响应结构
+// DashScope API 响应结构（同步模式使用 choices 格式）
 type dashScopeResponse struct {
 	Output struct {
-		TaskID     string `json:"task_id"`
-		TaskStatus string `json:"task_status"` // PENDING, RUNNING, SUCCEEDED, FAILED
-		Message    string `json:"message"`
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
+				Role    string `json:"role"`
+				Content []struct {
+					Image string `json:"image"`
+				} `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+
+		// 异步模式字段（保留以防需要回退到异步）
+		TaskID     string `json:"task_id,omitempty"`
+		TaskStatus string `json:"task_status,omitempty"`
+		Message    string `json:"message,omitempty"`
 		Results    []struct {
 			URL string `json:"url"`
-		} `json:"results"`
+		} `json:"results,omitempty"`
 	} `json:"output"`
 	RequestID string `json:"request_id"`
+}
+
+// postDashScopeJSONSync 向 DashScope 发送同步 POST 请求（不带 X-DashScope-Async header）
+func postDashScopeJSONSync(ctx context.Context, config providerConfig, path string, body interface{}, target interface{}) error {
+	data, _ := json.Marshal(body)
+	url := strings.TrimRight(config.BaseURL, "/") + path
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+config.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	// 同步模式：不设置 X-DashScope-Async header
+	ApplyOutboundHeaders(req, config.Headers)
+	return doJSON(req, target)
 }
 
 // postDashScopeJSON 向 DashScope 发送 POST 请求（带 X-DashScope-Async header）
@@ -197,7 +236,6 @@ func postDashScopeJSON(ctx context.Context, config providerConfig, path string, 
 
 // getDashScopeJSON 向 DashScope 发送 GET 请求
 func getDashScopeJSON(ctx context.Context, config providerConfig, path string, target interface{}) error {
-	// DashScope 轮询接口不需要 /v1 前缀，直接使用完整路径
 	url := strings.TrimRight(config.BaseURL, "/") + path
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
