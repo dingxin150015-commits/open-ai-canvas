@@ -104,6 +104,17 @@ type ChannelModelCatalogOption struct {
 }
 
 func (s *Service) FetchChannelModelCatalog(ctx context.Context, actor *model.User, input ChannelModelsRequest) ([]ChannelModelCatalogItem, error) {
+	// 功能开关：如果启用插件机制，使用新实现
+	if s.isPluginEnabled() {
+		return s.FetchChannelModelCatalogWithPlugin(ctx, actor, input)
+	}
+
+	// 否则使用原有实现（向后兼容）
+	return s.fetchChannelModelCatalogLegacy(ctx, actor, input)
+}
+
+// fetchChannelModelCatalogLegacy 原有的模型发现实现（支持 OpenAI 和 Gemini）
+func (s *Service) fetchChannelModelCatalogLegacy(ctx context.Context, actor *model.User, input ChannelModelsRequest) ([]ChannelModelCatalogItem, error) {
 	if actor == nil || strings.TrimSpace(actor.ID) == "" {
 		return nil, Unauthorized("请先登录")
 	}
