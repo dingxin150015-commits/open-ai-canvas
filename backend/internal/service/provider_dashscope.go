@@ -109,8 +109,8 @@ func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (ma
 
 
 // dashScopeImageDataURLs 下载 DashScope 图片 URL 并转为 data URL
-func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response dashScopeResponse) ([]string, error) {
-	images := make([]string, 0)
+func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response dashScopeResponse) ([]map[string]string, error) {
+	images := make([]map[string]string, 0)
 
 	// 优先处理同步模式的 choices 格式
 	if len(response.Output.Choices) > 0 {
@@ -127,7 +127,7 @@ func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response
 					return nil, fmt.Errorf("DashScope 图片下载失败：%w", err)
 				}
 				mimeType = normalizedMediaMimeType(mimeType, data)
-				images = append(images, dataURL(mimeType, data))
+				images = append(images, map[string]string{"dataUrl": dataURL(mimeType, data)})
 			}
 		}
 
@@ -154,7 +154,7 @@ func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response
 			return nil, fmt.Errorf("DashScope 图片下载失败：%w", err)
 		}
 		mimeType = normalizedMediaMimeType(mimeType, data)
-		images = append(images, dataURL(mimeType, data))
+		images = append(images, map[string]string{"dataUrl": dataURL(mimeType, data)})
 	}
 
 	if len(images) == 0 {
