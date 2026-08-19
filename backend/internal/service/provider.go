@@ -668,7 +668,16 @@ func runImageTask(ctx context.Context, input canvasGenerationInput) (map[string]
 		return runVolcengineArkImageTask(ctx, input)
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceDashScopeImage) {
+		fmt.Printf("[PROTOCOL DISPATCH] 进入 DashScope 图片协议处理\n")
+		fmt.Printf("[PROTOCOL DISPATCH] InterfaceType: %s\n", input.Config.InterfaceType)
+		fmt.Printf("[PROTOCOL DISPATCH] Model: %s\n", input.Config.Model)
+		fmt.Printf("[PROTOCOL DISPATCH] ChannelID: %s\n", input.Config.ChannelID)
 		return runDashScopeImageTask(ctx, input)
+	}
+
+	// DEBUG: 记录所有图片生成请求的协议类型
+	if capability := capabilityForProtocol(model.ChannelInterfaceType(input.Config.InterfaceType)); capability == "image" {
+		fmt.Printf("[PROTOCOL DISPATCH] 图片生成请求使用了其他协议: %s\n", input.Config.InterfaceType)
 	}
 	var payload imageResponse
 	if input.Mask != nil {
