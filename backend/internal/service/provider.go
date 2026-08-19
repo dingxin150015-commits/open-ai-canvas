@@ -613,6 +613,8 @@ func (s *Service) resolveProviderConfig(config providerConfig) (providerConfig, 
 		return providerConfig{}, errors.New("当前模型尚未配置请求协议")
 	}
 	config.InterfaceType = string(channelModel.Protocol)
+	// DEBUG: 记录从数据库读取的协议配置
+	fmt.Printf("[CONFIG LOAD] ChannelID: %s, Model: %s, Protocol: %s\n", channel.ID, modelName, channelModel.Protocol)
 	// 模型协议是实际请求契约；混合渠道中鉴权格式也必须随模型协议切换。
 	if config.InterfaceType == string(model.ChannelInterfaceGeminiVeo) {
 		config.APIFormat = "gemini"
@@ -658,6 +660,13 @@ func systemChannelIDFromBaseURL(baseURL string) string {
 }
 
 func runImageTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	// DEBUG: 记录所有图片生成请求的入口信息
+	fmt.Printf("[IMAGE TASK] 进入图片生成任务\n")
+	fmt.Printf("[IMAGE TASK] InterfaceType: %s\n", input.Config.InterfaceType)
+	fmt.Printf("[IMAGE TASK] Model: %s\n", input.Config.Model)
+	fmt.Printf("[IMAGE TASK] ChannelID: %s\n", input.Config.ChannelID)
+	fmt.Printf("[IMAGE TASK] BaseURL: %s\n", input.Config.BaseURL)
+
 	if input.Config.InterfaceType == string(model.ChannelInterfaceGrokImage) {
 		return runGrokImageTask(ctx, input)
 	}
