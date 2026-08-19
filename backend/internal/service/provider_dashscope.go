@@ -73,6 +73,11 @@ func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (ma
 		return nil, err
 	}
 
+	// DEBUG: 打印完整响应用于诊断
+	if responseJSON, err := json.MarshalIndent(response, "", "  "); err == nil {
+		fmt.Printf("[DashScope DEBUG] 完整响应:\n%s\n", string(responseJSON))
+	}
+
 	// 6. 检查响应格式并提取图片 URL
 	// 同步模式返回 choices 格式
 	if len(response.Output.Choices) > 0 && len(response.Output.Choices[0].Message.Content) > 0 {
