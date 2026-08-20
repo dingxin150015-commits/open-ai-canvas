@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,20 @@ import (
 )
 
 // runDashScopeImageTask 实现百炼（DashScope）图片生成协议（同步模式）
-// API 文档：https://help.aliyun.com/zh/model-studio/developer-reference/text-to-image-api
+//
+// API 文档：
+// - 千问图像编辑：https://platform.qianwenai.com/docs/api-reference/image-generation/qwen-image-editing
+// - 万相图像编辑：https://platform.qianwenai.com/docs/developer-guides/image-generation/wan-image-editing
+// - 模型选择指南：https://platform.qianwenai.com/docs/developer-guides/getting-started/image-models
+//
+// 支持的模型和能力（通过管理后台"最大参考图"配置）：
+// - qwen-image-3.0-pro / qwen-image-3.0: 1-3 张输入图像
+// - qwen-image-2.0-pro / qwen-image-2.0: 1-3 张输入图像
+// - wan2.7-image-pro / wan2.7-image: 0-9 张输入图像（0张=文生图模式）
+// - wan2.6-image: 1-4 张输入图像
+//
+// 参数限制由配置系统管理，在 validateImageTask 中统一验证。
+// 此函数只负责构建符合 DashScope 协议的请求格式。
 func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
 	if input.Mask != nil {
 		return nil, errors.New("DashScope 图片协议不支持蒙版编辑，请移除蒙版后重试")
@@ -33,18 +45,18 @@ func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (ma
 		})
 	}
 
-	// 2. 处理参考图（添加到 content 数组）
-	if len(input.ReferenceImages) > 0 {
-		if len(input.ReferenceImages) > 1 {
-			return nil, errors.New("DashScope 图片协议当前只支持 1 张参考图")
-		}
-		raw, _, err := mediaBytes(input.ReferenceImages[0])
+	// 2. 处理所有参考图（添加到 content 数组）
+	// 注意：参考图数量已在 validateImageTask 中验证，这里直接处理
+	for i, refImg := range input.ReferenceImages {
+		raw, mimeType, err := mediaBytes(refImg)
 		if err != nil {
-			return nil, fmt.Errorf("读取 DashScope 参考图失败：%w", err)
+			return nil, fmt.Errorf("读取第 %d 张参考图失败：%w", i+1, err)
 		}
-		// 参考图作为独立 content 对象（使用 data URL 格式）
+		// 使用实际的 MIME 类型（而不是硬编码为 image/png）
+		mimeType = normalizedMediaMimeType(mimeType, raw)
+		// 每张参考图作为独立 content 对象（使用 data URL 格式）
 		content = append(content, map[string]interface{}{
-			"image": "data:image/png;base64," + base64.StdEncoding.EncodeToString(raw),
+			"image": dataURL(mimeType, raw),
 		})
 	}
 
@@ -160,23 +172,35 @@ func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response
 }
 
 // normalizeDashScopeImageSize 规范化 DashScope 图片尺寸
-// 支持的尺寸：720*1280, 1280*720, 1024*1024 等
+// 支持的尺寸：720*1280, 1280*720, 1024*1024, 2048*2048, 4096*4096 等
 func normalizeDashScopeImageSize(value string) string {
 	size := strings.TrimSpace(value)
-	// 将 1024x1024 转为 1024*1024
-	size = strings.ReplaceAll(size, "x", "*")
-
-	// 常见尺寸映射
-	switch size {
-	case "1024*1024", "1:1":
-		return "1024*1024"
-	case "720*1280", "9:16":
-		return "720*1280"
-	case "1280*720", "16:9":
-		return "1280*720"
-	default:
-		return "1024*1024" // 默认正方形
+	if size == "" {
+		return "" // 返回空，让 API 使用服务端默认值
 	}
+
+	// 规范化格式：x 或 X -> *
+	size = strings.ReplaceAll(size, "x", "*")
+	size = strings.ReplaceAll(size, "X", "*")
+
+	// 常见比例别名映射
+	aliasMap := map[string]string{
+		"1:1":  "1024*1024",
+		"9:16": "720*1280",
+		"16:9": "1280*720",
+		"2:3":  "1024*1536",
+		"3:2":  "1536*1024",
+		"3:4":  "768*1024",
+		"4:3":  "1024*768",
+	}
+
+	if mapped, ok := aliasMap[size]; ok {
+		return mapped
+	}
+
+	// 已经是具体尺寸格式（如 "2048*2048"），直接返回
+	// 让配置系统和 API 验证是否合法
+	return size
 }
 
 // DashScope API 响应结构（同步模式使用 choices 格式）
