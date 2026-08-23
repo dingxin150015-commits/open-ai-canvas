@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { ArrowUp, AtSign, Boxes, ChevronDown, FileText, ImageIcon, ImagePlus, Maximize2, Music2, Pencil, SlidersHorizontal, Square, UserRound, Video } from "lucide-react";
-import { Button, Image as AntImage, Modal, Tooltip } from "antd";
+import { ArrowUp, AtSign, Boxes, ChevronDown, FileText, ImageIcon, ImagePlus, Maximize2, Music2, Pencil, SlidersHorizontal, UserRound, Video } from "lucide-react";
+import { Button, Image as AntImage, InputNumber, Modal, Tooltip } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, modelOptionName, resolveModelChannel, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
@@ -8,7 +8,7 @@ import { resolveCanvasGenerationModel } from "@/lib/canvas/canvas-project-genera
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { normalizeVideoDuration, normalizeVideoResolution } from "@/lib/video-generation-options";
-import { resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
+import { modelRequestOptions, resolveCompatibleModel, resolveModelGenerationDefaults, defaultImageParamsForModel, type ModelRequirements } from "@/lib/model-selection";
 import { navigateToSettings } from "@/lib/settings-navigation";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -30,7 +30,6 @@ type CanvasNodePromptPanelProps = {
     onPromptChange: (nodeId: string, prompt: string) => void;
     onConfigChange: (nodeId: string, patch: Partial<CanvasNodeMetadata>) => void;
     onGenerate: (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => void;
-    onStop: (nodeId: string) => void;
     mentionReferences?: CanvasResourceReference[];
     onImageSettingsOpenChange?: (open: boolean) => void;
     workspaceMode?: CanvasWorkspaceMode;
@@ -47,7 +46,7 @@ const PROMPT_EDITOR_VERTICAL_PADDING = 12;
 const PROMPT_EDITOR_EXPANDED_VERTICAL_PADDING = 20;
 const PROMPT_EDITOR_MAX_LINES = 8;
 
-export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfigChange, onGenerate, onStop, mentionReferences = [], onImageSettingsOpenChange, workspaceMode = "professional" }: CanvasNodePromptPanelProps) {
+export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfigChange, onGenerate, mentionReferences = [], onImageSettingsOpenChange, workspaceMode = "professional" }: CanvasNodePromptPanelProps) {
     const globalConfig = useEffectiveConfig();
     const themeName = useThemeStore((state) => state.theme);
     const theme = canvasThemes[themeName];
@@ -61,8 +60,8 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const [presetOpen, setPresetOpen] = useState(false);
     const [expandedPresetOpen, setExpandedPresetOpen] = useState(false);
     const [expandedPromptOpen, setExpandedPromptOpen] = useState(false);
-    const [promptContentHeight, setPromptContentHeight] = useState(PROMPT_EDITOR_MIN_HEIGHT);
-    const [expandedPromptContentHeight, setExpandedPromptContentHeight] = useState(PROMPT_EDITOR_EXPANDED_MIN_HEIGHT);
+    const [promptContentHeight, setPromptContentHeight] = useState(() => estimatePromptContentHeight(savedPrompt, false));
+    const [expandedPromptContentHeight, setExpandedPromptContentHeight] = useState(() => estimatePromptContentHeight(savedPrompt, true));
     const [manualPromptHeight, setManualPromptHeight] = useState<number | null>(null);
     const [manualExpandedPromptHeight, setManualExpandedPromptHeight] = useState<number | null>(null);
     const [paramsExpanded, setParamsExpanded] = useState(false); // #98 决策2：B区参数区折叠状态（手风琴）
@@ -77,7 +76,20 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
             characterCount: activeReferences.filter((item) => item.kind === "character").length,
         },
         videoOperation: node.metadata?.videoEditOperation,
-        videoSeconds: node.metadata?.seconds || globalConfig.videoSeconds,
+        videoSeconds: mode === "video" ? node.metadata?.seconds || globalConfig.videoSeconds : undefined,
+        options: modelRequestOptions({
+            ...globalConfig,
+            size: node.metadata?.size || globalConfig.size,
+            quality: node.metadata?.quality || globalConfig.quality,
+            count: String(node.metadata?.count || globalConfig.count),
+            videoSeconds: node.metadata?.seconds || globalConfig.videoSeconds,
+            vquality: node.metadata?.vquality || globalConfig.vquality,
+            videoGenerateAudio: node.metadata?.generateAudio || globalConfig.videoGenerateAudio,
+            videoWatermark: node.metadata?.watermark || globalConfig.videoWatermark,
+            audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice,
+            audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat,
+            audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed,
+        }, mode),
     };
     const config = buildNodeConfig(globalConfig, node, mode, requirements);
     const generationCount = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
@@ -91,7 +103,21 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     });
     const activeReferenceCount = activeReferences.length;
     const videoFrameOptions = mentionReferences.filter((item) => item.active && item.kind === "image").map((item) => ({ nodeId: item.nodeId, label: item.label, title: item.title, previewUrl: item.previewUrl }));
+    const hasVideoPromptTools = mode === "video" && !simpleMode && videoFrameOptions.length > 0;
     const monochromeAccent = theme.node.activeStroke;
+    const composerTokens = {
+        "--canvas-composer-surface": theme.node.panel,
+        "--canvas-composer-control-surface": theme.toolbar.itemHover,
+        "--canvas-composer-control-hover": theme.toolbar.activeBg,
+        "--canvas-composer-shadow": theme.node.shadow,
+        "--cn-text": theme.node.text,
+    } as CSSProperties;
+    const composerSurfaceStyle = {
+        ...composerTokens,
+        background: theme.node.panel,
+        color: theme.node.text,
+        boxShadow: theme.node.shadow,
+    } as CSSProperties;
     const controlSurface = "var(--canvas-composer-control-surface)";
     const promptBounds = promptEditorBounds(false, activeReferenceCount > 0);
     const expandedPromptBounds = promptEditorBounds(true, activeReferenceCount > 0);
@@ -108,8 +134,8 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     useEffect(() => {
         setExpandedPromptOpen(false);
         setExpandedPresetOpen(false);
-        setPromptContentHeight(PROMPT_EDITOR_MIN_HEIGHT);
-        setExpandedPromptContentHeight(PROMPT_EDITOR_EXPANDED_MIN_HEIGHT);
+        setPromptContentHeight(estimatePromptContentHeight(savedPrompt, false));
+        setExpandedPromptContentHeight(estimatePromptContentHeight(savedPrompt, true));
         setManualPromptHeight(null);
         setManualExpandedPromptHeight(null);
     }, [node.id]);
@@ -175,7 +201,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                     <Tooltip title="放大编辑">
                         <button
                             type="button"
-                            className="grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-white/[.06] hover:brightness-125 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 motion-reduce:hover:translate-y-0"
+                            className="canvas-node-composer-icon-button grid size-6 shrink-0 place-items-center rounded-md transition-[background-color,filter] hover:brightness-125 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 motion-reduce:hover:translate-y-0"
                             style={{ background: controlSurface, color: theme.node.text, outlineColor: monochromeAccent }}
                             onClick={() => setExpandedPromptOpen(true)}
                             aria-label="放大编辑提示词"
@@ -191,13 +217,12 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const renderSubmitButton = (expanded: boolean) => {
         const showCost = creditsEnabled && credits !== null;
         const formattedCredits = credits?.toLocaleString();
-        const actionLabel = isRunning ? "停止生成" : showCost ? `预计消耗 ${formattedCredits} 积分，生成` : "生成";
+        const actionLabel = isRunning ? "生成中" : showCost ? `预计消耗 ${formattedCredits} 积分，生成` : "生成";
         return (
             <Button
                 type="text"
                 className={`canvas-node-composer-submit ${showCost ? "has-cost" : ""}`}
-                danger={isRunning}
-                disabled={isSubmitDisabled}
+                disabled={isRunning || isSubmitDisabled}
                 style={
                     {
                         color: isSubmitDisabled ? theme.node.faint : theme.node.text,
@@ -205,7 +230,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                         "--canvas-composer-submit-action-fg": isSubmitDisabled ? theme.node.faint : theme.canvas.background,
                     } as CSSProperties
                 }
-                onClick={() => (isRunning ? onStop(node.id) : expanded ? submitExpandedPrompt() : submit())}
+                onClick={() => (expanded ? submitExpandedPrompt() : submit())}
                 aria-label={actionLabel}
                 title={actionLabel}
             >
@@ -216,7 +241,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                     </span>
                 ) : null}
                 <span className="canvas-node-composer-submit-action" aria-hidden>
-                    {isRunning ? <Square className="size-2.5 fill-current" /> : <ArrowUp className="size-3" />}
+                    {isRunning ? <span className="size-2.5 animate-pulse" aria-hidden="true" /> : <ArrowUp className="size-3" />}
                 </span>
             </Button>
         );
@@ -238,7 +263,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                         fullWidth
                         config={config}
                         value={config.model}
-                        onChange={(model) => onConfigChange(node.id, { model })}
+                        onChange={(model) => onConfigChange(node.id, mode === "image" ? { model, ...defaultImageParamsForModel(config, model) } : { model })}
                         capability={mode}
                         requirements={requirements}
                         onMissingConfig={() => navigateToSettings({ continueCreation: true })}
@@ -248,7 +273,19 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                     />
                 </div>
                 <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1">
-                    {mode === "image" ? (
+                    {mode === "text" ? (
+                        <Tooltip title={`文本生成份数（默认 1，可在生成配置中调整）`}>
+                            <InputNumber
+                                size="small"
+                                min={1}
+                                max={15}
+                                value={Math.max(1, Math.min(15, Math.floor(Math.abs(Number(node.metadata?.textCount) || 1))))}
+                                onChange={(value) => onConfigChange(node.id, { textCount: Math.max(1, Math.min(15, Math.floor(Math.abs(Number(value)) || 1))) })}
+                                aria-label="文本生成份数"
+                                className="!w-14 !h-7 [&_.ant-input-number-input]:!text-[var(--fs-tiny)]"
+                            />
+                        </Tooltip>
+                    ) : mode === "image" ? (
                         <CanvasImageSettingsPopover
                             config={config}
                             placement={expanded ? "topRight" : "topLeft"}
@@ -310,6 +347,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     return (
         <div
             className="canvas-node-composer"
+            style={composerSurfaceStyle}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
@@ -319,11 +357,11 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
             {renderPromptEditor(false)}
 
             {/* B区 参数区（对应 #98 决策2：默认折叠，手风琴展开）*/}
-            {mode === "video" && !simpleMode ? (
+            {hasVideoPromptTools ? (
                 <div className="canvas-node-composer-parameters overflow-hidden">
                     <button
                         type="button"
-                        className="flex w-full items-center gap-1.5 px-2 py-1 text-[var(--fs-micro)] font-medium transition-colors hover:bg-white/[.04]"
+                        className="canvas-node-composer-parameters-toggle flex w-full items-center gap-1.5 rounded-[var(--r-md)] px-2 py-1 text-[var(--fs-micro)] font-medium transition-colors"
                         style={{ color: theme.node.muted }}
                         onClick={() => setParamsExpanded(!paramsExpanded)}
                         aria-expanded={paramsExpanded}
@@ -356,14 +394,14 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                     setExpandedPromptOpen(false);
                 }}
                 styles={{
-                    container: { border: 0, borderRadius: "var(--canvas-composer-radius)", padding: 0, overflow: "hidden", background: "var(--canvas-composer-surface)", boxShadow: "var(--canvas-composer-shadow)" },
+                    container: { border: 0, borderRadius: "var(--canvas-composer-radius)", padding: 0, overflow: "hidden", background: theme.node.panel, boxShadow: theme.node.shadow },
                     body: { minHeight: 0, padding: 0 },
                 }}
             >
-                <div className="flex min-h-0 flex-col gap-2.5 p-3" style={{ color: theme.node.text }}>
+                <div className="flex min-h-0 flex-col gap-2.5 p-3" style={{ ...composerTokens, color: theme.node.text }}>
                     <div className="shrink-0 pr-8">{renderComposerHeader(true)}</div>
                     {renderPromptEditor(true)}
-                    {mode === "video" && !simpleMode ? (
+                    {hasVideoPromptTools ? (
                         <div className="canvas-node-composer-parameters shrink-0">
                             <CanvasVideoPromptTools metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
                         </div>
@@ -534,6 +572,15 @@ function promptEditorBounds(expanded: boolean, hasReferences: boolean) {
     return { min, max };
 }
 
+function estimatePromptContentHeight(value: string, expanded: boolean) {
+    if (!value.trim()) return expanded ? PROMPT_EDITOR_EXPANDED_MIN_HEIGHT : PROMPT_EDITOR_MIN_HEIGHT;
+    const charsPerLine = expanded ? 34 : 38;
+    const lineCount = value.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(Array.from(line).length / charsPerLine)), 0);
+    const lineHeight = expanded ? PROMPT_EDITOR_EXPANDED_LINE_HEIGHT : PROMPT_EDITOR_LINE_HEIGHT;
+    const verticalPadding = expanded ? PROMPT_EDITOR_EXPANDED_VERTICAL_PADDING : PROMPT_EDITOR_VERTICAL_PADDING;
+    return Math.max(expanded ? PROMPT_EDITOR_EXPANDED_MIN_HEIGHT : PROMPT_EDITOR_MIN_HEIGHT, lineCount * lineHeight + verticalPadding);
+}
+
 function clampPromptHeight(height: number, bounds: { min: number; max: number }) {
     return Math.min(bounds.max, Math.max(bounds.min, height));
 }
@@ -546,22 +593,51 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : mode === "audio" ? globalConfig.audioModel : globalConfig.textModel;
     const fallbackModel = mode === "image" ? defaultConfig.imageModel : mode === "video" ? defaultConfig.videoModel : mode === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
     const preferredModel = resolveCanvasGenerationModel(globalConfig, node.metadata?.model, mode) || resolveCanvasGenerationModel(globalConfig, defaultModel, mode) || fallbackModel;
-    const model = resolveCompatibleModel(globalConfig, preferredModel, requirements) || preferredModel;
+    const model = resolveCompatibleModel(globalConfig, preferredModel, mode === "image" ? { ...requirements, imageSize: node.metadata?.size || globalConfig.size || defaultConfig.size } : requirements) || preferredModel;
+    const defaults = resolveModelGenerationDefaults(
+        globalConfig,
+        model,
+        mode === "image" ? "image" : mode === "video" ? "video" : undefined,
+        mode === "image"
+            ? {
+                  size: node.metadata?.size,
+                  quality: node.metadata?.quality,
+                  transparentBackground: node.metadata?.transparentBackground,
+                  count: String(node.metadata?.count || globalConfig.canvasImageCount || globalConfig.count || defaultConfig.count),
+              }
+            : {
+                  size: node.metadata?.size,
+                  videoSeconds: node.metadata?.seconds,
+                  vquality: node.metadata?.vquality,
+                  videoGenerateAudio: node.metadata?.generateAudio,
+                  videoWatermark: node.metadata?.watermark,
+              },
+        {
+            size: globalConfig.size || defaultConfig.size,
+            quality: globalConfig.quality || defaultConfig.quality,
+            transparentBackground: globalConfig.transparentBackground || defaultConfig.transparentBackground,
+            count: String(globalConfig.canvasImageCount || globalConfig.count || defaultConfig.count),
+            videoSeconds: globalConfig.videoSeconds || defaultConfig.videoSeconds,
+            vquality: globalConfig.vquality || defaultConfig.vquality,
+            videoGenerateAudio: globalConfig.videoGenerateAudio || defaultConfig.videoGenerateAudio,
+            videoWatermark: globalConfig.videoWatermark || defaultConfig.videoWatermark,
+        },
+    );
     return {
         ...globalConfig,
         model,
-        quality: node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
-        size: node.metadata?.size || globalConfig.size || defaultConfig.size,
-        transparentBackground: (node.metadata?.transparentBackground || globalConfig.transparentBackground) === "true" ? "true" : "false",
-        videoSeconds: normalizeVideoDuration(node.metadata?.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds),
-        vquality: normalizeVideoResolution(node.metadata?.vquality || globalConfig.vquality || defaultConfig.vquality),
-        videoGenerateAudio: node.metadata?.generateAudio || globalConfig.videoGenerateAudio || defaultConfig.videoGenerateAudio,
-        videoWatermark: node.metadata?.watermark || globalConfig.videoWatermark || defaultConfig.videoWatermark,
+        quality: defaults.quality || globalConfig.quality || defaultConfig.quality,
+        size: defaults.size || globalConfig.size || defaultConfig.size,
+        transparentBackground: defaults.transparentBackground || "false",
+        videoSeconds: defaults.videoSeconds || normalizeVideoDuration(globalConfig.videoSeconds || defaultConfig.videoSeconds),
+        vquality: defaults.vquality || normalizeVideoResolution(globalConfig.vquality || defaultConfig.vquality),
+        videoGenerateAudio: defaults.videoGenerateAudio || globalConfig.videoGenerateAudio || defaultConfig.videoGenerateAudio,
+        videoWatermark: defaults.videoWatermark || globalConfig.videoWatermark || defaultConfig.videoWatermark,
         audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice || defaultConfig.audioVoice,
         audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed || defaultConfig.audioSpeed,
         audioInstructions: node.metadata?.audioInstructions || globalConfig.audioInstructions || defaultConfig.audioInstructions,
-        count: String(node.metadata?.count || (mode === "image" ? globalConfig.canvasImageCount || globalConfig.count : globalConfig.count) || defaultConfig.count),
+        count: defaults.count || String(node.metadata?.count || (mode === "image" ? globalConfig.canvasImageCount || globalConfig.count : globalConfig.count) || defaultConfig.count),
     };
 }
 
@@ -576,6 +652,7 @@ function videoConfigPatch(key: keyof AiConfig, value: string) {
     if (key === "videoSeconds") return { seconds: value };
     if (key === "videoGenerateAudio") return { generateAudio: value };
     if (key === "videoWatermark") return { watermark: value };
+    if (key === "videoArkPrivateAssetUpload") return { arkPrivateAssetUpload: value };
     return { [key]: value };
 }
 

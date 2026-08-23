@@ -11,10 +11,14 @@ import type { ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { useLocalDreaminaModelStore } from "@/stores/use-local-dreamina-model-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { DreaminaLocalModel } from "@/services/local-dreamina-model-catalog";
+import type { CapabilitySpec, PublicLogicalModelPriceTier } from "@/services/api/logical-models";
 
 export type ApiCallFormat = "openai" | "gemini";
 export type ChannelInterfaceType = ModelProtocol;
 export type ChannelHeader = { name: string; value: string };
+
+// 这是只读目录适配器的内部键，不是供应渠道或数据库实体 ID。
+export const PUBLIC_MODEL_CATALOG_ID = "managed";
 
 export type ModelChannel = {
     id: string;
@@ -27,6 +31,8 @@ export type ModelChannel = {
     apiFormat: ApiCallFormat;
     interfaceType?: ChannelInterfaceType;
     models: string[];
+    // 仅平台目录使用：将已保存的旧 SKU 选择重定向到当前模型家族。
+    modelAliases?: Record<string, string>;
     scope?: "system" | "user";
     enabled?: boolean;
     hasApiKey?: boolean;
@@ -35,14 +41,22 @@ export type ModelChannel = {
     modelCosts?: Array<{
         model: string;
         displayName?: string;
+        description?: string;
+        icon?: string;
         capability: ModelCapability;
         protocol?: ModelProtocol;
+        pricePolicy?: "channel" | "unified";
         billingMode: "fixed_request" | "per_second" | "token";
         unitPriceMicrocredits: number;
         inputTokenPriceMicrocredits?: number;
         outputTokenPriceMicrocredits?: number;
         cachedTokenPriceMicrocredits?: number;
         capabilityConfig?: ModelCapabilityConfig;
+        logicalModelId?: string;
+        logicalCapabilitySpec?: CapabilitySpec;
+        logicalCapabilityProfiles?: CapabilitySpec[];
+		logicalPriceTiers?: PublicLogicalModelPriceTier[];
+        defaultOptions?: Record<string, unknown>;
     }>;
     transport?: "backend-channel" | "local-runtime";
     localModels?: DreaminaLocalModel[];
@@ -67,6 +81,7 @@ export type AiConfig = {
     vquality: string;
     videoGenerateAudio: string;
     videoWatermark: string;
+    videoArkPrivateAssetUpload: string;
     systemPrompt: string;
     models: string[];
     imageModels: string[];
@@ -85,28 +100,20 @@ export type ModelCapability = "image" | "video" | "text" | "audio";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const OPENAI_BASE_URL = "https://api.openai.com";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+const LEGACY_DEFAULT_MODEL_NAMES = new Set(["gpt-image-2", "grok-imagine-video", "gpt-5.5", "gpt-4o-mini-tts"]);
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
     baseUrl: OPENAI_BASE_URL,
     apiKey: "",
     apiFormat: "openai",
-    channels: [
-        {
-            id: "default",
-            name: "默认渠道",
-            baseUrl: OPENAI_BASE_URL,
-            allowLocalChannel: false,
-            apiKey: "",
-            apiFormat: "openai",
-            models: ["gpt-image-2", "grok-imagine-video", "gpt-5.5", "gpt-4o-mini-tts"],
-        },
-    ],
-    model: "default::gpt-image-2",
-    imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
-    textModel: "default::gpt-5.5",
-    audioModel: "default::gpt-4o-mini-tts",
+    // 创作端模型目录只能来自后台公开逻辑模型和用户自定义渠道，不能内置供应商模型。
+    channels: [],
+    model: "",
+    imageModel: "",
+    videoModel: "",
+    textModel: "",
+    audioModel: "",
     audioVoice: "alloy",
     audioFormat: "mp3",
     audioSpeed: "1",
@@ -115,12 +122,13 @@ export const defaultConfig: AiConfig = {
     vquality: "720",
     videoGenerateAudio: "true",
     videoWatermark: "false",
+    videoArkPrivateAssetUpload: "true",
     systemPrompt: "",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
-    imageModels: ["default::gpt-image-2"],
-    videoModels: ["default::grok-imagine-video"],
-    textModels: ["default::gpt-5.5"],
-    audioModels: ["default::gpt-4o-mini-tts"],
+    models: [],
+    imageModels: [],
+    videoModels: [],
+    textModels: [],
+    audioModels: [],
     quality: "auto",
     size: "1:1",
     transparentBackground: "false",
@@ -235,14 +243,17 @@ export function filterModelsByCapability(models: string[], capability?: ModelCap
 }
 
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
-    if (!capability) return config.models;
-    return filterModelsByCapability(config.models, capability, config.channels);
+    // 选项目录只从当前有效渠道重建，不能信任旧快照里残留的 config.models。
+    // 这样旧版本内置模型、未绑定渠道的裸模型不会再次进入创作端。
+    const models = modelOptionsFromChannels(config.channels);
+    if (!capability) return models;
+    return filterModelsByCapability(models, capability, config.channels);
 }
 
 export function configuredModelMatchesCapability(config: AiConfig, model: string, capability?: ModelCapability) {
     const normalized = normalizeModelOptionValue(model, config.channels);
-    if (!normalized || !config.models.includes(normalized)) return false;
-    return capability ? selectableModelsByCapability(config, capability).includes(normalized) : true;
+    if (!normalized) return false;
+    return selectableModelsByCapability(config, capability).includes(normalized);
 }
 
 function isAiConfigReady(config: AiConfig, model: string) {
@@ -316,7 +327,7 @@ export function normalizeConfigSnapshot(snapshot: ConfigStoreSnapshot | undefine
             models,
             model,
             imageModel: normalizeSelectedModel(config.imageModel || model, channels, imageModels),
-            videoModel: normalizeSelectedModel(config.videoModel || "grok-imagine-video", channels, videoModels),
+            videoModel: normalizeSelectedModel(config.videoModel, channels, videoModels),
             textModel: normalizeSelectedModel(config.textModel || model, channels, textModels),
             audioModel: normalizeSelectedModel(config.audioModel || defaultConfig.audioModel, channels, audioModels),
             audioVoice: config.audioVoice || defaultConfig.audioVoice,
@@ -329,6 +340,7 @@ export function normalizeConfigSnapshot(snapshot: ConfigStoreSnapshot | undefine
             vquality: normalizeVideoResolution(config.vquality),
             videoGenerateAudio: config.videoGenerateAudio || "true",
             videoWatermark: config.videoWatermark || "false",
+            videoArkPrivateAssetUpload: config.videoArkPrivateAssetUpload || "true",
             transparentBackground: config.transparentBackground === "true" ? "true" : "false",
             canvasImageCount: config.canvasImageCount || defaultConfig.canvasImageCount,
             imageModels,
@@ -437,12 +449,19 @@ export function modelDisplayName(config: AiConfig, value: string) {
     return channel.scope === "system" ? "系统模型" : model;
 }
 
+export function modelIcon(config: AiConfig, value: string) {
+    const model = modelOptionName(value);
+    return resolveModelChannel(config, value).modelCosts?.find((item) => item.model === model)?.icon || "";
+}
+
 export function modelOptionLabel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
     if (!decoded) return modelDisplayName(config, value);
     const channel = config.channels.find((item) => item.id === decoded.channelId);
     const displayName = modelDisplayName(config, value);
-    return channel ? `${displayName}（${channel.name}）` : displayName;
+    // 平台前台模型只展示公开名称；供应来源和内部目录适配器不属于创作端信息。
+    if (!channel || channel.scope === "system") return displayName;
+    return `${displayName}（${channel.name}）`;
 }
 
 export function modelOptionsFromChannels(channels: ModelChannel[]) {
@@ -459,7 +478,20 @@ export function modelOptionsFromChannels(channels: ModelChannel[]) {
 
 export function hasSystemModelPrice(channel: ModelChannel, model: string) {
     if (channel.scope !== "system") return true;
-    return channel.modelCosts?.some((item) => item.model === model && Number.isFinite(item.unitPriceMicrocredits) && item.unitPriceMicrocredits >= 0) === true;
+    const positive = (value: number | undefined) => typeof value === "number" && Number.isFinite(value) && value > 0;
+    return channel.modelCosts?.some((item) => {
+        if (item.model !== model) return false;
+        const tiers = item.logicalPriceTiers || [];
+        if (tiers.length) {
+            return tiers.some((tier) => tier.billingMode === "token"
+                ? [tier.inputTokenPriceMicrocredits, tier.outputTokenPriceMicrocredits, tier.cachedTokenPriceMicrocredits].some(positive)
+                : positive(tier.unitPriceMicrocredits));
+        }
+        if (item.billingMode === "token") {
+            return [item.inputTokenPriceMicrocredits, item.outputTokenPriceMicrocredits, item.cachedTokenPriceMicrocredits].some(positive);
+        }
+        return positive(item.unitPriceMicrocredits);
+    }) === true;
 }
 
 export function normalizeModelOptionValue(value: unknown, channels: ModelChannel[]) {
@@ -468,10 +500,12 @@ export function normalizeModelOptionValue(value: unknown, channels: ModelChannel
     const decoded = decodeChannelModel(model);
     if (decoded) {
         const channel = channels.find((item) => item.id === decoded.channelId);
-        return channel && channel.models.includes(decoded.model) ? model : "";
+        const resolved = channel?.modelAliases?.[decoded.model] || decoded.model;
+        return channel && channel.models.includes(resolved) ? encodeChannelModel(channel.id, resolved) : "";
     }
-    const channel = channels.find((item) => item.models.includes(model)) || channels[0];
-    return channel && channel.models.includes(model) ? encodeChannelModel(channel.id, model) : "";
+    const channel = channels.find((item) => item.models.includes(model) || Boolean(item.modelAliases?.[model])) || channels[0];
+    const resolved = channel?.modelAliases?.[model] || model;
+    return channel && channel.models.includes(resolved) ? encodeChannelModel(channel.id, resolved) : "";
 }
 
 export function resolveModelChannel(config: AiConfig, value: string) {
@@ -479,6 +513,11 @@ export function resolveModelChannel(config: AiConfig, value: string) {
     const model = decoded?.model || value;
     const matched = decoded ? config.channels.find((channel) => channel.id === decoded.channelId) : config.channels.find((channel) => channel.models.includes(model));
     return matched || config.channels[0] || createModelChannel({ id: "default", name: "默认渠道", baseUrl: config.baseUrl, apiKey: config.apiKey, apiFormat: config.apiFormat, models: config.models.map(modelOptionName) });
+}
+
+export function logicalModelIDForConfig(config: AiConfig) {
+    const channel = resolveModelChannel(config, config.model);
+    return channel.modelCosts?.find((item) => item.model === modelOptionName(config.model))?.logicalModelId || "";
 }
 
 export function channelConnectionSignature(channel: ModelChannel) {
@@ -498,7 +537,7 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
         apiKey: channel.apiKey,
         secretKey: channel.secretKey,
         headers: channel.headers,
-        apiFormat: interfaceType ? (interfaceType === "gemini-veo" ? ("gemini" as const) : ("openai" as const)) : channel.apiFormat,
+        apiFormat: interfaceType ? (interfaceType === "gemini-veo" || interfaceType === "gemini-image" ? ("gemini" as const) : ("openai" as const)) : channel.apiFormat,
         interfaceType,
         channelId: channel.scope === "system" ? channel.id : "",
     });
@@ -537,8 +576,9 @@ function isEmptyDefaultChannel(channel: ModelChannel) {
     const baseUrl = channel.baseUrl.trim().replace(/\/+$/, "");
     const defaultBaseUrl = defaultConfig.baseUrl.trim().replace(/\/+$/, "");
     if (baseUrl && baseUrl !== defaultBaseUrl) return false;
-    const defaultModels = new Set((defaultConfig.channels[0]?.models || []).map(modelOptionName));
-    return !channel.models.length || channel.models.every((model) => defaultModels.has(modelOptionName(model)));
+    // 只清理旧版本写入浏览器的无密钥“默认渠道”和内置模型；没有 API Key 但已填写自定义模型时仍保留，
+    // 让用户可以先保存模型目录再补充密钥，而不是把真实自定义配置误判为空。
+    return !channel.models.length || channel.models.every((model) => LEGACY_DEFAULT_MODEL_NAMES.has(modelOptionName(model)));
 }
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
@@ -546,10 +586,11 @@ export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
 }
 
 export function defaultBaseUrlForChannelInterface(interfaceType?: ChannelInterfaceType) {
-    if (interfaceType === "gemini-veo") return GEMINI_BASE_URL;
+    if (interfaceType === "gemini-veo" || interfaceType === "gemini-image") return GEMINI_BASE_URL;
     if (interfaceType === "novita-video") return "https://api.novita.ai/v3";
     if (interfaceType === "volcengine-ark-image" || interfaceType === "volcengine-ark-video") return "https://ark.cn-beijing.volces.com/api/v3";
     if (interfaceType === "volcengine-jimeng-image" || interfaceType === "volcengine-jimeng-video") return "https://visual.volcengineapi.com";
+    if (interfaceType === "minimax-video") return "https://api.minimaxi.com";
     if (interfaceType === "grok-image" || interfaceType === "newapi" || interfaceType === "newapi-channel-1" || interfaceType === "newapi-channel-2" || interfaceType === "xai-video") return "";
     return OPENAI_BASE_URL;
 }

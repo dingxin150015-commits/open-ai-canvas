@@ -1,5 +1,5 @@
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "@/constant/canvas";
-import { STORYBOARD_HEADER_HEIGHT, STORYBOARD_ROW_HEIGHT, storyboardTableHeight } from "@/components/canvas/canvas-script-node";
+import { STORYBOARD_HEADER_HEIGHT, STORYBOARD_ROW_HEIGHT, storyboardTableHeight } from "@/lib/canvas/canvas-storyboard-layout";
 import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
 import type { NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
 import { isFrameNode } from "@/lib/canvas/canvas-frame";
@@ -45,7 +45,7 @@ export function createCanvasNode(type: CanvasNodeType, position: Position, metad
         width: spec.width,
         height: spec.height,
         metadata: type === CanvasNodeType.Script
-            ? { ...spec.metadata, ...metadata, storyboard: metadata?.storyboard || { rows: [1, 2, 3].map((shotNumber) => createStoryboardRow(shotNumber)), visibleColumns: ["shotNumber", "durationSeconds", "plotDescription", "dialogue"], referenceNodeIds: [] } }
+            ? { ...spec.metadata, ...metadata, storyboard: metadata?.storyboard || { rows: [1, 2, 3].map((shotNumber) => createStoryboardRow(shotNumber)), visibleColumns: ["shotNumber", "plotDescription", "videoMotionPrompt", "dialogue"], referenceNodeIds: [] } }
             : { ...spec.metadata, ...metadata, ...(type === CanvasNodeType.Drawing ? { drawingId: metadata?.drawingId || `${id}-document` } : {}) },
     };
 }
@@ -90,7 +90,7 @@ export function storyboardPromptTemplateMetadata(row: StoryboardRow, kind: "imag
 
 export function cinematicStoryboardColumns(columns?: StoryboardColumn[]): StoryboardColumn[] {
     return Array.from(new Set([
-        ...(columns || ["shotNumber", "durationSeconds", "plotDescription", "dialogue"]),
+        ...(columns || ["shotNumber", "plotDescription", "videoMotionPrompt", "dialogue"]),
         "shotSize",
         "narrativeIntent",
         "viewerPOV",
@@ -126,23 +126,54 @@ export function storyboardRowsFromTask(task: GenerationTask) {
 }
 
 
+// 模型切换时必须清理的节点级生成参数：这些参数属于旧模型的能力档位（分辨率/宽高比/质量等），
+// 新模型不支持时若残留，会在 buildNodeConfig 的「节点优先、全局兜底」合并中反复叠加（issue #254）。
+const NODE_MODEL_GENERATION_PARAMS: ReadonlyArray<keyof CanvasNodeMetadata> = [
+    "size",
+    "quality",
+    "transparentBackground",
+    "count",
+    "seconds",
+    "vquality",
+    "generateAudio",
+    "watermark",
+    "audioVoice",
+    "audioFormat",
+    "audioSpeed",
+    "audioInstructions",
+];
+
 export function applyNodeConfigPatch(node: CanvasNodeData, patch: Partial<CanvasNodeMetadata>) {
     const safePatch = patch || {};
-    const next = { ...node, metadata: { ...node.metadata, ...safePatch } };
+    const nextPatch = resetGenerationParamsOnModelSwitch(node, safePatch);
+    const next = { ...node, metadata: { ...node.metadata, ...nextPatch } };
     const spec = node.type === CanvasNodeType.Video ? NODE_DEFAULT_SIZE[CanvasNodeType.Video] : NODE_DEFAULT_SIZE[CanvasNodeType.Image];
     const size = typeof safePatch.size === "string" && !node.metadata?.content ? nodeSizeFromRatio(safePatch.size, spec.width, spec.height) : null;
     return size && (node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video) ? { ...next, ...size, position: { x: node.position.x + node.width / 2 - size.width / 2, y: node.position.y + node.height / 2 - size.height / 2 } } : next;
 }
 
-export function getConnectionTargetAnchor(node: CanvasNodeData, current: ConnectionHandle, handleId?: string, scrollTop = 0, anchorRatio?: number) {
-    return {
-        x: current.handleType === "source" ? node.position.x : node.position.x + node.width,
-        y: storyboardHandleY(node, handleId, scrollTop) ?? node.position.y + node.height * normalizeAnchorRatio(anchorRatio),
-    };
+// 切换模型（不同模型标识）时，节点级生成参数必须随旧模型一起失效，回落全局配置；
+// 显式传入的同批 patch（如用户同时调整了参数）仍然优先。
+function resetGenerationParamsOnModelSwitch(node: CanvasNodeData, patch: Partial<CanvasNodeMetadata>): Partial<CanvasNodeMetadata> {
+    if (typeof patch.model !== "string" || patch.model === node.metadata?.model) {
+        return patch;
+    }
+    const reset: Partial<CanvasNodeMetadata> = {};
+    for (const key of NODE_MODEL_GENERATION_PARAMS) {
+        reset[key] = undefined;
+    }
+    return { ...reset, ...patch };
 }
 
-function normalizeAnchorRatio(value?: number) {
-    return typeof value === "number" && Number.isFinite(value) ? clamp(value, 0.06, 0.94) : 0.5;
+/**
+ * 连线落到目标节点上的吸附点。单端口一侧取边的正中——与 connectionHandleY 保持同一个
+ * 口径，否则吸附点和实际画出来的线会对不上（这两处是同一规则的两份实现，改一处必错）。
+ */
+export function getConnectionTargetAnchor(node: CanvasNodeData, current: ConnectionHandle, handleId?: string, scrollTop = 0) {
+    return {
+        x: current.handleType === "source" ? node.position.x : node.position.x + node.width,
+        y: storyboardHandleY(node, handleId, scrollTop) ?? node.position.y + node.height / 2,
+    };
 }
 
 export function storyboardHandleAtY(node: CanvasNodeData, worldY: number, scrollTop = 0) {
@@ -209,7 +240,7 @@ export function attachNodeToStoryboardRow(nodes: CanvasNodeData[], connection: P
                     rows: (storyboard?.rows || []).map((item) => item.id !== rowId ? item : scriptNodeId === connection.fromNodeId
                         ? { ...item, imageNodeId: linkedNode.type === CanvasNodeType.Image ? linkedNode.id : item.imageNodeId, videoNodeId: linkedNode.type === CanvasNodeType.Video ? linkedNode.id : item.videoNodeId }
                         : { ...item, referenceNodeIds: Array.from(new Set([...(item.referenceNodeIds || []), linkedNode.id])) }),
-                    visibleColumns: storyboard?.visibleColumns || ["shotNumber", "durationSeconds", "plotDescription", "dialogue"],
+                    visibleColumns: storyboard?.visibleColumns || ["shotNumber", "plotDescription", "videoMotionPrompt", "dialogue"],
                     referenceNodeIds: handleId === "storyboard:context" ? Array.from(new Set([...(storyboard?.referenceNodeIds || []), linkedNode.id])) : storyboard?.referenceNodeIds || [],
                 },
             },

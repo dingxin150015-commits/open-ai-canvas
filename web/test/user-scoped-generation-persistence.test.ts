@@ -8,13 +8,54 @@ import { switchUserStorageScope } from "../src/lib/user-session";
 import { canvasCinematicContinuationEntryAdapters } from "../src/components/canvas/canvas-assistant-panel";
 import { activeGenerationConsumerController, beginGenerationConsumer, runGenerationConsumer } from "../src/services/generation-consumer-lifecycle";
 import { createCanvasGenerationLiveProjectAdapter, persistCanvasCinematicSessionContinuationEffect, persistCanvasGenerationEffect, registerCanvasGenerationLiveProject } from "../src/services/canvas-generation-consumer";
-import { CREATION_CONVERSATIONS_KEY, loadCreationConversations, pendingCreationTaskIds, saveCreationConversations } from "../src/services/creation-conversation-store";
+import { CREATION_CONVERSATIONS_KEY, loadCreationConversations, pendingCreationTaskIds, pendingCreationTaskKey, saveCreationConversations } from "../src/services/creation-conversation-store";
+import { recoverCreationTextTask } from "../src/services/creation-text-task-recovery";
 import { ASSET_STORE_KEY, flushAssetStorePersistence, useAssetStore, type Asset, type NewAsset } from "../src/stores/use-asset-store";
 import { withGenerationAssetStorageLock } from "../src/services/generation-asset-repository";
 import { CANVAS_STORE_KEY, flushCanvasStorePersistence, useCanvasStore, withCanvasStorePersistenceLock, withCanvasStorePersistenceSuppressed, type CanvasProject } from "../src/stores/canvas/use-canvas-store";
 import { CanvasNodeType, type CanvasAssistantSession, type CanvasConnection, type CanvasNodeData } from "../src/types/canvas";
-import { deleteAssetWithRemoteSync, resetRemoteUserDataSync, syncRemoteUserData, withRemoteUserDataSyncPaused } from "../src/services/user-data-sync";
+import { deleteAssetWithRemoteSync, deleteCanvasProjectsWithRemoteSync, resetRemoteUserDataSync, syncRemoteUserData, withRemoteUserDataSyncPaused } from "../src/services/user-data-sync";
 import { apiClient } from "../src/services/api/request";
+
+test("creation recovery observes streaming text tasks after reload", () => {
+    const conversations = [{
+        id: "conversation-text-recovery",
+        messages: [
+            { id: "text-streaming", role: "assistant" as const, mode: "text", status: "streaming", taskIds: ["task-text"] },
+            { id: "text-done", role: "assistant" as const, mode: "text", status: "done", taskIds: ["task-text-done"] },
+            { id: "image-pending", role: "assistant" as const, mode: "image", status: "pending", taskIds: ["task-image"] },
+        ],
+    }];
+
+    expect(pendingCreationTaskIds(conversations)).toEqual(["task-text", "task-image"]);
+    expect(pendingCreationTaskKey(conversations)).toContain("conversation-text-recovery:text-streaming:task-text");
+});
+
+test("creation recovery restores completed text and terminal status", () => {
+    const message = { mode: "text", status: "streaming", content: "", taskIds: ["task-text"] };
+    const baseTask = {
+        id: "task-text",
+        type: "canvas_text",
+        prompt: "写一篇小说",
+        attempts: 1,
+        createdAt: "2026-08-19T22:47:51.000Z",
+        updatedAt: "2026-08-19T22:48:39.000Z",
+    };
+
+    expect(recoverCreationTextTask(message, [{ ...baseTask, status: "running" }])).toBeNull();
+    expect(recoverCreationTextTask(message, [{ ...baseTask, status: "succeeded", resultJson: JSON.stringify({ mode: "text", text: "恢复后的正文" }) }])).toEqual({
+        status: "done",
+        content: "恢复后的正文",
+        error: undefined,
+        taskIds: ["task-text"],
+    });
+    expect(recoverCreationTextTask(message, [{ ...baseTask, status: "failed", error: "渠道请求失败" }])).toEqual({
+        status: "error",
+        content: "生成失败",
+        error: "渠道请求失败",
+        taskIds: ["task-text"],
+    });
+});
 
 function generatedAsset(title: string): NewAsset {
     return {
@@ -3937,6 +3978,7 @@ test("account scope transition drains an active remote deletion before entering 
     const localStorageValues = new Map<string, string>();
     const previousAdapter = apiClient.defaults.adapter;
     const previousAssets = useAssetStore.getState().assets;
+    const requestUrls: string[] = [];
     let releaseDelete!: () => void;
     const deleteReleased = new Promise<void>((resolve) => {
         releaseDelete = resolve;
@@ -3944,12 +3986,13 @@ test("account scope transition drains an active remote deletion before entering 
     let deleteStarted = false;
     apiClient.defaults.adapter = async (config) => {
         const url = String(config.url || "");
+        requestUrls.push(url);
         if (config.method === "delete") {
             deleteStarted = true;
             await deleteReleased;
             return { data: { code: 0, data: { id: "shared-asset" }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
         }
-        const data = url.includes("canvas-projects") ? { projects: [] } : { assets: [] };
+        const data = url.includes("user-data/snapshot") ? { projects: [], assets: [] } : url.includes("canvas-projects") ? { projects: [] } : { assets: [] };
         return { data: { code: 0, data, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
     };
     Object.defineProperty(globalThis, "window", {
@@ -3972,6 +4015,8 @@ test("account scope transition drains an active remote deletion before entering 
     try {
         useAssetStore.getState().replaceAssets([]);
         await syncRemoteUserData("account-A");
+        expect(requestUrls.filter((url) => url.includes("user-data/snapshot"))).toHaveLength(1);
+        expect(requestUrls.some((url) => /\/(assets|canvas-projects)\/[^/]+/.test(url))).toBe(false);
         useAssetStore.getState().replaceAssets([
             {
                 id: "shared-asset",
@@ -4005,6 +4050,56 @@ test("account scope transition drains an active remote deletion before entering 
         resetRemoteUserDataSync();
         useAssetStore.getState().replaceAssets(previousAssets);
         await flushAssetStorePersistence();
+        localforage.getItem = originalGetItem;
+        localforage.setItem = originalSetItem;
+        apiClient.defaults.adapter = previousAdapter;
+        if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+        else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+    }
+});
+
+test("canvas deletion removes the remote project before updating local state", async () => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    const originalGetItem = localforage.getItem.bind(localforage);
+    const originalSetItem = localforage.setItem.bind(localforage);
+    const previousAdapter = apiClient.defaults.adapter;
+    const previousProjects = useCanvasStore.getState().projects;
+    const requestUrls: string[] = [];
+    const project = storedCanvasProject("canvas-delete", "待删除画布");
+    let remoteProjects = [project];
+
+    apiClient.defaults.adapter = async (config) => {
+        const url = String(config.url || "");
+        requestUrls.push(`${String(config.method || "get").toLowerCase()} ${url}`);
+        if (String(config.method || "").toLowerCase() === "delete") {
+            remoteProjects = remoteProjects.filter((item) => item.id !== project.id);
+            return { data: { code: 0, data: { id: project.id }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+        }
+        const data = url.includes("user-data/snapshot") ? { projects: remoteProjects, assets: [] } : { projects: [] };
+        return { data: { code: 0, data, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+    };
+    Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: {
+            setTimeout: () => 1,
+            clearTimeout: () => undefined,
+            localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+        },
+    });
+    localforage.getItem = (async () => null) as typeof localforage.getItem;
+    localforage.setItem = (async (_key: string, value: string) => value) as typeof localforage.setItem;
+    try {
+        resetRemoteUserDataSync();
+        useCanvasStore.setState({ projects: [project] });
+        await syncRemoteUserData("account-A");
+        await deleteCanvasProjectsWithRemoteSync([project.id]);
+        await syncRemoteUserData("account-A");
+
+        expect(requestUrls).toContain(`delete /canvas-projects/${project.id}`);
+        expect(useCanvasStore.getState().projects.some((item) => item.id === project.id)).toBe(false);
+    } finally {
+        resetRemoteUserDataSync();
+        useCanvasStore.setState({ projects: previousProjects });
         localforage.getItem = originalGetItem;
         localforage.setItem = originalSetItem;
         apiClient.defaults.adapter = previousAdapter;

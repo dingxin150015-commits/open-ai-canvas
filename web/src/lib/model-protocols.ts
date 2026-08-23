@@ -7,6 +7,7 @@ export type ModelProtocol =
     | "volcengine-jimeng-image"
     | "dashscope-image"
     | "dashscope-video"
+    | "gemini-image"
     | "openai-audio"
     | "async-audio"
     | "newapi"
@@ -16,7 +17,8 @@ export type ModelProtocol =
     | "volcengine-ark-video"
     | "volcengine-jimeng-video"
     | "gemini-veo"
-    | "novita-video";
+    | "novita-video"
+    | "minimax-video";
 
 export type ProtocolCapability = "text" | "image" | "video" | "audio";
 
@@ -39,6 +41,7 @@ export const MODEL_PROTOCOLS: ModelProtocolDefinition[] = [
     { value: "volcengine-jimeng-image", label: "即梦官方图片", capability: "image", create: "POST CVSync2AsyncSubmitTask", poll: "POST CVSync2AsyncGetResult", contentType: "application/json + AK/SK 签名", media: "0-14 张参考图，模型标识填写 req_key" },
     { value: "dashscope-image", label: "DashScope 图片", capability: "image", create: "POST /api/v1/services/aigc/multimodal-generation/generation", contentType: "application/json (同步模式)", media: "文生图与参考图，content 多模态数组格式" },
     { value: "dashscope-video", label: "DashScope 视频", capability: "video", create: "POST /services/aigc/video-generation/video-synthesis", poll: "GET /tasks/{task_id}", contentType: "application/json (异步模式)", media: "文生视频、图生视频、参考生视频，media 多模态数组" },
+    { value: "gemini-image", label: "Gemini Images", capability: "image", create: "POST /v1beta/models/{model}:generateContent", contentType: "application/json", media: "文生图、图片编辑与多张内嵌参考图" },
     { value: "openai-audio", label: "OpenAI Audio", capability: "audio", create: "POST /v1/audio/speech", contentType: "application/json", media: "文本转语音" },
     { value: "async-audio", label: "异步音频任务", capability: "audio", create: "POST /v1/audio/tasks", poll: "GET /v1/audio/tasks/{task_id}", contentType: "application/json", media: "语音、音效与音乐生成" },
     { value: "newapi", label: "OpenAI / NewAPI Videos", capability: "video", create: "POST /v1/videos", poll: "GET /v1/videos/{task_id}", contentType: "multipart/form-data", media: "input_reference[] 参考图" },
@@ -65,6 +68,7 @@ export const MODEL_PROTOCOLS: ModelProtocolDefinition[] = [
     { value: "volcengine-jimeng-video", label: "即梦官方视频", capability: "video", create: "POST CVSync2AsyncSubmitTask", poll: "POST CVSync2AsyncGetResult", contentType: "application/json + AK/SK 签名", media: "文本或一张首帧图，模型标识填写 req_key" },
     { value: "gemini-veo", label: "Gemini Veo", capability: "video", create: "POST /v1beta/models/{model}:predictLongRunning", poll: "GET /v1beta/{operation_name}", contentType: "application/json", media: "文本与单张起始图" },
     { value: "novita-video", label: "Novita 视频", capability: "video", create: "POST /v3/video/create", poll: "GET /v3/async/task-result?task_id={id}", contentType: "application/json", media: "文本或单张起始图" },
+    { value: "minimax-video", label: "MiniMax 视频", capability: "video", create: "POST /v2/video_generation", poll: "GET /v2/query/video_generation/{task_id}", contentType: "application/json", media: "文本、图片、视频、音频参考素材" },
 ];
 
 export const MODEL_PROTOCOL_OPTIONS = protocolGroups(MODEL_PROTOCOLS.filter((item) => !item.value.startsWith("volcengine-jimeng-")));
@@ -100,6 +104,7 @@ export function protocolForModelCatalog(endpointTypes: string[] = []): ModelProt
     const normalized = new Set(endpointTypes.map((value) => value.trim().toLowerCase()));
     if (normalized.has("openai-chat") || normalized.has("chat-completion") || normalized.has("chat")) return "chat-completion";
     if (normalized.has("openai-response") || normalized.has("responses")) return "openai-response";
+    if (normalized.has("gemini-image") || normalized.has("gemini-images")) return "gemini-image";
     if (normalized.has("openai-image") || normalized.has("image")) return "openai-image";
     if (normalized.has("openai-video") || normalized.has("video")) return "newapi-channel-2";
     if (normalized.has("openai-audio") || normalized.has("audio")) return "openai-audio";
