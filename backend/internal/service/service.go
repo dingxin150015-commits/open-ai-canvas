@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -379,6 +380,7 @@ func (s *Service) CreateTask(userID string, req CreateTaskRequest) (*model.Task,
 	}
 	s.recordActivity(userID, "task", 1)
 	_ = s.log(userID, task.ID, "info", "任务已进入队列", "")
+	log.Printf("[TRACE-1 CreateTask] taskID=%s type=%s model=%s provider=%s operation=%s", task.ID, task.Type, task.Model, task.Provider, task.Operation)
 	return taskForOutput(task), nil
 }
 
@@ -913,7 +915,9 @@ func (s *Service) processClaimedTask(task *model.Task) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), taskExecutionTimeoutWithPolicy(task.Type, policy.Task))
+	execTimeout := taskExecutionTimeoutWithPolicy(task.Type, policy.Task)
+	log.Printf("[TRACE-2 ClaimedTask] taskID=%s type=%s model=%s execTimeout=%v", task.ID, task.Type, task.Model, execTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), execTimeout)
 	defer cancel()
 	leaseDone := make(chan struct{})
 	leaseLost := make(chan error, 1)
@@ -1112,6 +1116,7 @@ func (s *Service) processTask(ctx context.Context, task model.Task) (map[string]
 		return s.processStoryboardRowsTask(ctx, task)
 	}
 	if strings.HasPrefix(task.Type, "canvas_") || canRunProviderTask(task) {
+		log.Printf("[TRACE-3 processTask] taskID=%s type=%s → 进入 provider 生成链路", task.ID, task.Type)
 		result, err := s.processCanvasGenerationTask(ctx, task.UserID, task.ProjectID, task.Type, task.Prompt, task.InputJSON)
 		return result, nil, err
 	}
@@ -1119,6 +1124,7 @@ func (s *Service) processTask(ctx context.Context, task model.Task) (map[string]
 		return s.processAgentStoryboardTask(ctx, task)
 	}
 	if strings.HasPrefix(task.Type, "video_") {
+		log.Printf("[TRACE-3 processTask] taskID=%s type=%s → ⚠️ 落入 buildVideoWorkflowResult（未走 provider，canRunProviderTask=false）", task.ID, task.Type)
 		result, ops := buildVideoWorkflowResult(task)
 		return result, ops, nil
 	}
@@ -1128,18 +1134,23 @@ func (s *Service) processTask(ctx context.Context, task model.Task) (map[string]
 
 func canRunProviderTask(task model.Task) bool {
 	if !strings.HasPrefix(task.Type, "video_") || strings.TrimSpace(task.InputJSON) == "" {
+		log.Printf("[TRACE-3a canRunProviderTask] taskID=%s → false（type 前缀不符或 InputJSON 为空，type=%s）", task.ID, task.Type)
 		return false
 	}
 	var input map[string]any
 	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
+		log.Printf("[TRACE-3a canRunProviderTask] taskID=%s → false（InputJSON 解析失败：%v）", task.ID, err)
 		return false
 	}
 	mode, _ := input["mode"].(string)
 	config, ok := input["config"].(map[string]any)
 	if mode != "video" || !ok || strings.TrimSpace(fmt.Sprint(config["model"])) == "" {
+		log.Printf("[TRACE-3a canRunProviderTask] taskID=%s → false（mode=%q configOK=%v model=%q）", task.ID, mode, ok, fmt.Sprint(config["model"]))
 		return false
 	}
-	return strings.TrimSpace(fmt.Sprint(config["channelId"])) != "" || (strings.TrimSpace(fmt.Sprint(config["baseUrl"])) != "" && strings.TrimSpace(fmt.Sprint(config["apiKey"])) != "")
+	result := strings.TrimSpace(fmt.Sprint(config["channelId"])) != "" || (strings.TrimSpace(fmt.Sprint(config["baseUrl"])) != "" && strings.TrimSpace(fmt.Sprint(config["apiKey"])) != "")
+	log.Printf("[TRACE-3a canRunProviderTask] taskID=%s → %v（channelId=%q interfaceType=%q）", task.ID, result, fmt.Sprint(config["channelId"]), fmt.Sprint(config["interfaceType"]))
+	return result
 }
 
 func (s *Service) processAgentStoryboardTask(ctx context.Context, task model.Task) (map[string]interface{}, []map[string]interface{}, error) {

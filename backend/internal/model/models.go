@@ -75,6 +75,7 @@ const (
 	ChannelInterfaceGeminiVeo             ChannelInterfaceType = "gemini-veo"
 	ChannelInterfaceNovitaVideo           ChannelInterfaceType = "novita-video"
 	ChannelInterfaceDashScopeImage        ChannelInterfaceType = "dashscope-image"
+	ChannelInterfaceDashScopeVideo        ChannelInterfaceType = "dashscope-video"
 
 	ApiCallStatusSucceeded ApiCallStatus = "succeeded"
 	ApiCallStatusFailed    ApiCallStatus = "failed"

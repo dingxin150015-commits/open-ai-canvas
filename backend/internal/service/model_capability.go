@@ -382,7 +382,25 @@ func (s *Service) ValidateTaskCapability(input map[string]any) error {
 }
 
 func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInput) error {
-	if len(input.ReferenceImages) > profile.References.MaxImages || len(input.ReferenceVideos) > profile.References.MaxVideos || len(input.ReferenceAudios) > profile.References.MaxAudios {
+	// 特殊处理：DashScope Wan 2.7 的音频字段映射
+	// - i2v: ReferenceAudios[0] -> driving_audio (在 media[] 内)
+	// - r2v: ReferenceAudios[0] -> reference_voice (在 input 顶级字段)
+	// 这些音频不计入 ReferenceAudios 数量限制
+	model := input.Config.Model
+	isWan27 := strings.Contains(model, "wan2.7") || strings.Contains(model, "wan27")
+	audioCountForValidation := len(input.ReferenceAudios)
+
+	if isWan27 && audioCountForValidation > 0 {
+		if strings.Contains(model, "i2v") {
+			// i2v 的音频会被转换为 driving_audio，不计入 ReferenceAudios
+			audioCountForValidation = 0
+		} else if strings.Contains(model, "r2v") {
+			// r2v 的音频会被转换为 reference_voice，不计入 ReferenceAudios
+			audioCountForValidation = 0
+		}
+	}
+
+	if len(input.ReferenceImages) > profile.References.MaxImages || len(input.ReferenceVideos) > profile.References.MaxVideos || audioCountForValidation > profile.References.MaxAudios {
 		return BadAuthRequest("参考素材数量超过当前模型限制")
 	}
 	if len(input.ReferenceImages) < profile.References.MinImages {
@@ -421,9 +439,16 @@ func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInp
 	}
 	operation := metadataString(input.Metadata, "videoEditOperation")
 	if operation == "" {
-		if len(input.ReferenceImages) > 0 {
+		// 根据模型名判定 operation，避免 i2v/r2v 混淆
+		model := input.Config.Model
+		if strings.Contains(model, "r2v") {
+			// r2v 模型（参考生视频）
+			operation = "reference_to_video"
+		} else if len(input.ReferenceImages) > 0 {
+			// i2v 模型（图生视频）或其他有参考图的模式
 			operation = "image_to_video"
 		} else {
+			// t2v 模型（文生视频）或其他
 			operation = profile.DefaultOperation
 		}
 	}

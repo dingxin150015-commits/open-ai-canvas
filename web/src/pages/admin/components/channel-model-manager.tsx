@@ -142,7 +142,11 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                 protocol: values.protocol,
                 capabilityConfig: values.capabilityConfig,
             });
-            message.success(`模型测试通过，耗时 ${(result.durationMs / 1000).toFixed(2)} 秒`);
+            const duration = (result.durationMs / 1000).toFixed(2);
+            const successMsg = result.note
+                ? `模型测试通过，耗时 ${duration} 秒（${result.note}）`
+                : `模型测试通过，耗时 ${duration} 秒`;
+            message.success(successMsg);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "模型测试失败");
         } finally {

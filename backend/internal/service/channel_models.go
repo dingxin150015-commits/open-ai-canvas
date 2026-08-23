@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -35,7 +36,8 @@ type AdminChannelModelFetchResult struct {
 }
 
 type AdminChannelModelTestResult struct {
-	DurationMs int64 `json:"durationMs"`
+	DurationMs int64  `json:"durationMs"`
+	Note       string `json:"note,omitempty"` // 附注，用于展示测试受限时的说明，如"该模型需参考图，未做完整生成验证"
 }
 
 func (s *Service) EnsureSystemChannelModels() error {
@@ -329,6 +331,17 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		_, err = runAudioTask(testCtx, input)
 	}
 	if err != nil {
+		// 对于需要参考素材的视频模型（i2v/r2v），探针未携带图片/视频会触发错误，
+		// 但只要错误明确指向「缺少参考素材」，就证明凭证、端点、模型名和协议路由均有效。
+		// 此时判为成功并附注，避免管理员误以为配置不可用。
+		if capability == "video" && isVideoReferenceRequiredError(err) {
+			log.Printf("[TestChannelModel] 视频模型测试触发素材缺失错误，判为成功+附注")
+			return &AdminChannelModelTestResult{
+				DurationMs: time.Since(startedAt).Milliseconds(),
+				Note:       "该模型需参考素材（图片/视频），仅验证了凭证与端点，未做完整生成测试",
+			}, nil
+		}
+		log.Printf("[TestChannelModel] 测试失败，capability=%s isVideoRefRequired=%v err=%v", capability, capability == "video" && isVideoReferenceRequiredError(err), err)
 		status := http.StatusBadGateway
 		if errors.Is(err, context.DeadlineExceeded) {
 			status = http.StatusGatewayTimeout
@@ -336,6 +349,29 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		return nil, &AuthError{Status: status, Message: "模型测试失败：" + truncateRunes(err.Error(), 1000)}
 	}
 	return &AdminChannelModelTestResult{DurationMs: time.Since(startedAt).Milliseconds()}, nil
+}
+
+// isVideoReferenceRequiredError 判定错误是否源于「缺少参考素材」（本地校验或远端拒绝）。
+// 使用健壮的文本匹配，不依赖 errors.Is，能穿透任意层错误包装。
+func isVideoReferenceRequiredError(err error) bool {
+	msg := err.Error()
+
+	// 本地校验（validateVideoTask 的 MinImages 配置）
+	if strings.Contains(msg, "至少需要") && strings.Contains(msg, "参考图") {
+		return true
+	}
+
+	// 远端 DashScope 翻译后的中文提示
+	if strings.Contains(msg, "需要参考素材") {
+		return true
+	}
+
+	// 远端 DashScope 原始错误（防御性匹配，防止翻译失效）
+	if strings.Contains(msg, "Field required") && strings.Contains(msg, "input.media") {
+		return true
+	}
+
+	return false
 }
 
 // 模型测试必须使用当前模型声明的默认参数，避免固定分辨率 SKU 被通用 1K 测试值误伤。
@@ -492,7 +528,7 @@ func capabilityForProtocol(protocol model.ChannelInterfaceType) string {
 		return "image"
 	case model.ChannelInterfaceOpenAIAudio, model.ChannelInterfaceAsyncAudio:
 		return "audio"
-	case model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo, model.ChannelInterfaceNovitaVideo:
+	case model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo, model.ChannelInterfaceNovitaVideo, model.ChannelInterfaceDashScopeVideo:
 		return "video"
 	case model.ChannelInterfaceChatCompletion, model.ChannelInterfaceOpenAIResponse:
 		return "text"

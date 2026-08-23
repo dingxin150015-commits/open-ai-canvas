@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime"
 	"mime/multipart"
@@ -226,7 +227,10 @@ func (s *Service) processCanvasGenerationTask(ctx context.Context, userID string
 		}
 	}
 	if resumedProviderRequestID(ctx) == "" {
-		requirePublicURL := input.Config.InterfaceType == "newapi-channel-1" || input.Config.InterfaceType == "newapi-channel-2" || input.Config.InterfaceType == string(model.ChannelInterfaceVolcengineArkVideo)
+		// DashScope 视频接口要求 media[].url 为公网 HTTP(S) 地址（见 wan27-image-to-video 文档 media[].url: format uri），
+		// 因此与其他 JSON 视频协议一并登记，让参考素材走对象存储签名 URL 而非内嵌 data URL。
+		requirePublicURL := input.Config.InterfaceType == "newapi-channel-1" || input.Config.InterfaceType == "newapi-channel-2" || input.Config.InterfaceType == string(model.ChannelInterfaceVolcengineArkVideo) || input.Config.InterfaceType == "dashscope-video"
+		log.Printf("[TRACE-7 hydrateMedia] InterfaceType=%q requirePublicURL=%v images=%d videos=%d audios=%d", input.Config.InterfaceType, requirePublicURL, len(input.ReferenceImages), len(input.ReferenceVideos), len(input.ReferenceAudios))
 		if err := s.hydrateGenerationMedia(userID, &input, requirePublicURL); err != nil {
 			return nil, err
 		}
@@ -572,8 +576,10 @@ func normalizedMediaMimeType(declared string, data []byte) string {
 }
 
 func (s *Service) resolveProviderConfig(config providerConfig) (providerConfig, error) {
+	log.Printf("[TRACE-4 resolveProviderConfig] 入参 InterfaceType=%q Model=%q ChannelID=%q BaseURL=%q", config.InterfaceType, config.Model, config.ChannelID, config.BaseURL)
 	headers, err := NormalizeOutboundHeaders(config.Headers)
 	if err != nil {
+		log.Printf("[TRACE-4 resolveProviderConfig] ❌ Header 规范化失败：%v", err)
 		return providerConfig{}, err
 	}
 	config.Headers = headers
@@ -583,36 +589,45 @@ func (s *Service) resolveProviderConfig(config providerConfig) (providerConfig, 
 	}
 	if channelID == "" {
 		if _, err := s.validateChannelOutboundURL(config.BaseURL, config.AllowLocalChannel, false); err != nil {
+			log.Printf("[TRACE-4 resolveProviderConfig] ❌ 自定义渠道 URL 校验失败：%v", err)
 			return providerConfig{}, err
 		}
 		config.AllowLocalChannel = s.effectiveAllowLocalChannel(config.AllowLocalChannel)
+		log.Printf("[TRACE-4 resolveProviderConfig] ⚠️ 早退分支：channelID 为空，InterfaceType 保持前端传入值 %q（未被数据库覆盖）", config.InterfaceType)
 		return config, nil
 	}
 	channel, err := s.SystemChannel(channelID)
 	if err != nil {
+		log.Printf("[TRACE-4 resolveProviderConfig] ❌ 系统渠道不存在或停用：channelID=%s err=%v", channelID, err)
 		return providerConfig{}, errors.New("系统渠道不存在或已停用")
 	}
 	modelName := strings.TrimSpace(config.Model)
 	if modelName == "" {
 		models := channelModelNames(*channel)
 		if len(models) == 0 {
+			log.Printf("[TRACE-4 resolveProviderConfig] ❌ 系统渠道未配置可用模型：channelID=%s", channelID)
 			return providerConfig{}, errors.New("系统渠道未配置可用模型")
 		}
 		modelName = models[0]
 	}
 	if !stringInSlice(modelName, channelModelNames(*channel)) {
+		log.Printf("[TRACE-4 resolveProviderConfig] ❌ 模型未授权：model=%q 渠道可用模型=%v", modelName, channelModelNames(*channel))
 		return providerConfig{}, errors.New("当前系统渠道未授权该模型")
 	}
 	if _, err := s.validateChannelOutboundURL(channel.BaseURL, channel.AllowLocalChannel, false); err != nil {
+		log.Printf("[TRACE-4 resolveProviderConfig] ❌ 渠道 URL 校验失败：%v", err)
 		return providerConfig{}, err
 	}
 	config.ChannelID = channel.ID
 	config.APIFormat = channel.APIFormat
 	channelModel, modelErr := s.repo.ChannelModelByKey(channel.ID, modelName)
+	log.Printf("[TRACE-5 ChannelModelByKey] channelID=%s model=%q → err=%v Protocol=%q Capability=%q", channel.ID, modelName, modelErr, channelModel.Protocol, channelModel.Capability)
 	if modelErr != nil || channelModel.Protocol == "" {
+		log.Printf("[TRACE-5 ChannelModelByKey] ❌ 模型未配置请求协议")
 		return providerConfig{}, errors.New("当前模型尚未配置请求协议")
 	}
 	config.InterfaceType = string(channelModel.Protocol)
+	log.Printf("[TRACE-5 resolveProviderConfig] ✅ InterfaceType 已被数据库覆盖为 %q", config.InterfaceType)
 	// 模型协议是实际请求契约；混合渠道中鉴权格式也必须随模型协议切换。
 	if config.InterfaceType == string(model.ChannelInterfaceGeminiVeo) {
 		config.APIFormat = "gemini"
@@ -628,6 +643,7 @@ func (s *Service) resolveProviderConfig(config providerConfig) (providerConfig, 
 		return providerConfig{}, err
 	}
 	config.Model = modelName
+	log.Printf("[TRACE-5 resolveProviderConfig] 出参 InterfaceType=%q Model=%q BaseURL=%q APIFormat=%q", config.InterfaceType, config.Model, config.BaseURL, config.APIFormat)
 	return config, nil
 }
 
@@ -1398,30 +1414,44 @@ func audioFormatMimeType(format string) string {
 }
 
 func runVideoTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	log.Printf("[TRACE-6 runVideoTask] 收到 InterfaceType=%q Model=%q", input.Config.InterfaceType, input.Config.Model)
+	if input.Config.InterfaceType == "dashscope-video" {
+		log.Printf("[TRACE-6 runVideoTask] ✅ 命中 dashscope-video 分支")
+		return runDashScopeVideoTask(ctx, input)
+	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceVolcengineJiMengVideo) {
+		log.Printf("[TRACE-6 runVideoTask] 命中 volcengine-jimeng-video 分支")
 		return runVolcengineJiMengVideoTask(ctx, input)
 	}
 	if input.Config.InterfaceType == "gemini-veo" {
+		log.Printf("[TRACE-6 runVideoTask] 命中 gemini-veo 分支")
 		return runGeminiVeoVideoTask(ctx, input)
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceNovitaVideo) {
+		log.Printf("[TRACE-6 runVideoTask] 命中 novita-video 分支")
 		return runNovitaVideoTask(ctx, input)
 	}
 	if input.Config.InterfaceType == "newapi-channel-2" {
+		log.Printf("[TRACE-6 runVideoTask] 命中 newapi-channel-2 分支")
 		return runNewAPIChannel2VideoTask(ctx, input)
 	}
 	if input.Config.InterfaceType == "newapi-channel-1" {
+		log.Printf("[TRACE-6 runVideoTask] 命中 newapi-channel-1 分支")
 		return runNewAPIChannel1VideoTask(ctx, input)
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceVolcengineArkVideo) {
+		log.Printf("[TRACE-6 runVideoTask] 命中 volcengine-ark-video 分支")
 		return runSeedanceAgentPlanVideoTask(ctx, input)
 	}
 	if isArkPlanVideoConfig(input.Config) {
+		log.Printf("[TRACE-6 runVideoTask] 命中 ArkPlan 兜底分支")
 		return runSeedanceAgentPlanVideoTask(ctx, input)
 	}
 	if isSeedanceVideoConfig(input.Config) {
+		log.Printf("[TRACE-6 runVideoTask] 命中 Seedance 兜底分支")
 		return runSeedanceVideosTask(ctx, input)
 	}
+	log.Printf("[TRACE-6 runVideoTask] ⚠️ 未命中任何专有分支，落入 OpenAI 风格通用视频链路（InterfaceType=%q）", input.Config.InterfaceType)
 	if len(input.ReferenceVideos) > 0 || len(input.ReferenceAudios) > 0 {
 		return nil, errors.New("OpenAI 风格视频接口不支持参考视频或参考音频，请切换到 Seedance / Agent Plan 渠道")
 	}
@@ -2236,7 +2266,7 @@ func validateGenerationInterface(mode string, interfaceType string) error {
 	allowed := map[string]map[string]bool{
 		"text":  {"chat-completion": true, "openai-response": true},
 		"image": {"openai-image": true, "grok-image": true, "volcengine-ark-image": true, "volcengine-jimeng-image": true, "dashscope-image": true},
-		"video": {"newapi": true, "newapi-channel-1": true, "newapi-channel-2": true, "xai-video": true, "volcengine-ark-video": true, "volcengine-jimeng-video": true, "gemini-veo": true, "novita-video": true},
+		"video": {"newapi": true, "newapi-channel-1": true, "newapi-channel-2": true, "xai-video": true, "volcengine-ark-video": true, "volcengine-jimeng-video": true, "gemini-veo": true, "novita-video": true, "dashscope-video": true},
 		"audio": {"openai-audio": true, "async-audio": true},
 	}
 	if allowed[mode] != nil && !allowed[mode][interfaceType] {

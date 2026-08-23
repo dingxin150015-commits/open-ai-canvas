@@ -34,3 +34,35 @@ assets/prototypes/.*.drawio.bkp
 .spec-workflow/
 .vscode/
 camera_language_guide.md
+
+# 临时文件和文档
+.temp/
+百炼千问文档/
+百炼千问文档.zip
+*.exe
+
+# Claude 工作目录（保留 memory 和关键文档）
+.claude/projects/
+.claude/settings.json
+.claude/skills/
+
+# 临时报告（保留最终报告）
+DASHSCOPE_FIX_REPORT.md
+DASHSCOPE_VERIFICATION_GUIDE.md
+DASHSCOPE_VIDEO_ANALYSIS.md
+DASHSCOPE_VIDEO_STAGE1_REPORT.md
+DEEP_INSPECTION_REPORT.md
+FINAL_FIX_REPORT.md
+FIX_REPORT.md
+FRONTEND_SWITCH_EXPLANATION.md
+LESSONS_LEARNED.md
+STAGE1_COMPLETE_FINAL.md
+STAGE1_FINAL_REPORT.md
+TESTING_GUIDE.md
+CONFIG_GUIDE.md
+dashscope-fix-summary.md
+quick-test.sh
+test-video.json
+
+# NPM lock（由团队决定是否提交）
+web/package-lock.json
