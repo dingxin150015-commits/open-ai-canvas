@@ -36,6 +36,11 @@ test("Dreamina submit failure categories have bounded user-facing messages", () 
     }
 });
 
+test("resource storage 403 is not reported as generation channel authentication", () => {
+    const raw = "参考图片上传失败：OSS 上传失败：403 Forbidden <Code>UserDisable</Code><Message>UserDisable</Message>";
+    expect(generationErrorMessage(raw)).toBe("对象存储账号已停用，请检查或更换对象存储配置。");
+});
+
 test("durable Dreamina submit failures keep their stable user-facing category in task center", () => {
     const task = projectLocalDreaminaTask({
         id: "dreamina-submit-timeout-task-0001",
@@ -151,7 +156,7 @@ test("Dreamina submission uncertainty is not an accepted background task", () =>
     expect(localDreaminaCancellationCopy(uncertain)).toBeUndefined();
 });
 
-test("Canvas task surfaces route Dreamina uncertainty through shared display semantics", async () => {
+test("Canvas task surfaces route Dreamina uncertainty through shared display semantics without cancellation", async () => {
     const [nodeSource, detailSource, scriptSource, taskCenterSource, createSource] = await Promise.all([
         Bun.file(new URL("../src/components/canvas/canvas-node-content.tsx", import.meta.url)).text(),
         Bun.file(new URL("../src/pages/canvas/canvas-project-status-dialogs.tsx", import.meta.url)).text(),
@@ -161,30 +166,8 @@ test("Canvas task surfaces route Dreamina uncertainty through shared display sem
     ]);
     expect(nodeSource).toContain("generationTaskStageLabel(displayTask)");
     expect(nodeSource).toContain("generationTaskShowsProgress(displayTask)");
-    const loadingContentSource = sourceSection(nodeSource, "function LoadingContent(", "function useTaskElapsed(");
-    const cancelBranchStart = loadingContentSource.indexOf("{!submissionUncertain ? (");
-    const cancelBranchEndMarker = ") : null}";
-    const cancelBranchEnd = loadingContentSource.indexOf(cancelBranchEndMarker, cancelBranchStart);
-    expect(cancelBranchStart).toBeGreaterThanOrEqual(0);
-    expect(cancelBranchEnd).toBeGreaterThan(cancelBranchStart);
-
-    const cancelBranchSource = loadingContentSource.slice(cancelBranchStart, cancelBranchEnd + cancelBranchEndMarker.length);
-    const cancelButtonStart = cancelBranchSource.indexOf("<button");
-    const cancelButtonEndMarker = "</button>";
-    const cancelButtonEnd = cancelBranchSource.indexOf(cancelButtonEndMarker, cancelButtonStart);
-    expect(cancelButtonStart).toBeGreaterThan(0);
-    expect(cancelButtonEnd).toBeGreaterThan(cancelButtonStart);
-    expect(cancelBranchSource.slice(0, cancelButtonStart)).toBe("{!submissionUncertain ? ( ");
-
-    const cancelButtonSource = cancelBranchSource.slice(cancelButtonStart, cancelButtonEnd + cancelButtonEndMarker.length);
-    const onClickStart = cancelButtonSource.indexOf("onClick={(event) => {");
-    const onClickEnd = cancelButtonSource.indexOf("}}", onClickStart);
-    expect(cancelButtonSource).toContain("<button");
-    expect(onClickStart).toBeGreaterThanOrEqual(0);
-    expect(onClickEnd).toBeGreaterThan(onClickStart);
-    expect(cancelButtonSource.slice(onClickStart, onClickEnd)).toContain("onCancelTask?.(node);");
-    expect(cancelButtonSource).toContain("<Square");
-    expect(cancelButtonSource).toContain("取消");
+    expect(nodeSource).not.toContain("onCancelTask");
+    expect(nodeSource).not.toContain("取消生成");
     expect(nodeSource).not.toContain('node.metadata?.taskStage || (taskId ? "任务处理中" : "正在创建任务")');
     expect(detailSource).toContain("generationTaskStageLabel(task)");
     expect(detailSource).toContain("generationTaskShowsProgress(task) ? <TaskDetailItem");
@@ -193,9 +176,9 @@ test("Canvas task surfaces route Dreamina uncertainty through shared display sem
     expect(scriptSource).toContain("generationTaskShowsProgress(displayTask)");
     expect(scriptSource).not.toContain('node.metadata.taskStage || "正在创建任务"');
     expect(nodeSource).toContain("isGenerationTaskSubmissionUncertain(errorDisplayTask)");
-    expect(taskCenterSource).toContain('if (action === "retry" && currentTask && isGenerationTaskSubmissionUncertain(currentTask))');
+    expect(taskCenterSource).toContain("if (currentTask && isGenerationTaskSubmissionUncertain(currentTask))");
     expect(taskCenterSource).toContain("不能自动重试；请先核对官方状态，避免重复生成");
-    expect(taskCenterSource).toContain('onRetry={() => void runAction(task.id, "retry")}');
+    expect(taskCenterSource).toContain('onRetry={() => void runAction(task.id)}');
     expect(taskCenterSource).toContain("<TaskListRow");
     expect(taskCenterSource).toContain("<TaskGridCard");
     expect(createSource).not.toContain('item.generationStage === "submission_unknown"');
@@ -333,6 +316,140 @@ test("shared Create and Canvas task projection exposes queued, submitted, genera
         ["dreamina:dreamina-shared-async-0001", "succeeded", "succeeded"],
     ]);
     expect(distinctUpdates[4]?.resultJson).toContain('"mode":"video"');
+});
+
+test("the first local Dreamina submission waits for catalog readiness before invoking the paid Runtime path", async () => {
+    const order: string[] = [];
+    let release!: () => void;
+    const readyGate = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    const pending = runBackendGenerationTask(
+        {
+            mode: "video",
+            prompt: "first visit",
+            config: { ...defaultConfig, model: "local:dreamina-cli:seedance2.0mini", videoSeconds: "4", vquality: "720" },
+        },
+        {
+            createTask: async () => {
+                throw new Error("must not create backend task");
+            },
+            waitTask: async () => {
+                throw new Error("must not wait backend task");
+            },
+            ensureLocalDreaminaReady: async () => {
+                order.push("catalog-start");
+                await readyGate;
+                order.push("catalog-ready");
+            },
+            runLocal: async () => {
+                order.push("paid-runtime");
+                return { mode: "video", video: { dataUrl: "data:video/mp4;base64,AAAA", mimeType: "video/mp4", bytes: 3 } };
+            },
+            createId: () => "dreamina-first-ready-0001",
+            now: () => "2026-08-18T00:00:00.000Z",
+        },
+    );
+
+    await Promise.resolve();
+    expect(order).toEqual(["catalog-start"]);
+    release();
+    await pending;
+    expect(order).toEqual(["catalog-start", "catalog-ready", "paid-runtime"]);
+});
+
+test("the first local Dreamina batch shares one catalog readiness gate before any paid Runtime call", async () => {
+    const order: string[] = [];
+    let release!: () => void;
+    const readyGate = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    const pending = runBackendGenerationTaskBatch(
+        {
+            mode: "image",
+            prompt: "first batch",
+            config: { ...defaultConfig, model: "local:dreamina-cli:5.0Pro", count: "1" },
+            count: 3,
+        },
+        {
+            createTask: async () => {
+                throw new Error("must not create backend task");
+            },
+            waitTask: async () => {
+                throw new Error("must not wait backend task");
+            },
+            ensureLocalDreaminaReady: async () => {
+                order.push("catalog-start");
+                await readyGate;
+                order.push("catalog-ready");
+            },
+            runLocal: async () => {
+                order.push("paid-runtime");
+                return { mode: "image", images: [{ dataUrl: "data:image/png;base64,AAAA", mimeType: "image/png", bytes: 3 }] };
+            },
+            createId: () => `dreamina-first-batch-${order.length}`,
+            now: () => "2026-08-18T00:00:00.000Z",
+        },
+    );
+
+    await Promise.resolve();
+    expect(order).toEqual(["catalog-start"]);
+    release();
+    const settled = await pending;
+    expect(settled.every((entry) => entry.status === "fulfilled")).toBe(true);
+    expect(order).toEqual(["catalog-start", "catalog-ready", "paid-runtime", "paid-runtime", "paid-runtime"]);
+});
+
+test("local Dreamina terminal projection keeps the latest receipt, observation, and durable outputs", async () => {
+    const updates: GenerationTask[] = [];
+    const timestamp = "2026-08-18T00:00:00.000Z";
+    await runBackendGenerationTask(
+        {
+            mode: "video",
+            prompt: "late result",
+            config: { ...defaultConfig, model: "local:dreamina-cli:seedance2.0mini", videoSeconds: "4", vquality: "720" },
+            onTaskUpdate: (task) => updates.push(task),
+        },
+        {
+            createTask: async () => {
+                throw new Error("must not create backend task");
+            },
+            waitTask: async () => {
+                throw new Error("must not wait backend task");
+            },
+            runLocal: async (input, _signal, onTaskUpdate) => {
+                onTaskUpdate?.({
+                    id: input.idempotencyKey!,
+                    provider: "dreamina-cli",
+                    mode: "video",
+                    operation: "text2video",
+                    model: "seedance2.0mini",
+                    status: "succeeded",
+                    stage: "succeeded",
+                    progress: 100,
+                    receiptRecorded: true,
+                    officialStatus: "completed",
+                    providerObservation: { source: "query_result", status: "completed", observedAt: timestamp },
+                    outputs: [{ outputIndex: 0, mediaType: "video", materializedAssetId: "asset-late-0001" }],
+                    result: { mode: "video", video: { dataUrl: "data:video/mp4;base64,AAAA", mimeType: "video/mp4", bytes: 3 } },
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                });
+                return { mode: "video", video: { dataUrl: "data:video/mp4;base64,AAAA", mimeType: "video/mp4", bytes: 3 } };
+            },
+            createId: () => "dreamina-latest-context-0001",
+            now: () => timestamp,
+        },
+    );
+
+    expect(updates.at(-1)).toMatchObject({
+        status: "succeeded",
+        stage: "local_cli_succeeded",
+        receiptRecorded: true,
+        officialStatus: "completed",
+        outputs: [{ outputIndex: 0, mediaType: "video", materializedAssetId: "asset-late-0001" }],
+    });
+    expect(updates.at(-1)?.resultJson).toContain('"mode":"video"');
 });
 
 test("an explicitly cancelled Dreamina task stays cancelled instead of being projected as failed", async () => {

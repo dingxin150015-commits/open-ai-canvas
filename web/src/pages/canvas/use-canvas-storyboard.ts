@@ -8,6 +8,7 @@ import {
     buildGenerationConfig,
     generationTaskMetadata,
     resetGenerationTaskMetadata,
+	logicalModelIDForConfig,
 } from "@/lib/canvas/canvas-project-generation";
 import {
     cinematicStoryboardColumns,
@@ -79,7 +80,7 @@ export function useCanvasStoryboard({
                 ...node.metadata,
                 storyboard: {
                     rows: updater(node.metadata?.storyboard?.rows || []),
-                    visibleColumns: node.metadata?.storyboard?.visibleColumns || ["shotNumber", "durationSeconds", "plotDescription", "dialogue"],
+                    visibleColumns: node.metadata?.storyboard?.visibleColumns || ["shotNumber", "plotDescription", "videoMotionPrompt", "dialogue"],
                     referenceNodeIds: node.metadata?.storyboard?.referenceNodeIds || [],
                 },
             },
@@ -138,6 +139,7 @@ export function useCanvasStoryboard({
                 operation: "storyboard_rows",
                 prompt: expandedPrompt,
                 model: generationConfig.model,
+				...(logicalModelIDForConfig(generationConfig) ? { logicalModelId: logicalModelIDForConfig(generationConfig) } : {}),
                 input: {
                     canvasSnapshot: { nodes: nodesRef.current, connections: connectionsRef.current },
                     requirements: "输出可直接编辑并用于批量生成图片和视频的分镜表。",
@@ -223,7 +225,7 @@ export function useCanvasStoryboard({
                 ...scriptNode.metadata,
                 storyboard: {
                     rows: (scriptNode.metadata?.storyboard?.rows || []).map((row) => ({ ...row, imageNodeId: imageNodeByRowId.get(row.id) || row.imageNodeId })),
-                    visibleColumns: scriptNode.metadata?.storyboard?.visibleColumns || ["shotNumber", "durationSeconds", "plotDescription", "dialogue"],
+                    visibleColumns: scriptNode.metadata?.storyboard?.visibleColumns || ["shotNumber", "plotDescription", "videoMotionPrompt", "dialogue"],
                     referenceNodeIds: scriptNode.metadata?.storyboard?.referenceNodeIds || [],
                 },
             },
@@ -311,7 +313,7 @@ export function useCanvasStoryboard({
                 ...scriptNode.metadata,
                 storyboard: {
                     rows: allRows.map((row) => ({ ...row, videoNodeId: videoNodeByRowId.get(row.id) || row.videoNodeId })),
-                    visibleColumns: scriptNode.metadata?.storyboard?.visibleColumns || ["shotNumber", "durationSeconds", "plotDescription", "dialogue"],
+                    visibleColumns: scriptNode.metadata?.storyboard?.visibleColumns || ["shotNumber", "plotDescription", "videoMotionPrompt", "dialogue"],
                     referenceNodeIds: scriptNode.metadata?.storyboard?.referenceNodeIds || [],
                 },
             },

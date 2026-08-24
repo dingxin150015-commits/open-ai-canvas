@@ -1,7 +1,6 @@
 import { DREAMINA_SUBMIT_ERROR_MESSAGES, generationErrorMessage } from "@/lib/generation-error";
 import { apiClient, request, type BackendEnvelope } from "@/services/api/request";
 import {
-    cancelLocalDreaminaGenerationTask,
     deleteLocalDreaminaGenerationTask,
     listLocalDreaminaGenerationTaskPage,
     queryLocalDreaminaGenerationTask,
@@ -167,6 +166,7 @@ export type CreateSessionInput = {
     projectStyle?: { presetId: string; title: string; prompt: string };
     characters?: Array<{ assetId: string; versionId: string; name: string; definition: Record<string, unknown> }>;
     config?: Record<string, unknown>;
+	logicalModelId?: string;
 };
 
 export type CreateTaskInput = {
@@ -177,6 +177,7 @@ export type CreateTaskInput = {
     prompt: string;
     provider?: string;
     model?: string;
+	logicalModelId?: string;
     input?: Record<string, unknown>;
 };
 
@@ -389,6 +390,10 @@ export function appendTaskTextDelta(id: string, content: string) {
     return request<TaskTextDelta>(api.post(`/tasks/${encodeURIComponent(id)}/text-deltas`, { content }));
 }
 
+export function completeTextReplayTask(id: string, text: string) {
+    return request<GenerationTask>(api.post(`/tasks/${encodeURIComponent(id)}/text-replay-complete`, { text }));
+}
+
 export function queryTaskTextReplay(id: string, after = 0) {
     return request<TaskTextReplay>(api.get(`/tasks/${encodeURIComponent(id)}/text-deltas`, { params: { after } }));
 }
@@ -399,13 +404,6 @@ export function retryGenerationTask(id: string) {
 
 export function queryFailedVideoProviderTask(id: string) {
     return request<ProviderTaskQueryResult>(api.post(`/tasks/${encodeURIComponent(id)}/query-provider`));
-}
-
-export function cancelGenerationTask(id: string) {
-    if (isLocalDreaminaTaskId(id)) {
-        return cancelLocalDreaminaGenerationTask(stripLocalDreaminaTaskPrefix(id)).then((task) => projectLocalDreaminaTask(task));
-    }
-    return request<GenerationTask>(api.post(`/tasks/${encodeURIComponent(id)}/cancel`));
 }
 
 export function refreshGenerationTaskStatus(id: string, options?: { signal?: AbortSignal }) {
@@ -525,8 +523,7 @@ export async function waitForGenerationTask(id: string, options?: { signal?: Abo
         }
     } catch (error) {
         if (options?.signal?.aborted) {
-            await cancelGenerationTask(id).catch(() => undefined);
-            window.dispatchEvent(new CustomEvent("wallet:updated"));
+            // Abort 只停止当前页面的状态监听，不能把已发起的上游任务改成取消状态。
             throw new DOMException("Aborted", "AbortError");
         }
         throw error;
