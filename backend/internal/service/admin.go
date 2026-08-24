@@ -89,6 +89,7 @@ type ChannelRequest struct {
 	AllowLocalChannel    *bool            `json:"allowLocalChannel"`
 	APIKey               string           `json:"apiKey"`
 	SecretKey            string           `json:"secretKey"`
+	APIFormat            string           `json:"apiFormat"`
 	ConcurrencyLimit     *int             `json:"concurrencyLimit"`
 	UseGlobalConcurrency *bool            `json:"useGlobalConcurrency"`
 	Models               []string         `json:"models"`
@@ -777,8 +778,13 @@ func (s *Service) channelFromRequest(req ChannelRequest, channel model.ModelChan
 	if req.SecretKey != "" {
 		channel.SecretKey = req.SecretKey
 	}
-	// 系统渠道只保存地址与凭证；实际协议和鉴权方式由所选模型决定。
-	channel.APIFormat = "openai"
+	// 使用请求中指定的 API 格式，默认为 openai。
+	// 该字段仅用于拉取模型目录（含百炼等厂商插件的目录补充）；
+	// 实际请求协议与鉴权方式仍由所选模型的 protocol 决定。
+	channel.APIFormat = strings.ToLower(strings.TrimSpace(req.APIFormat))
+	if channel.APIFormat == "" {
+		channel.APIFormat = "openai"
+	}
 	if req.UseGlobalConcurrency != nil && *req.UseGlobalConcurrency {
 		channel.ConcurrencyLimit = 0
 	} else if req.ConcurrencyLimit != nil {
@@ -819,7 +825,7 @@ func mergeChannelRequest(req ChannelRequest, channel model.ModelChannel) Channel
 
 func validChannelInterfaceType(value model.ChannelInterfaceType) bool {
 	switch value {
-	case model.ChannelInterfaceChatCompletion, model.ChannelInterfaceOpenAIResponse, model.ChannelInterfaceOpenAIImage, model.ChannelInterfaceGrokImage, model.ChannelInterfaceVolcengineArkImage, model.ChannelInterfaceVolcengineJiMengImage, model.ChannelInterfaceGeminiImage, model.ChannelInterfaceOpenAIAudio, model.ChannelInterfaceAsyncAudio, model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo, model.ChannelInterfaceNovitaVideo, model.ChannelInterfaceMiniMaxVideo:
+	case model.ChannelInterfaceChatCompletion, model.ChannelInterfaceOpenAIResponse, model.ChannelInterfaceOpenAIImage, model.ChannelInterfaceGrokImage, model.ChannelInterfaceVolcengineArkImage, model.ChannelInterfaceVolcengineJiMengImage, model.ChannelInterfaceDashScopeImage, model.ChannelInterfaceDashScopeVideo, model.ChannelInterfaceGeminiImage, model.ChannelInterfaceOpenAIAudio, model.ChannelInterfaceAsyncAudio, model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo, model.ChannelInterfaceNovitaVideo, model.ChannelInterfaceMiniMaxVideo:
 		return true
 	default:
 		return false
