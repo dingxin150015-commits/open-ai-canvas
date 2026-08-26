@@ -1,0 +1,105 @@
+# 待测试
+
+## 百炼官方模型发现目录
+
+阶段 1 已实现，尚未进入运行环境：
+
+- 官方版本化 Manifest 与上游 `/models` 结果合并；
+- `ready/planned/unsupported/deprecated` 支持状态；
+- 保留 capability、protocol、provider model key、endpoint、operation 与文档证据；
+- 安全补齐既有未配置记录，保护管理员配置、价格和启用状态；
+- 非 `ready` 模型在 Backend 强制禁止定价、启用、模型测试和逻辑线路；
+- 管理后台展示支持状态、筛选、只读详情和分类拉取汇总。
+
+阶段 1 只做源码和离线专项测试，不迁移当前数据库、不重建容器、不在 Edge 操作、不调用真实百炼模型。完成 Wan 3.0、Wan 2.7 和 HappyHorse Adapter 及其序列化测试后，才按阶段将对应模型晋升为 `ready`。
+
+## Wan 3.0 All-in-One Adapter
+
+阶段 2 已完成源码与离线测试，尚未进入运行环境：
+
+- `wan3.0-video` 已具备独立原生 DashScope 序列化器，目录状态晋升为 `ready`；
+- `wan3.0-video-prime` 保持 `planned`，不得启用或调用；
+- 支持文生视频、首帧、首尾帧、参考图片、参考视频和参考音频；
+- `file` 与 `link` 官方输入类型尚未接入产品素材模型，不列入 Ready 操作；
+- 严格支持 480P/720P/1080P、`adaptive` 与五种固定比例、2–30 秒和 `-1` 智能时长、音频、水印及 seed；
+- 首尾帧与参考素材互斥，参考视频总时长与固定输出时长之和不得超过 30 秒；不再静默改写时长、分辨率或截断媒体；
+- 智能时长无法在请求前确定秒数，因此只适用于按次价格；按秒价格会在账务预留阶段明确拒绝无确定时长的请求。
+
+已完成 mock 请求与能力合同测试，但这不证明当前账号、区域、额度或真实生成可用。后续仍需阶段 6 的数据库迁移/容器更新、阶段 7 的 Edge 验证，以及用户单独批准后的阶段 8 真实调用。
+
+## Linux CGO Backend 测试门禁
+
+阶段 1 遗留的 Windows `CGO_ENABLED=0` 问题已解决：
+
+- `backend/Dockerfile` 提供独立 `backend-test` target，使用 Linux、`build-base` 和 `CGO_ENABLED=1`；
+- `scripts/test-backend-cgo.ps1` 只构建测试镜像，不挂载运行数据库、阶段 0 备份、`.settings-key` 或 Docker 数据卷；
+- GitHub Actions 明确检查 CGO 和 GCC，并使用 `go test -count=1 ./...`；
+- 当前源码已在该 target 中完成 Backend 全量测试，Database/Repository/Handler/Service 均通过；
+- 测试前后现有 Web、Backend 和其他容器 ID、镜像与运行状态未变化。
+
+## Wan 2.7 与 HappyHorse 1.1
+
+阶段 3 已完成源码、mock、CGO 全量 Backend 测试和 Web 构建，尚未进入运行环境：
+
+- Ready：Wan 2.7 T2V 三个主线/快照 ID、I2V 两个 ID、R2V 两个 ID，以及 HappyHorse 1.1 T2V/I2V/R2V；
+- Planned：Wan 2.7 视频编辑、HappyHorse 视频编辑、HappyHorse 1.0 和其他未适配模型；
+- Wan 2.7 分别实现 T2V 的 `audio_url`、I2V 的首帧/首尾帧/驱动音频/视频续写、R2V 的 1-5 个图片或视频与 `reference_voice`；
+- HappyHorse T2V、单首帧 I2V、1-9 图 R2V 分别使用精确媒体合同；
+- 能力层增加图片+视频总视觉素材数量、含参考视频时最大输出时长、驱动音频不得长于输出等跨层约束；
+- 不支持的格式、尺寸、比例、时长、媒体组合和操作会明确拒绝，不再截断或忽略。
+
+这些结果仍不等于真实账号模型可用；运行数据库、容器、Edge、真实百炼与 OSS 验证继续保留在后续阶段。
+
+## 阶段 4 全量质量门禁
+
+当前未部署源码已完成以下本地门禁：
+
+- Backend：隔离 Linux CGO 全量测试通过，不挂载运行数据库或数据卷；
+- Web：主套件 445/445、跨 Runtime 1/1，TypeScript 与生产构建通过；
+- Canvas Agent：286/286，全量测试与 TypeScript 构建通过；
+- CI：已加入 Web build 和独立 Canvas Agent test/build job，远程 Actions 尚未触发；
+- 依赖：撤销未使用的 modernc SQLite 依赖漂移，继续使用生产 go-sqlite3 + CGO。
+
+Windows 本机无文件符号链接权限，因此符号链接拒绝子项保留给 Linux CI；本机已通过其他路径与 TOCTOU 安全检查。文档站仍缺少可执行的 Next/Fumadocs package/config，用户决定暂缓，不能声称文档构建通过。
+
+阶段 4 后已修复 Bun/Rolldown 退出竞争：测试不再在 Bun 主进程内启动 Vite，专项连续 10 次和 Web 445+1 全量测试均无 panic，TypeScript 与生产构建通过；panic guard 会把退出码为 0 的 Rolldown worker panic 强制转换为门禁失败。远程 GitHub Actions 仍待提交或 PR 后验证。
+
+## 阶段 5 发布候选
+
+- Web 最终主套件 446/446，跨 Runtime 1/1；Backend 隔离 CGO 全量测试通过；
+- Canvas Agent 在 Bun 1.4.0 下 286/286 且构建通过；
+- Catalog 与任务 admission 共用持久能力配置，缺失/损坏/不完整均 fail closed；
+- `price_configured=false` 的草稿价格不再进入目录或路由；
+- Qwen 临时 DEBUG 和 DashScope 提示词、URL、API Key 片段日志已清理；
+- Manifest 重生成仍为 80 项、11 Ready，哈希稳定；
+- Backend/Web 独立候选镜像构建及临时无数据 smoke 通过。
+
+阶段 6 已完成：pre/post-deploy verified/protected 备份已登记，Backend/Web 候选已保留卷逐个更新并保持 healthy；Schema、241 条 `planned/legacy` 回填、业务计数和 OSS 密文核对通过。
+
+阶段 7 已在已登录 Microsoft Edge 中完成管理后台拉取和显示验证：运行数据库现为 319 条，官方补充 80 项，11 Ready、308 Planned；支持状态筛选、Planned 只读、`wan3.0-video` 的 DashScope 视频协议、未定价和停用状态均有 UI 证据。首轮重复拉取暴露的空字段伪补齐已修复，专项测试通过，修复后重复拉取显示新增 0/补齐 0，包含 `updated_at` 的目录摘要保持不变。
+
+阶段 7 的普通用户创作台门禁也已完成：Microsoft Edge 截图显示视频模型选择器为空并提示当前没有可用模型，未定价且停用的 `wan3.0-video` 没有被误开放，用户未点击生成。另有 Backend 回归测试锁定停用模型不进入目录、启用但未定价模型仍不可用，隔离 Linux CGO 全量测试通过。
+
+阶段 8 的真实百炼生成与 OSS 结果物化仍未执行，可能产生费用，继续需要用户单独批准账号、区域、模型、参数、费用和重试上限。
+
+阶段 8 调用前审计已修复三项会使真实验证失真的缺口：MaaS OpenAI 兼容路径到原生 DashScope 路径的转换、结果下载禁止跨主机转发 API Key/自定义头、`generation-*` 本地素材进入平台 OSS 的远端同步。Backend CGO 全量、Web 448+1、TypeScript、生产构建、候选容器和保留卷部署均通过，调用前恢复点已登记。
+
+仍待用户精确批准后执行一次最小 `wan3.0-video` 文生视频：北京区域、480P、2 秒、固定种子、无声、无水印、创建重试 0；最高供应商费用按当前原价估算为 0.60 元。完成后需验证任务终态、账务、OSS 对象、资源记录、浏览器播放和调用后恢复点。
+
+用户已批准上述费用合同，但 Create UI 当前没有 seed 输入；真实任务仍未提交，正在等待用户决定是否允许本次 UI 验证省略 seed。调用前还修复了系统渠道精确 SKU 计费，并处置了 root 监控容器导致 SQLite WAL/SHM owner 漂移的工具链事故；数据计数保持不变，Backend 已恢复并部署精确计费候选。
+
+用户随后已批准本次调用省略 seed，其余参数、费用上限和创建重试次数不变。当前允许进入 Microsoft Edge 临时价格配置和单次 UI 提交，仍禁止第二次创建。
+
+真实预提交截图发现 Create 未渲染能力中支持的音频/水印开关，旧默认实际为有声。已暂停调用并为真实 Create 菜单补齐能力驱动输出控制；Web 449+1、TypeScript、容器构建和部署通过。仍需 Edge 刷新后确认“无声/无水印”，真实任务尚未提交。
+
+唯一真实任务随后已提交并 succeeded；实际参数为 adaptive、480P、2 秒、无声、无水印，未使用 seed，未重试。内部 2 积分结算完成，阿里云 OSS Resource ready、MP4 805,526 bytes，Asset confirmed 且使用 resource 存储键，浏览器 Range 读取为 206。仍待用户视觉确认播放、无声和无水印；确认后恢复模型安全状态并创建调用后备份。
+
+Edge 最终视觉验证已完成：视频正常播放，播放器显示 0:02，用户确认无声、无水印。待恢复模型停用/未定价并创建调用后备份后，阶段 8 可收口。
+
+阶段 8 已收口：Wan 3.0 模型和临时价格档已恢复停用/未定价；成功任务、2 积分结算、ready 阿里云 OSS Resource、confirmed Asset 与 API 审计保留。调用后 verified/protected 恢复点 `BKP-20260826-201444-STAGE8-POSTCALL` 已登记。实际画幅为 adaptive，不是原计划 16:9；没有补发第二次任务。
+
+阶段 9 当前 Windows 复验发现 Canvas Agent 的 `dreamina-cli-process.test.ts` 有 4 个进程树清理用例失败并导致测试进程不退出；TypeScript 构建通过。阶段 4 的 286/286 仅为历史记录，当前不能宣称 Canvas Agent 全量绿色，需后续 Linux CI 复核或单独修复。
+
+阶段 9 已完成本地 Git 固化：Backend `64015db`、Web `62cf5d8`、构建测试 `f97adde`，最终文档和工程记忆另行提交。尚未 push、未创建 PR、未触发远程 GitHub Actions；旧问题完成度与剩余门禁以 `.codex/project-memory/STAGE9_RELEASE_HANDOFF.md` 为准。
+
+以上仍不授权数据库迁移、运行容器重建、Edge 管理后台操作、真实百炼调用或 OSS 上传验证。

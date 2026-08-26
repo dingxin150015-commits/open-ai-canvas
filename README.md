@@ -83,7 +83,7 @@ Codex 插件（`plugins/yingce/`）负责把 MCP 接入 Codex App。
 
 ### 环境
 
-- Bun（前端和文档站）
+- Bun 1.4.0（版本由仓库根目录 `.bun-version` 固定）
 - Go 1.25（后端）
 - Node.js 18+（Canvas Agent）
 - 如使用 Docker 开发，需要 Docker Compose
@@ -216,14 +216,20 @@ node dist/index.js
 # 前端
 cd web && bun run build
 
-# 后端
-cd backend && go test ./...
+# 后端（Linux/macOS 或已配置 CGO 的环境）
+cd backend && CGO_ENABLED=1 go test -count=1 ./...
 
 # Canvas Agent
 cd canvas-agent && npm test && npm run build
 
 # 文档站
 cd docs && bun run types:check
+```
+
+Windows 默认使用隔离的 Linux CGO 测试 target，无需安装全局 GCC，也不会挂载当前数据库或 Docker 数据卷：
+
+```powershell
+.\scripts\test-backend-cgo.ps1
 ```
 
 前端专项测试和后端集成测试较多，优先运行与改动模块相关的测试；UI 改动还应在浏览器检查关键路由、主题、弹窗、滚动和空态。验证结果必须在提交或交付说明中如实记录。
