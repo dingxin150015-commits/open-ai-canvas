@@ -100,6 +100,8 @@ Edge 最终视觉验证已完成：视频正常播放，播放器显示 0:02，�
 
 阶段 9 当前 Windows 复验发现 Canvas Agent 的 `dreamina-cli-process.test.ts` 有 4 个进程树清理用例失败并导致测试进程不退出；TypeScript 构建通过。阶段 4 的 286/286 仅为历史记录，当前不能宣称 Canvas Agent 全量绿色，需后续 Linux CI 复核或单独修复。
 
+阶段 10 已替代上述判断：4 个失败由 Codex 受限进程调用 `taskkill` 被系统拒绝造成，主机权限下真实进程树专项 12/12、Canvas Agent 全量 287/287 和 TypeScript 构建通过。测试夹具现在显式探测该权限；受限环境不会再挂住，但远程 Linux CI 仍需未来 PR 实际触发。
+
 阶段 9 已完成本地 Git 固化：Backend `64015db`、Web `62cf5d8`、构建测试 `f97adde`，最终文档和工程记忆另行提交。尚未 push、未创建 PR、未触发远程 GitHub Actions；旧问题完成度与剩余门禁以 `.codex/project-memory/STAGE9_RELEASE_HANDOFF.md` 为准。
 
 以上仍不授权数据库迁移、运行容器重建、Edge 管理后台操作、真实百炼调用或 OSS 上传验证。

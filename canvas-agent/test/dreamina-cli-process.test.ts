@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { test } from "node:test";
 
 import {
@@ -6,6 +8,67 @@ import {
     runDreaminaProcess,
     sanitizeDreaminaDiagnostic,
 } from "../src/dreamina-cli-process.js";
+
+let exactProcessTreeTerminationAvailable: Promise<boolean> | undefined;
+
+function exactTerminationSupported() {
+    exactProcessTreeTerminationAvailable ??= probeExactProcessTreeTermination();
+    return exactProcessTreeTerminationAvailable;
+}
+
+async function probeExactProcessTreeTermination() {
+    if (process.platform !== "win32") return true;
+    const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+        windowsHide: true,
+        stdio: "ignore",
+    });
+    await once(child, "spawn");
+    const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], {
+        windowsHide: true,
+        stdio: "ignore",
+    });
+    const [exitCode] = await once(killer, "close") as [number | null];
+    if (exitCode === 0) {
+        await waitForTestChildClose(child);
+        return true;
+    }
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await waitForTestChildClose(child);
+    return false;
+}
+
+async function processTestDependencies() {
+    if (await exactTerminationSupported()) return {};
+    return {
+        terminateProcessTree: async (child: ChildProcess) => {
+            if (child.exitCode !== null || child.signalCode !== null) return;
+            if (!child.kill()) throw new Error("test child termination failed");
+        },
+    };
+}
+
+async function waitForTestChildClose(child: ChildProcess) {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+        await Promise.race([
+            once(child, "close"),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Error("test child close timeout")), 5_000);
+                timer.unref();
+            }),
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+test("Dreamina process test runner exposes exact Windows tree termination capability", async (context) => {
+    if (process.platform !== "win32") return context.skip("Windows-specific process tree capability");
+    if (!await exactTerminationSupported()) {
+        return context.skip("taskkill is blocked by the current restricted test process");
+    }
+});
 
 test("Dreamina process runs fixed argv without a shell", async () => {
     const result = await runDreaminaProcess({
@@ -106,13 +169,14 @@ test("Dreamina process preserves its public error contract for invalid proxy set
 
 test("Dreamina process rejects oversized output and terminates the child", async () => {
     let pid = 0;
+    const dependencies = await processTestDependencies();
     await assert.rejects(
         runDreaminaProcess({
             executable: process.execPath,
             args: ["-e", "process.stdout.write('x'.repeat(2*1024*1024+1));setInterval(()=>{},1000)"],
             timeoutMs: 5_000,
             onSpawn: (childPid) => { pid = childPid; },
-        }),
+        }, dependencies),
         (error: unknown) => error instanceof DreaminaCliError && error.code === "dreamina_output_too_large",
     );
     assert.ok(pid > 0);
@@ -122,6 +186,7 @@ test("Dreamina process rejects oversized output and terminates the child", async
 test("Dreamina cancellation waits for exact process cleanup", async () => {
     const controller = new AbortController();
     let pid = 0;
+    const dependencies = await processTestDependencies();
     const running = runDreaminaProcess({
         executable: process.execPath,
         args: ["-e", "setInterval(()=>{},1000)"],
@@ -131,7 +196,7 @@ test("Dreamina cancellation waits for exact process cleanup", async () => {
             pid = childPid;
             controller.abort();
         },
-    });
+    }, dependencies);
 
     await assert.rejects(
         running,
@@ -179,6 +244,7 @@ test("Dreamina early JSON completion waits for the original child close after tr
 
 test("Dreamina process accepts one exact submit receipt line and cleans up a long-lived child", async () => {
     let pid = 0;
+    const dependencies = await processTestDependencies();
     const result = await runDreaminaProcess({
         executable: process.execPath,
         args: ["-e", "process.stdout.write(JSON.stringify({submit_id:'receipt-process-cleanup'})+'\\n');setInterval(()=>{},1000)"],
@@ -189,7 +255,7 @@ test("Dreamina process accepts one exact submit receipt line and cleans up a lon
             return Object.keys(record).length === 1 && typeof record.submit_id === "string" && /^receipt-[a-z-]+$/.test(record.submit_id);
         },
         onSpawn: (childPid) => { pid = childPid; },
-    });
+    }, dependencies);
 
     assert.equal(result.exitCode, 0);
     assert.equal(result.stdout, '{"submit_id":"receipt-process-cleanup"}');
@@ -200,6 +266,7 @@ test("Dreamina process accepts one exact submit receipt line and cleans up a lon
 test("Dreamina process does not accept a progress event that happens to carry a submit id", async () => {
     let pid = 0;
     const startedAt = Date.now();
+    const dependencies = await processTestDependencies();
     await assert.rejects(runDreaminaProcess({
         executable: process.execPath,
         args: ["-e", "process.stdout.write(JSON.stringify({event:'progress',submit_id:'receipt-progress-event'})+'\\n');setInterval(()=>{},1000)"],
@@ -210,7 +277,7 @@ test("Dreamina process does not accept a progress event that happens to carry a 
             return Object.keys(record).length === 1 && typeof record.submit_id === "string";
         },
         onSpawn: (childPid) => { pid = childPid; },
-    }), (error: unknown) => error instanceof DreaminaCliError && error.code === "dreamina_command_timeout");
+    }, dependencies), (error: unknown) => error instanceof DreaminaCliError && error.code === "dreamina_command_timeout");
     assert.ok(Date.now() - startedAt >= 40);
     assert.ok(pid > 0);
     assert.throws(() => process.kill(pid, 0));

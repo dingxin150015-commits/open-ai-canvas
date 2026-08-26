@@ -438,3 +438,11 @@ ACL 复核：目录关闭继承；仅 `<current-windows-user>`、SYSTEM、Admini
 ### 恢复边界
 
 这是阶段 8 完成后的权威数据库恢复点。恢复数据库不能撤销已经发生的百炼供应商费用，也不会自动删除或恢复阿里云 OSS 对象；OSS 对象与数据库资源记录必须按同一审计范围处理。任何恢复、对象删除、价格重新启用或卷操作仍需用户即时批准。
+
+## 2026-08-26：阶段 10 前空间清理登记
+
+- 保留：阶段 0、阶段 6、阶段 7、阶段 8 全部 `verified/protected` 私有恢复点及项目内位置指针；运行数据卷未操作。
+- 删除：可再生成的 `.local/cache` 大部分缓存、`web/dist`、`canvas-agent/dist`、`backend/server.exe`。
+- 已确认释放下限：775,473,371 bytes（约 739.55 MiB）；不把未能完整计量的部分删除计入结果。
+- 保留依赖：`web/node_modules` 与 `canvas-agent/node_modules`，避免阶段 10–16 重复联网安装。
+- 未完成：`.local/cache/stage1-go-mod` 尚有残余。直接 `Remove-Item`、清除只读属性后删除、显式 `GOMODCACHE` 的 `go clean -modcache` 均未完整成功；按三次同类失败门禁停止，不使用跨 Shell 强制清理。

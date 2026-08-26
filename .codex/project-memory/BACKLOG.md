@@ -27,7 +27,7 @@
 
 ## P1：测试与可观察性
 
-- [ ] 修复或在 Linux CI 复核 Canvas Agent Windows 进程树清理：当前 4 个 `dreamina-cli-process` 用例失败且测试进程不退出；TypeScript 构建通过。
+- [x] 复核 Canvas Agent Windows 进程树清理：确认 Codex 受限进程的 `taskkill` 被拒绝导致假阴性；测试夹具显式探测能力，主机真实专项 12/12、全量 287/287 和 TypeScript 构建通过。远程 Linux CI 仍随未来 PR 验证。
 - [ ] 增加 Qwen 38/39 项、同名 SKU 和真实存量配置测试；字段缺失、空数组、`*` 和非法默认值已有局部覆盖。
 - [ ] 增加 Qwen `auto` 省略、`x -> *`、比例映射和 1–6 输出完整序列化测试；当前只有尺寸规范化局部覆盖。
 - [x] 为 Ready 视频模型增加 480P/时长/音频/水印、跨媒体数量、输入相关时长和非法组合拒绝测试。

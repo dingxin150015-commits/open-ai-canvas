@@ -32,6 +32,7 @@
 - Backend：隔离 Linux CGO `go test -count=1 ./...` 通过；测试不挂载运行数据、备份或密钥。
 - Web：主套件 449/449、跨 Runtime 1/1、TypeScript 和容器生产构建通过，无 Rolldown panic。
 - Canvas Agent：TypeScript 构建通过；阶段 4 曾有 286/286 历史通过记录，但阶段 9 当前 Windows 复验在 `dreamina-cli-process.test.ts` 稳定出现 4 个进程树清理失败并使测试进程不退出。失败涉及 oversized output、取消清理、早期 receipt 清理和 progress timeout 后的 `taskkill`/child close 语义；不能写成当前全绿，需 Linux CI 复核或单独修复。
+- 后续阶段 10 已确认上述 4 个失败是 Codex 受限进程无权执行 `taskkill` 的测试环境假阴性；主机权限专项 12/12、全量 287/287 和构建通过。阶段 9 此处保留为当时历史结论，不再代表当前状态。
 - Manifest：80 个百炼官方补充模型，11 Ready；生成前后哈希稳定。
 - Git 静态门禁：`gofmt -l backend` 为空，`git diff --check` 通过；最终密钥/本机路径扫描见阶段 9 执行记录。
 - 远程 GitHub Actions 尚未触发；本地通过不能写成远程 CI 已通过。

@@ -52,12 +52,20 @@
 
 ## 当前验证状态
 
-- Backend 隔离 Linux CGO 全量测试、Web 449/449 + 跨 Runtime 1/1、TypeScript和生产构建均通过。Canvas Agent TypeScript 构建通过；阶段 9 当前 Windows 复验有 4 个 `dreamina-cli-process` 进程清理用例失败并挂住测试进程，阶段 4 的 286/286 只能作为历史记录，最终状态见阶段 9 交付报告。
+- Backend 隔离 Linux CGO 全量测试、Web 449/449 + 跨 Runtime 1/1、TypeScript和生产构建均通过。
+- 阶段 10 已推翻“Canvas Agent Windows 生产进程清理失败”的旧判断：4 个失败由 Codex 受限测试进程调用 `taskkill` 时被系统拒绝访问造成；同一源码在主机权限下真实 `taskkill /T /F` 专项 12/12、Canvas Agent 全量 287/287 和 TypeScript 构建均通过。
+- 进程测试现会探测精确 Windows 进程树终止能力：受限环境用注入的直属测试子进程终止器继续验证取消、超时、输出上限和 receipt 语义，并把精确树能力明确标记为 skip；正常主机和 CI 仍执行真实生产终止器。
 - 运行数据库已迁移并完成 319 条目录拉取；重复拉取真实幂等。Backend/Web 当前运行最终候选且 healthy，数据卷保持原位。
 - Microsoft Edge 已验证管理后台支持状态、普通用户门禁、Create 音频/水印控制和 Wan 3.0 结果播放。
 - 一次授权内 Wan 3.0 真实任务 succeeded，精确 SKU 账务 settled，阿里云 OSS Resource ready、Asset confirmed；随后模型恢复停用/未定价。
 - 2026-08-25 的 Chrome/内置浏览器失效登录结果仍属于错误浏览器证据，后续只使用 Edge。
 - 后续任何真实模型调用仍必须重新确认账号、模型、参数、额度、费用和重试次数；阶段 8 授权不可复用。
+
+## 阶段 10 前空间清理
+
+- 已删除可再生成的 `.local/cache` 大部分缓存、`web/dist`、`canvas-agent/dist` 和 `backend/server.exe`，按清理前精确计数至少释放 775,473,371 bytes（约 739.55 MiB）。
+- `node_modules` 是阶段 10–16 持续开发依赖，未删除；阶段 0/6/7/8 的 verified/protected 恢复点和运行数据卷均未触碰。
+- `.local/cache/stage1-go-mod` 因 Windows 只读属性、目录并发消失和访问拒绝，在三次安全清理路径后仍有残余；已停止盲目强删，后续可在无占用的主机维护窗口处理。
 
 ## 百炼官方文档与全局技能
 
