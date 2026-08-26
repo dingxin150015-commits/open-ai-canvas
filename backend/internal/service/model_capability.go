@@ -79,25 +79,30 @@ type VideoCapabilityConfig struct {
 }
 
 type VideoReferenceConfig struct {
-	PromptMaxChars   int   `json:"promptMaxChars"`
-	MinImages        int   `json:"minImages"`
-	MaxImages        int   `json:"maxImages"`
-	MaxImageBytes    int64 `json:"maxImageBytes"`
-	MaxVideos        int   `json:"maxVideos"`
-	MaxVideoBytes    int64 `json:"maxVideoBytes"`
-	MaxVideoDuration int   `json:"maxVideoDurationSeconds"`
-	MaxAudios        int   `json:"maxAudios"`
-	MaxAudioBytes    int64 `json:"maxAudioBytes"`
-	MaxAudioDuration int   `json:"maxAudioDurationSeconds"`
+	PromptMaxChars             int   `json:"promptMaxChars"`
+	MinVisuals                 int   `json:"minVisualReferences,omitempty"`
+	MaxVisuals                 int   `json:"maxVisualReferences,omitempty"`
+	MinImages                  int   `json:"minImages"`
+	MaxImages                  int   `json:"maxImages"`
+	MaxImageBytes              int64 `json:"maxImageBytes"`
+	MaxVideos                  int   `json:"maxVideos"`
+	MaxVideoBytes              int64 `json:"maxVideoBytes"`
+	MaxVideoDuration           int   `json:"maxVideoDurationSeconds"`
+	MaxOutputDurationWithVideo int   `json:"maxOutputDurationWithVideoSeconds,omitempty"`
+	MaxAudios                  int   `json:"maxAudios"`
+	MaxAudioBytes              int64 `json:"maxAudioBytes"`
+	MaxAudioDuration           int   `json:"maxAudioDurationSeconds"`
+	AudioMustFitOutput         bool  `json:"audioMustFitOutput,omitempty"`
 }
 
 type VideoDurationConfig struct {
-	Selection string `json:"selection"`
-	Min       int    `json:"min,omitempty"`
-	Max       int    `json:"max,omitempty"`
-	Step      int    `json:"step,omitempty"`
-	Values    []int  `json:"values,omitempty"`
-	Default   int    `json:"default"`
+	Selection      string `json:"selection"`
+	Min            int    `json:"min,omitempty"`
+	Max            int    `json:"max,omitempty"`
+	Step           int    `json:"step,omitempty"`
+	Values         []int  `json:"values,omitempty"`
+	Default        int    `json:"default"`
+	SmartSupported bool   `json:"smartSupported,omitempty"`
 }
 
 type VideoBooleanConfig struct {
@@ -151,6 +156,25 @@ func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapab
 		image.ResponseFormat.Supported = false
 		image.OutputFormat.Supported = false
 		image.MaxOutputs = 4
+	case model.ChannelInterfaceDashScopeImage:
+		// DashScope 支持比例和像素格式输入，适配器会自动转换为上游格式（如 1:1 → 1024*1024）
+		image.Size = ImageSizeConfig{
+			Parameter: "size",
+			Values: []string{
+				"auto",
+				// 比例（推荐，更直观）
+				"1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16",
+				// 像素尺寸（高级用户）- 使用 x 格式与数据库存储一致
+				"1024x1024", "1536x1024", "1024x1536", "2048x2048", "2048x1152",
+			},
+			Default:     "1:1",
+			AllowCustom: false,
+		}
+		image.Quality = ImageQualityConfig{
+			Supported: true,
+			Values:    []string{"auto", "low", "medium", "high"},
+			Default:   "auto",
+		}
 	}
 	if model.ChannelInterfaceType(protocol) != model.ChannelInterfaceGrokImage && strings.HasPrefix(strings.ToLower(strings.TrimSpace(modelName)), "grok-imagine-image") {
 		image.References.MaxImages = 0
@@ -228,6 +252,29 @@ func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *Mo
 		video.Ratios = []string{"16:9", "9:16", "1:1"}
 		video.Resolutions = []string{"1080p"}
 		video.DefaultResolution = "1080p"
+	case model.ChannelInterfaceDashScopeVideo:
+		// DashScope 视频协议（wan2.7, wan3.0, HappyHorse 系列）
+		video.Operations = []string{"text_to_video", "image_to_video", "reference_to_video"}
+		video.References.MinImages = 0
+		video.References.MaxImages = 9
+		video.References.MaxImageBytes = 30 * 1024 * 1024
+		video.References.MaxVideos = 3
+		video.References.MaxVideoBytes = 50 * 1024 * 1024
+		video.References.MaxVideoDuration = 30
+		video.Duration = VideoDurationConfig{
+			Selection: "range",
+			Min:       2,
+			Max:       16,
+			Step:      1,
+			Default:   6,
+		}
+		video.Ratios = []string{"16:9", "9:16", "1:1", "4:3", "3:4"}
+		video.DefaultRatio = "16:9"
+		// 使用小写 p，适配器负责转换为大写 P
+		video.Resolutions = []string{"480p", "720p", "1080p"}
+		video.DefaultResolution = "720p"
+		video.GenerateAudio = VideoBooleanConfig{Supported: true, Default: true}
+		video.Watermark = VideoBooleanConfig{Supported: true, Default: false}
 	case model.ChannelInterfaceMiniMaxVideo:
 		video.Operations = append(video.Operations, "reference_to_video")
 		video.References.MaxImages = 9
@@ -245,7 +292,132 @@ func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *Mo
 		video.DefaultResolution = "768P"
 		video.Watermark = VideoBooleanConfig{Supported: true, Default: false}
 	}
+	if model.ChannelInterfaceType(protocol) == model.ChannelInterfaceDashScopeVideo && isWan30VideoModel(modelName) {
+		video = wan30VideoCapabilityConfig()
+	}
+	if model.ChannelInterfaceType(protocol) == model.ChannelInterfaceDashScopeVideo && isWan27ReadyVideoModel(modelName) {
+		video = wan27VideoCapabilityConfig(wan27VideoKind(modelName))
+	}
+	if model.ChannelInterfaceType(protocol) == model.ChannelInterfaceDashScopeVideo && isHappyHorse11ReadyVideoModel(modelName) {
+		video = happyHorseVideoCapabilityConfig(happyHorse11VideoKind(modelName))
+	}
 	return &ModelCapabilityConfig{Version: 1, Text: text, Image: DefaultImageCapabilityConfig(protocol, modelName), Video: video}
+}
+
+func wan30VideoCapabilityConfig() *VideoCapabilityConfig {
+	return &VideoCapabilityConfig{
+		// 官方页未声明媒体数量上限；这里采用产品侧保守上传上限，Adapter 不会静默截断。
+		References: VideoReferenceConfig{
+			PromptMaxChars:   20000,
+			MaxImages:        9,
+			MaxImageBytes:    30 * 1024 * 1024,
+			MaxVideos:        3,
+			MaxVideoBytes:    50 * 1024 * 1024,
+			MaxVideoDuration: 30,
+			MaxAudios:        1,
+			MaxAudioBytes:    15 * 1024 * 1024,
+			MaxAudioDuration: 30,
+		},
+		Duration:          VideoDurationConfig{Selection: "range", Min: 2, Max: 30, Step: 1, Default: 5, SmartSupported: true},
+		Ratios:            []string{"adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"},
+		DefaultRatio:      "adaptive",
+		Resolutions:       []string{"480p", "720p", "1080p"},
+		DefaultResolution: "1080p",
+		GenerateAudio:     VideoBooleanConfig{Supported: true, Default: true},
+		Watermark:         VideoBooleanConfig{Supported: true, Default: false},
+		Operations:        []string{"text_to_video", "image_to_video", "reference_to_video", "audio_to_video"},
+		DefaultOperation:  "text_to_video",
+	}
+}
+
+func wan27VideoCapabilityConfig(kind string) *VideoCapabilityConfig {
+	profile := &VideoCapabilityConfig{
+		References:        VideoReferenceConfig{PromptMaxChars: 5000},
+		Duration:          VideoDurationConfig{Selection: "range", Min: 2, Max: 15, Step: 1, Default: 5},
+		Ratios:            []string{"16:9", "9:16", "1:1", "4:3", "3:4"},
+		DefaultRatio:      "16:9",
+		Resolutions:       []string{"720p", "1080p"},
+		DefaultResolution: "1080p",
+		GenerateAudio:     VideoBooleanConfig{Supported: false, Default: false},
+		Watermark:         VideoBooleanConfig{Supported: true, Default: false},
+	}
+	switch kind {
+	case "t2v":
+		profile.References.MaxAudios = 1
+		profile.References.MaxAudioBytes = 15 * 1024 * 1024
+		profile.References.MaxAudioDuration = 30
+		profile.References.AudioMustFitOutput = true
+		profile.Operations = []string{"text_to_video", "audio_to_video"}
+		profile.DefaultOperation = "text_to_video"
+	case "i2v":
+		profile.References.MaxImages = 2
+		profile.References.MinVisuals = 1
+		profile.References.MaxVisuals = 2
+		profile.References.MaxImageBytes = 20 * 1024 * 1024
+		profile.References.MaxVideos = 1
+		profile.References.MaxVideoBytes = 100 * 1024 * 1024
+		profile.References.MaxVideoDuration = 10
+		profile.References.MaxAudios = 1
+		profile.References.MaxAudioBytes = 15 * 1024 * 1024
+		profile.References.MaxAudioDuration = 30
+		profile.References.AudioMustFitOutput = true
+		profile.Ratios = []string{"adaptive"}
+		profile.DefaultRatio = "adaptive"
+		profile.Operations = []string{"image_to_video", "extend", "reference_to_video", "audio_to_video"}
+		profile.DefaultOperation = "image_to_video"
+	case "r2v":
+		profile.References.MaxImages = 5
+		profile.References.MinVisuals = 1
+		profile.References.MaxVisuals = 5
+		profile.References.MaxImageBytes = 20 * 1024 * 1024
+		profile.References.MaxVideos = 5
+		profile.References.MaxVideoBytes = 100 * 1024 * 1024
+		profile.References.MaxVideoDuration = 30
+		profile.References.MaxOutputDurationWithVideo = 10
+		profile.References.MaxAudios = 1
+		profile.References.MaxAudioBytes = 15 * 1024 * 1024
+		profile.References.MaxAudioDuration = 10
+		profile.Operations = []string{"reference_to_video", "image_to_video", "audio_to_video"}
+		profile.DefaultOperation = "reference_to_video"
+	}
+	return profile
+}
+
+func happyHorseVideoCapabilityConfig(kind string) *VideoCapabilityConfig {
+	profile := &VideoCapabilityConfig{
+		References:        VideoReferenceConfig{PromptMaxChars: 5000},
+		Duration:          VideoDurationConfig{Selection: "range", Min: 3, Max: 15, Step: 1, Default: 5},
+		Ratios:            []string{"16:9", "9:16", "1:1", "4:3", "3:4", "4:5", "5:4", "9:21", "21:9"},
+		DefaultRatio:      "16:9",
+		Resolutions:       []string{"480p", "720p", "1080p"},
+		DefaultResolution: "1080p",
+		GenerateAudio:     VideoBooleanConfig{Supported: false, Default: false},
+		Watermark:         VideoBooleanConfig{Supported: true, Default: true},
+	}
+	switch kind {
+	case "t2v":
+		profile.Operations = []string{"text_to_video"}
+		profile.DefaultOperation = "text_to_video"
+	case "i2v":
+		profile.References.MinImages = 1
+		profile.References.MinVisuals = 1
+		profile.References.MaxVisuals = 1
+		profile.References.MaxImages = 1
+		profile.References.MaxImageBytes = 20 * 1024 * 1024
+		profile.Ratios = []string{"adaptive"}
+		profile.DefaultRatio = "adaptive"
+		profile.Operations = []string{"image_to_video"}
+		profile.DefaultOperation = "image_to_video"
+	case "r2v":
+		profile.References.MinImages = 1
+		profile.References.MinVisuals = 1
+		profile.References.MaxVisuals = 9
+		profile.References.MaxImages = 9
+		profile.References.MaxImageBytes = 20 * 1024 * 1024
+		profile.Operations = []string{"reference_to_video", "image_to_video"}
+		profile.DefaultOperation = "reference_to_video"
+	}
+	return profile
 }
 
 func DecodeModelCapabilityConfig(raw string) (*ModelCapabilityConfig, error) {
@@ -257,6 +429,23 @@ func DecodeModelCapabilityConfig(raw string) (*ModelCapabilityConfig, error) {
 		return nil, err
 	}
 	return &value, nil
+}
+
+// effectiveChannelModelCapability is the single persisted capability boundary
+// shared by catalog projection and task admission. System models fail closed
+// when their durable profile is missing, malformed, or incomplete.
+func effectiveChannelModelCapability(item *model.ChannelModel) (*ModelCapabilityConfig, error) {
+	if item == nil || strings.TrimSpace(item.CapabilityConfigJSON) == "" {
+		return nil, fmt.Errorf("channel model capability profile is missing")
+	}
+	config, err := DecodeModelCapabilityConfig(item.CapabilityConfigJSON)
+	if err != nil || config == nil {
+		if err == nil {
+			err = fmt.Errorf("channel model capability profile is empty")
+		}
+		return nil, err
+	}
+	return NormalizeModelCapabilityConfig(item.Capability, string(item.Protocol), config)
 }
 
 func NormalizeModelCapabilityConfig(capability string, _ string, input *ModelCapabilityConfig) (*ModelCapabilityConfig, error) {
@@ -350,14 +539,24 @@ func CapabilitySpecFromModelCapabilityConfig(config *ModelCapabilityConfig, capa
 		addInputConstraint(spec.Inputs, "image", video.References.MinImages, video.References.MaxImages)
 		addInputConstraint(spec.Inputs, "video", 0, video.References.MaxVideos)
 		addInputConstraint(spec.Inputs, "audio", 0, video.References.MaxAudios)
+		addInputConstraint(spec.Inputs, "visual", video.References.MinVisuals, video.References.MaxVisuals)
 		if video.Duration.Selection == "enum" {
 			values := make([]any, 0, len(video.Duration.Values))
 			for _, value := range video.Duration.Values {
 				values = append(values, value)
 			}
 			spec.Options["videoSeconds"] = OptionConstraint{Values: values}
+		} else if video.Duration.SmartSupported {
+			values := []any{-1}
+			for value := video.Duration.Min; value <= video.Duration.Max; value += video.Duration.Step {
+				values = append(values, value)
+			}
+			spec.Options["videoSeconds"] = OptionConstraint{Values: values}
 		} else {
 			spec.Options["videoSeconds"] = numericRange(float64(video.Duration.Min), float64(video.Duration.Max), float64(video.Duration.Step))
+		}
+		if video.References.MaxOutputDurationWithVideo > 0 {
+			spec.Options["videoSecondsWithReferenceVideo"] = numericRange(float64(video.Duration.Min), float64(video.References.MaxOutputDurationWithVideo), float64(video.Duration.Step))
 		}
 		spec.Options["size"] = anyValues(video.Ratios)
 		if len(video.Resolutions) > 0 {
@@ -472,7 +671,7 @@ func validateVideoCapabilityConfig(value *VideoCapabilityConfig) error {
 	if value.References.PromptMaxChars < 1 || value.References.PromptMaxChars > 1000000 {
 		return BadAuthRequest("提示词最大字符数必须在 1-1000000 之间")
 	}
-	for name, number := range map[string]int{"最少图片引用数": value.References.MinImages, "最大图片引用数": value.References.MaxImages, "最大视频引用数": value.References.MaxVideos, "最大音频引用数": value.References.MaxAudios} {
+	for name, number := range map[string]int{"最少视觉引用数": value.References.MinVisuals, "最大视觉引用数": value.References.MaxVisuals, "最少图片引用数": value.References.MinImages, "最大图片引用数": value.References.MaxImages, "最大视频引用数": value.References.MaxVideos, "最大音频引用数": value.References.MaxAudios} {
 		if number < 0 || number > 100 {
 			return BadAuthRequest(name + "必须在 0-100 之间")
 		}
@@ -480,7 +679,10 @@ func validateVideoCapabilityConfig(value *VideoCapabilityConfig) error {
 	if value.References.MinImages > value.References.MaxImages {
 		return BadAuthRequest("最少图片引用数不能超过最大图片引用数")
 	}
-	if value.References.MaxImageBytes < 0 || value.References.MaxVideoBytes < 0 || value.References.MaxAudioBytes < 0 || value.References.MaxVideoDuration < 0 || value.References.MaxAudioDuration < 0 {
+	if value.References.MinVisuals > value.References.MaxVisuals {
+		return BadAuthRequest("最少视觉引用数不能超过最大视觉引用数")
+	}
+	if value.References.MaxImageBytes < 0 || value.References.MaxVideoBytes < 0 || value.References.MaxAudioBytes < 0 || value.References.MaxVideoDuration < 0 || value.References.MaxOutputDurationWithVideo < 0 || value.References.MaxAudioDuration < 0 {
 		return BadAuthRequest("引用素材限制不能小于 0")
 	}
 	if err := validateVideoDuration(value.Duration); err != nil {
@@ -558,16 +760,12 @@ func (s *Service) ValidateTaskCapability(input map[string]any) error {
 	if err != nil {
 		return BadAuthRequest("当前系统渠道模型未配置或已停用")
 	}
-	profile, err := DecodeModelCapabilityConfig(item.CapabilityConfigJSON)
+	profile, err := effectiveChannelModelCapability(item)
 	if taskInput.Mode == "image" {
-		if err != nil {
+		if err != nil || profile == nil || profile.Image == nil {
 			return BadAuthRequest("当前图片模型能力参数无效")
 		}
-		imageProfile := DefaultImageCapabilityConfig(string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey))
-		if profile != nil && profile.Image != nil {
-			imageProfile = profile.Image
-		}
-		return validateImageTask(applyModelSpecificImageCapability(imageProfile, string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey), taskInput.Config.APIFormat), taskInput)
+		return validateImageTask(applyModelSpecificImageCapability(profile.Image, string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey), taskInput.Config.APIFormat), taskInput)
 	}
 	if err != nil || profile == nil || profile.Video == nil {
 		return BadAuthRequest("当前视频模型尚未配置能力参数")
@@ -598,25 +796,14 @@ func applyFixedVideoResolution(input *canvasGenerationInput, profile *VideoCapab
 }
 
 func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInput) error {
-	// 特殊处理：DashScope Wan 2.7 的音频字段映射
-	// - i2v: ReferenceAudios[0] -> driving_audio (在 media[] 内)
-	// - r2v: ReferenceAudios[0] -> reference_voice (在 input 顶级字段)
-	// 这些音频不计入 ReferenceAudios 数量限制
-	model := input.Config.Model
-	isWan27 := strings.Contains(model, "wan2.7") || strings.Contains(model, "wan27")
-	audioCountForValidation := len(input.ReferenceAudios)
-
-	if isWan27 && audioCountForValidation > 0 {
-		if strings.Contains(model, "i2v") {
-			// i2v 的音频会被转换为 driving_audio，不计入 ReferenceAudios
-			audioCountForValidation = 0
-		} else if strings.Contains(model, "r2v") {
-			// r2v 的音频会被转换为 reference_voice，不计入 ReferenceAudios
-			audioCountForValidation = 0
-		}
+	visualCount := len(input.ReferenceImages) + len(input.ReferenceVideos)
+	if profile.References.MaxVisuals > 0 && visualCount > profile.References.MaxVisuals {
+		return BadAuthRequest(fmt.Sprintf("当前视频模型最多支持 %d 个图片/视频视觉素材", profile.References.MaxVisuals))
 	}
-
-	if len(input.ReferenceImages) > profile.References.MaxImages || len(input.ReferenceVideos) > profile.References.MaxVideos || audioCountForValidation > profile.References.MaxAudios {
+	if visualCount < profile.References.MinVisuals {
+		return BadAuthRequest(fmt.Sprintf("当前视频模型至少需要 %d 个图片/视频视觉素材", profile.References.MinVisuals))
+	}
+	if len(input.ReferenceImages) > profile.References.MaxImages || len(input.ReferenceVideos) > profile.References.MaxVideos || len(input.ReferenceAudios) > profile.References.MaxAudios {
 		return BadAuthRequest("参考素材数量超过当前模型限制")
 	}
 	if len(input.ReferenceImages) < profile.References.MinImages {
@@ -646,6 +833,16 @@ func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInp
 	seconds, err := strconv.Atoi(strings.TrimSpace(input.Config.VideoSeconds))
 	if err != nil || !videoDurationAllowed(profile.Duration, seconds) {
 		return BadAuthRequest("视频时长不在当前模型支持范围内")
+	}
+	if len(input.ReferenceVideos) > 0 && profile.References.MaxOutputDurationWithVideo > 0 && seconds > profile.References.MaxOutputDurationWithVideo {
+		return BadAuthRequest(fmt.Sprintf("包含参考视频时，输出时长最多为 %d 秒", profile.References.MaxOutputDurationWithVideo))
+	}
+	if profile.References.AudioMustFitOutput {
+		for _, audio := range input.ReferenceAudios {
+			if audio.DurationMs > int64(seconds)*1000 {
+				return BadAuthRequest("参考音频不能长于输出视频")
+			}
+		}
 	}
 	if input.Config.Size != "" && !videoRatioAllowed(profile.Ratios, input.Config.Size) {
 		return BadAuthRequest("画面比例不在当前模型支持范围内")
@@ -746,6 +943,9 @@ func validateGPTImage2CustomSize(value string) error {
 }
 
 func videoDurationAllowed(value VideoDurationConfig, seconds int) bool {
+	if seconds == -1 {
+		return value.SmartSupported
+	}
 	if value.Selection == "enum" {
 		return containsInt(value.Values, seconds)
 	}

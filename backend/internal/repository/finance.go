@@ -72,7 +72,7 @@ func (r *Repository) ChannelModels(channelID string, includeDisabled bool) ([]mo
 	var items []model.ChannelModel
 	query := r.db.Where("channel_id = ?", channelID).Order("created_at asc")
 	if !includeDisabled {
-		query = query.Where("enabled = ?", true)
+		query = query.Where("enabled = ? AND support_status = ?", true, model.ChannelModelSupportReady)
 	}
 	if err := query.Find(&items).Error; err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (r *Repository) ChannelModelByID(channelID string, id string) (*model.Chann
 
 func (r *Repository) ChannelModelByKey(channelID string, modelKey string) (*model.ChannelModel, error) {
 	var item model.ChannelModel
-	if err := r.db.First(&item, "channel_id = ? AND model_key = ? AND enabled = ?", channelID, modelKey, true).Error; err != nil {
+	if err := r.db.First(&item, "channel_id = ? AND model_key = ? AND enabled = ? AND support_status = ?", channelID, modelKey, true, model.ChannelModelSupportReady).Error; err != nil {
 		return nil, err
 	}
 	if err := r.attachChannelModelPriceTiers([]*model.ChannelModel{&item}); err != nil {
@@ -283,6 +283,48 @@ func (r *Repository) CreateMissingChannelModels(items []model.ChannelModel) (int
 	// 拉取目录可能与其他管理员操作并发，唯一键冲突时保留已有定价配置。
 	result := r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&items)
 	return result.RowsAffected, result.Error
+}
+
+type ChannelModelCatalogUpdate struct {
+	ID                string
+	ExpectedUpdatedAt time.Time
+	Changes           map[string]any
+}
+
+// SyncChannelModelCatalog creates missing records and enriches untouched catalog records
+// in one transaction. Guarding updates by updated_at prevents a concurrent admin save
+// from being overwritten by a slower upstream catalog fetch.
+func (r *Repository) SyncChannelModelCatalog(items []model.ChannelModel, updates []ChannelModelCatalogUpdate) (int64, int64, error) {
+	var added int64
+	var updated int64
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if len(items) > 0 {
+			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&items)
+			if result.Error != nil {
+				return result.Error
+			}
+			added = result.RowsAffected
+		}
+		for _, update := range updates {
+			if len(update.Changes) == 0 {
+				continue
+			}
+			changes := make(map[string]any, len(update.Changes)+1)
+			for key, value := range update.Changes {
+				changes[key] = value
+			}
+			changes["updated_at"] = time.Now()
+			result := tx.Model(&model.ChannelModel{}).
+				Where("id = ? AND updated_at = ? AND enabled = ? AND price_configured = ? AND (capability_config_json = '' OR capability_config_json IS NULL)", update.ID, update.ExpectedUpdatedAt, false, false).
+				Updates(changes)
+			if result.Error != nil {
+				return result.Error
+			}
+			updated += result.RowsAffected
+		}
+		return nil
+	})
+	return added, updated, err
 }
 
 func (r *Repository) CreditAccount(userID string) (*model.CreditAccount, error) {

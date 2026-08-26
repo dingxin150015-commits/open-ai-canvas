@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -113,7 +114,6 @@ func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (ma
 
 	return map[string]interface{}{"mode": "image", "images": images}, nil
 }
-
 
 // dashScopeImageDataURLs 下载 DashScope 图片 URL 并转为 data URL
 func dashScopeImageDataURLs(ctx context.Context, config providerConfig, response dashScopeResponse) ([]map[string]string, error) {
@@ -230,8 +230,11 @@ type dashScopeResponse struct {
 // postDashScopeJSONSync 向 DashScope 发送同步 POST 请求（不带 X-DashScope-Async header）
 func postDashScopeJSONSync(ctx context.Context, config providerConfig, path string, body interface{}, target interface{}) error {
 	data, _ := json.Marshal(body)
-	url := strings.TrimRight(config.BaseURL, "/") + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	endpoint, err := dashScopeNativeEndpoint(config.BaseURL, path)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
@@ -245,9 +248,11 @@ func postDashScopeJSONSync(ctx context.Context, config providerConfig, path stri
 // postDashScopeJSON 向 DashScope 发送 POST 请求（带 X-DashScope-Async header）
 func postDashScopeJSON(ctx context.Context, config providerConfig, path string, body interface{}, target interface{}) error {
 	data, _ := json.Marshal(body)
-	// DashScope API 路径不需要 /v1 前缀
-	url := strings.TrimRight(config.BaseURL, "/") + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	endpoint, err := dashScopeNativeEndpoint(config.BaseURL, path)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
@@ -260,12 +265,40 @@ func postDashScopeJSON(ctx context.Context, config providerConfig, path string, 
 
 // getDashScopeJSON 向 DashScope 发送 GET 请求
 func getDashScopeJSON(ctx context.Context, config providerConfig, path string, target interface{}) error {
-	url := strings.TrimRight(config.BaseURL, "/") + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	endpoint, err := dashScopeNativeEndpoint(config.BaseURL, path)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+config.APIKey)
 	ApplyOutboundHeaders(req, config.Headers)
 	return doJSON(req, target)
+}
+
+// dashScopeNativeEndpoint keeps the configured account/region host while moving
+// from an OpenAI-compatible base path to the native DashScope API surface.
+// Token Plan and workspace-specific MaaS keys are bound to their configured host,
+// so replacing the host with the public DashScope domain would break entitlement.
+func dashScopeNativeEndpoint(rawBaseURL string, path string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawBaseURL))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", errors.New("DashScope Base URL 无效")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", errors.New("DashScope Base URL 不能包含查询参数或片段")
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	for _, suffix := range []string{"/compatible-mode/v1", "/api/v1"} {
+		if strings.HasSuffix(strings.ToLower(basePath), suffix) {
+			basePath = strings.TrimRight(basePath[:len(basePath)-len(suffix)], "/")
+			break
+		}
+	}
+	parsed.Path = basePath
+	parsed.RawPath = ""
+	return strings.TrimRight(parsed.String(), "/") + "/" + strings.TrimLeft(path, "/"), nil
 }

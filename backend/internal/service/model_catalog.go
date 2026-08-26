@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"infinite-canvas/backend/internal/model"
+	"log"
 )
 
 // ModelCatalogSource 表示模型目录来源
@@ -143,7 +144,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 	// 转换为公开的价格档
 	publicTiers := make([]PublicChannelModelPriceTier, 0, len(priceTiers))
 	for _, tier := range priceTiers {
-		if !tier.Enabled || !ValidatePriceTierPrice(&tier) {
+		if !tier.Enabled || !tier.PriceConfigured || !ValidatePriceTierPrice(&tier) {
 			continue
 		}
 		publicTiers = append(publicTiers, PublicChannelModelPriceTier{
@@ -162,17 +163,16 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 	// 计算价格展示
 	pricingMode, displayPrice, priceLabel := computeChannelModelPriceDisplay(cm, publicTiers)
 
-	// 解析能力配置
+	available := len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm))
+
+	// Catalog and task admission consume the same durable capability profile.
 	var capabilityConfig map[string]any
-	if cm.CapabilityConfigJSON != "" {
-		config, _ := DecodeModelCapabilityConfig(cm.CapabilityConfigJSON)
-		if config != nil {
-			normalized, _ := NormalizeModelCapabilityConfig(cm.Capability, string(cm.Protocol), config)
-			if normalized != nil {
-				// 转换为 map[string]any
-				capabilityConfig = modelCapabilityConfigToMap(normalized)
-			}
-		}
+	config, capabilityErr := effectiveChannelModelCapability(cm)
+	if capabilityErr != nil {
+		available = false
+		log.Printf("channel model omitted from available catalog model_id=%s: invalid durable capability profile: %v", cm.ID, capabilityErr)
+	} else {
+		capabilityConfig = modelCapabilityConfigToMap(config)
 	}
 
 	return PublicChannelModel{
@@ -185,7 +185,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 		PricingMode:      pricingMode,
 		DisplayPrice:     displayPrice,
 		PriceLabel:       priceLabel,
-		Available:        len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm)),
+		Available:        available,
 	}
 }
 

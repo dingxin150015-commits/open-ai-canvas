@@ -57,7 +57,7 @@ func HasValidPrice(channelModel *model.ChannelModel) bool {
 	// 如果有价格档，检查价格档
 	if len(channelModel.PriceTiers) > 0 {
 		for _, tier := range channelModel.PriceTiers {
-			if tier.Enabled && ValidatePriceTierPrice(&tier) {
+			if tier.Enabled && tier.PriceConfigured && ValidatePriceTierPrice(&tier) {
 				return true
 			}
 		}
@@ -65,6 +65,9 @@ func HasValidPrice(channelModel *model.ChannelModel) bool {
 	}
 
 	// 否则检查模型级别的价格
+	if !channelModel.PriceConfigured {
+		return false
+	}
 	return ValidateChannelModelPrice(channelModel.BillingMode, channelModel.Capability, channelModel.Protocol, channelModel.UnitPriceMicrocredits, channelModel.InputTokenPriceMicrocredits, channelModel.OutputTokenPriceMicrocredits, channelModel.CachedTokenPriceMicrocredits)
 }
 

@@ -1,10 +1,58 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"infinite-canvas/backend/internal/model"
 	"strings"
 	"testing"
 )
+
+func TestEffectiveChannelModelCapabilityIsSharedFailClosedBoundary(t *testing.T) {
+	profile := DefaultModelCapabilityConfigForModel("dashscope-video", "wan3.0-video")
+	encoded, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := &model.ChannelModel{
+		ID:                    "wan30",
+		ModelKey:              "wan3.0-video",
+		Capability:            "video",
+		Protocol:              model.ChannelInterfaceDashScopeVideo,
+		CapabilityConfigJSON:  string(encoded),
+		BillingMode:           "fixed_request",
+		UnitPriceMicrocredits: 1,
+		PriceConfigured:       true,
+	}
+
+	effective, err := effectiveChannelModelCapability(item)
+	if err != nil {
+		t.Fatalf("effectiveChannelModelCapability() error = %v", err)
+	}
+	if effective.Video == nil || effective.Video.Duration.Max != 30 || !effective.Video.Duration.SmartSupported {
+		t.Fatalf("effective video profile = %#v", effective.Video)
+	}
+	if public := (&Service{}).sanitizeChannelModel(item); !public.Available || public.CapabilityConfig == nil {
+		t.Fatalf("valid public model = %#v", public)
+	}
+
+	for name, raw := range map[string]string{
+		"missing":   "",
+		"malformed": "{",
+		"partial":   `{"version":1,"video":{"duration":{"selection":"range","min":2,"max":30,"default":5}}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := *item
+			invalid.CapabilityConfigJSON = raw
+			if _, err := effectiveChannelModelCapability(&invalid); err == nil {
+				t.Fatal("effectiveChannelModelCapability() error = nil")
+			}
+			if public := (&Service{}).sanitizeChannelModel(&invalid); public.Available || public.CapabilityConfig != nil {
+				t.Fatalf("invalid public model = %#v", public)
+			}
+		})
+	}
+}
 
 func TestValidateImageTaskRejectsOversizedGrokPromptByUTF8Bytes(t *testing.T) {
 	prompt := strings.Repeat("中", 4001)

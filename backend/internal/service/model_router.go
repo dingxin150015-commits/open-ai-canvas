@@ -255,6 +255,13 @@ func MatchCapability(spec CapabilitySpec, intent ModelRequestIntent) CapabilityM
 		}
 	}
 	for inputType, constraint := range spec.Inputs {
+		if inputType == "visual" {
+			count := intent.Inputs["image"] + intent.Inputs["video"]
+			if count < constraint.Min || count > constraint.Max {
+				reasons = append(reasons, fmt.Sprintf("图片/视频视觉素材数量需在 %d-%d 之间", constraint.Min, constraint.Max))
+			}
+			continue
+		}
 		if intent.Inputs[inputType] < constraint.Min {
 			reasons = append(reasons, fmt.Sprintf("至少需要 %d 个%s", constraint.Min, capabilityInputLabel(inputType)))
 		}
@@ -280,6 +287,8 @@ func capabilityInputLabel(name string) string {
 		return "参考视频"
 	case "audio":
 		return "参考音频"
+	case "visual":
+		return "图片/视频视觉素材"
 	case "mask":
 		return "蒙版"
 	default:

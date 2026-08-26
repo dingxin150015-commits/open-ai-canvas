@@ -11,6 +11,7 @@ type UserRole string
 type UserStatus string
 type ChannelScope string
 type ChannelInterfaceType string
+type ChannelModelSupportStatus string
 type ApiCallStatus string
 type ResourceStatus string
 type BillingStatus string
@@ -61,6 +62,11 @@ const (
 
 	ChannelScopeSystem ChannelScope = "system"
 	ChannelScopeUser   ChannelScope = "user"
+
+	ChannelModelSupportReady       ChannelModelSupportStatus = "ready"
+	ChannelModelSupportPlanned     ChannelModelSupportStatus = "planned"
+	ChannelModelSupportUnsupported ChannelModelSupportStatus = "unsupported"
+	ChannelModelSupportDeprecated  ChannelModelSupportStatus = "deprecated"
 
 	ChannelInterfaceChatCompletion        ChannelInterfaceType = "chat-completion"
 	ChannelInterfaceOpenAIResponse        ChannelInterfaceType = "openai-response"

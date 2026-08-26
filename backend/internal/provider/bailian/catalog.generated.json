@@ -1,0 +1,1727 @@
+{
+  "provider": "bailian",
+  "version": "2026-08-25",
+  "generatedFrom": "local official Bailian documentation mirror plus reviewed live Wan 3.0 Prime enum",
+  "models": [
+    {
+      "id": "animate-anyone-gen2",
+      "displayName": "animate-anyone-gen2",
+      "providerModelKey": "animate-anyone-gen2",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/animate-anyone/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "animate-anyone-template-gen2",
+      "displayName": "animate-anyone-template-gen2",
+      "providerModelKey": "animate-anyone-template-gen2",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/animate-anyone-template-gen/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "emo-v1",
+      "displayName": "emo-v1",
+      "providerModelKey": "emo-v1",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/emo-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "emoji-v1",
+      "displayName": "emoji-v1",
+      "providerModelKey": "emoji-v1",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/emoji-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.0-i2v",
+      "displayName": "happyhorse-1.0-i2v",
+      "providerModelKey": "happyhorse-1.0-i2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.0-r2v",
+      "displayName": "happyhorse-1.0-r2v",
+      "providerModelKey": "happyhorse-1.0-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.0-t2v",
+      "displayName": "happyhorse-1.0-t2v",
+      "providerModelKey": "happyhorse-1.0-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.0-video-edit",
+      "displayName": "happyhorse-1.0-video-edit",
+      "providerModelKey": "happyhorse-1.0-video-edit",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-video-editing/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.1-i2v",
+      "displayName": "HappyHorse 1.1 图生视频",
+      "providerModelKey": "happyhorse-1.1-i2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.1-r2v",
+      "displayName": "HappyHorse 1.1 参考生视频",
+      "providerModelKey": "happyhorse-1.1-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "reference_to_video",
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "happyhorse-1.1-t2v",
+      "displayName": "HappyHorse 1.1 文生视频",
+      "providerModelKey": "happyhorse-1.1-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/happyhorse-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "kling/kling-v3-omni-video-generation",
+      "displayName": "kling/kling-v3-omni-video-generation",
+      "providerModelKey": "kling/kling-v3-omni-video-generation",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video",
+        "reference_to_video",
+        "text_to_video",
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/kling-video-generation/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "kling/kling-v3-video-generation",
+      "displayName": "kling/kling-v3-video-generation",
+      "providerModelKey": "kling/kling-v3-video-generation",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video",
+        "reference_to_video",
+        "text_to_video",
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/kling-video-generation/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "liveportrait",
+      "displayName": "liveportrait",
+      "providerModelKey": "liveportrait",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/liveportrait-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-c1-it2v",
+      "displayName": "pixverse/pixverse-c1-it2v",
+      "providerModelKey": "pixverse/pixverse-c1-it2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/pixverse-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-c1-kf2v",
+      "displayName": "pixverse/pixverse-c1-kf2v",
+      "providerModelKey": "pixverse/pixverse-c1-kf2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-image-to-video-first-last/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-c1-r2v",
+      "displayName": "pixverse/pixverse-c1-r2v",
+      "providerModelKey": "pixverse/pixverse-c1-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-c1-t2v",
+      "displayName": "pixverse/pixverse-c1-t2v",
+      "providerModelKey": "pixverse/pixverse-c1-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-lipsync",
+      "displayName": "pixverse/pixverse-lipsync",
+      "providerModelKey": "pixverse/pixverse-lipsync",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "lip_sync"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-lipsync/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-motioncontrol",
+      "displayName": "pixverse/pixverse-motioncontrol",
+      "providerModelKey": "pixverse/pixverse-motioncontrol",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "motion_control"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-motioncontrol/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-upscale",
+      "displayName": "pixverse/pixverse-upscale",
+      "providerModelKey": "pixverse/pixverse-upscale",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "video_upscale"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-upscale/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v5.6-it2v",
+      "displayName": "pixverse/pixverse-v5.6-it2v",
+      "providerModelKey": "pixverse/pixverse-v5.6-it2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/pixverse-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v5.6-kf2v",
+      "displayName": "pixverse/pixverse-v5.6-kf2v",
+      "providerModelKey": "pixverse/pixverse-v5.6-kf2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-image-to-video-first-last/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v5.6-r2v",
+      "displayName": "pixverse/pixverse-v5.6-r2v",
+      "providerModelKey": "pixverse/pixverse-v5.6-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v5.6-t2v",
+      "displayName": "pixverse/pixverse-v5.6-t2v",
+      "providerModelKey": "pixverse/pixverse-v5.6-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v6-it2v",
+      "displayName": "pixverse/pixverse-v6-it2v",
+      "providerModelKey": "pixverse/pixverse-v6-it2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/pixverse-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v6-kf2v",
+      "displayName": "pixverse/pixverse-v6-kf2v",
+      "providerModelKey": "pixverse/pixverse-v6-kf2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-image-to-video-first-last/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v6-r2v",
+      "displayName": "pixverse/pixverse-v6-r2v",
+      "providerModelKey": "pixverse/pixverse-v6-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v6-r2v-omni",
+      "displayName": "pixverse/pixverse-v6-r2v-omni",
+      "providerModelKey": "pixverse/pixverse-v6-r2v-omni",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "pixverse/pixverse-v6-t2v",
+      "displayName": "pixverse/pixverse-v6-t2v",
+      "providerModelKey": "pixverse/pixverse-v6-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/pixverse-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "qwen-image-3.0-pro",
+      "displayName": "通义千问图像 3.0 Pro",
+      "providerModelKey": "qwen-image-3.0-pro",
+      "capability": "image",
+      "protocol": "dashscope-image",
+      "supportedEndpointTypes": [
+        "image"
+      ],
+      "apiPath": "/api/v1/services/aigc/multimodal-generation/generation",
+      "supportStatus": "planned",
+      "supportReason": "Qwen Image 能力合同与 Create UI 回归尚未完成",
+      "supportedOperations": [
+        "text_to_image",
+        "image_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/image-generation/qwen-text-to-image.md",
+        "api-reference/image-generation/qwen-image-editing.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "video-style-transform",
+      "displayName": "video-style-transform",
+      "providerModelKey": "video-style-transform",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/video-style-transform/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "videoretalk",
+      "displayName": "videoretalk",
+      "providerModelKey": "videoretalk",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "lip_sync"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/video-retalk/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2-pro_img2video",
+      "displayName": "vidu/viduq2-pro_img2video",
+      "providerModelKey": "vidu/viduq2-pro_img2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/vidu-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2-pro_reference2video",
+      "displayName": "vidu/viduq2-pro_reference2video",
+      "providerModelKey": "vidu/viduq2-pro_reference2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2-pro_start-end2video",
+      "displayName": "vidu/viduq2-pro_start-end2video",
+      "providerModelKey": "vidu/viduq2-pro_start-end2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2-turbo_img2video",
+      "displayName": "vidu/viduq2-turbo_img2video",
+      "providerModelKey": "vidu/viduq2-turbo_img2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/vidu-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2-turbo_start-end2video",
+      "displayName": "vidu/viduq2-turbo_start-end2video",
+      "providerModelKey": "vidu/viduq2-turbo_start-end2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2_reference2video",
+      "displayName": "vidu/viduq2_reference2video",
+      "providerModelKey": "vidu/viduq2_reference2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq2_text2video",
+      "displayName": "vidu/viduq2_text2video",
+      "providerModelKey": "vidu/viduq2_text2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-ad_reference2video",
+      "displayName": "vidu/viduq3-ad_reference2video",
+      "providerModelKey": "vidu/viduq3-ad_reference2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-drama_reference2video",
+      "displayName": "vidu/viduq3-drama_reference2video",
+      "providerModelKey": "vidu/viduq3-drama_reference2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-pro-fast_img2video",
+      "displayName": "vidu/viduq3-pro-fast_img2video",
+      "providerModelKey": "vidu/viduq3-pro-fast_img2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-pro_img2video",
+      "displayName": "vidu/viduq3-pro_img2video",
+      "providerModelKey": "vidu/viduq3-pro_img2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/vidu-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-pro_start-end2video",
+      "displayName": "vidu/viduq3-pro_start-end2video",
+      "providerModelKey": "vidu/viduq3-pro_start-end2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-pro_text2video",
+      "displayName": "vidu/viduq3-pro_text2video",
+      "providerModelKey": "vidu/viduq3-pro_text2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-turbo_img2video",
+      "displayName": "vidu/viduq3-turbo_img2video",
+      "providerModelKey": "vidu/viduq3-turbo_img2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-image-to-video-first-frame/create-task.md",
+        "api-reference/video-generation/vidu-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-turbo_start-end2video",
+      "displayName": "vidu/viduq3-turbo_start-end2video",
+      "providerModelKey": "vidu/viduq3-turbo_start-end2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "vidu/viduq3-turbo_text2video",
+      "displayName": "vidu/viduq3-turbo_text2video",
+      "providerModelKey": "vidu/viduq3-turbo_text2video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/vidu-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.1-i2v-plus",
+      "displayName": "wan2.1-i2v-plus",
+      "providerModelKey": "wan2.1-i2v-plus",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.1-i2v-turbo",
+      "displayName": "wan2.1-i2v-turbo",
+      "providerModelKey": "wan2.1-i2v-turbo",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.1-kf2v-plus",
+      "displayName": "wan2.1-kf2v-plus",
+      "providerModelKey": "wan2.1-kf2v-plus",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-last-frames/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.1-t2v-plus",
+      "displayName": "wan2.1-t2v-plus",
+      "providerModelKey": "wan2.1-t2v-plus",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.1-t2v-turbo",
+      "displayName": "wan2.1-t2v-turbo",
+      "providerModelKey": "wan2.1-t2v-turbo",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-animate-mix",
+      "displayName": "wan2.2-animate-mix",
+      "providerModelKey": "wan2.2-animate-mix",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-video-character-swap/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-animate-move",
+      "displayName": "wan2.2-animate-move",
+      "providerModelKey": "wan2.2-animate-move",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-animation/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-i2v-flash",
+      "displayName": "wan2.2-i2v-flash",
+      "providerModelKey": "wan2.2-i2v-flash",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-i2v-plus",
+      "displayName": "wan2.2-i2v-plus",
+      "providerModelKey": "wan2.2-i2v-plus",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-kf2v-flash",
+      "displayName": "wan2.2-kf2v-flash",
+      "providerModelKey": "wan2.2-kf2v-flash",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "first_last_frame_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-last-frames/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-s2v",
+      "displayName": "wan2.2-s2v",
+      "providerModelKey": "wan2.2-s2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-s2v/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.2-t2v-plus",
+      "displayName": "wan2.2-t2v-plus",
+      "providerModelKey": "wan2.2-t2v-plus",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.5-i2v-preview",
+      "displayName": "wan2.5-i2v-preview",
+      "providerModelKey": "wan2.5-i2v-preview",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.5-t2v-preview",
+      "displayName": "wan2.5-t2v-preview",
+      "providerModelKey": "wan2.5-t2v-preview",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.6-i2v",
+      "displayName": "wan2.6-i2v",
+      "providerModelKey": "wan2.6-i2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.6-i2v-flash",
+      "displayName": "wan2.6-i2v-flash",
+      "providerModelKey": "wan2.6-i2v-flash",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "image_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.6-r2v",
+      "displayName": "wan2.6-r2v",
+      "providerModelKey": "wan2.6-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.6-r2v-flash",
+      "displayName": "wan2.6-r2v-flash",
+      "providerModelKey": "wan2.6-r2v-flash",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "reference_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.6-t2v",
+      "displayName": "wan2.6-t2v",
+      "providerModelKey": "wan2.6-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-i2v",
+      "displayName": "万相 2.7 图生视频",
+      "providerModelKey": "wan2.7-i2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "image_to_video",
+        "first_last_frame_to_video",
+        "extend",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-i2v-2026-04-25",
+      "displayName": "wan2.7-i2v-2026-04-25",
+      "providerModelKey": "wan2.7-i2v-2026-04-25",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "image_to_video",
+        "first_last_frame_to_video",
+        "extend",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-image-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-image-pro",
+      "displayName": "万相图像 2.7 Pro",
+      "providerModelKey": "wan2.7-image-pro",
+      "capability": "image",
+      "protocol": "dashscope-image",
+      "supportedEndpointTypes": [
+        "image"
+      ],
+      "apiPath": "/api/v1/services/aigc/multimodal-generation/generation",
+      "supportStatus": "planned",
+      "supportReason": "Wan 2.7 Image 模型专属能力合同尚未完成",
+      "supportedOperations": [
+        "text_to_image",
+        "image_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/image-generation/wan27-image-gen-edit/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-r2v",
+      "displayName": "万相 2.7 参考生视频",
+      "providerModelKey": "wan2.7-r2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "reference_to_video",
+        "image_to_video",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-r2v-2026-06-12",
+      "displayName": "wan2.7-r2v-2026-06-12",
+      "providerModelKey": "wan2.7-r2v-2026-06-12",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "reference_to_video",
+        "image_to_video",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-reference-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-t2v",
+      "displayName": "万相 2.7 文生视频",
+      "providerModelKey": "wan2.7-t2v",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "text_to_video",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-t2v-2026-04-25",
+      "displayName": "wan2.7-t2v-2026-04-25",
+      "providerModelKey": "wan2.7-t2v-2026-04-25",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "text_to_video",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-t2v-2026-06-12",
+      "displayName": "wan2.7-t2v-2026-06-12",
+      "providerModelKey": "wan2.7-t2v-2026-06-12",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "模型专属 Adapter 与离线合同测试已完成",
+      "supportedOperations": [
+        "text_to_video",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-text-to-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan2.7-videoedit",
+      "displayName": "wan2.7-videoedit",
+      "providerModelKey": "wan2.7-videoedit",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan27-video-editing/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan3.0-video",
+      "displayName": "万相 3.0 全能视频",
+      "providerModelKey": "wan3.0-video",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "ready",
+      "supportReason": "文本、首帧/首尾帧和参考图片/视频/音频已适配；file/link 输入仍待实现",
+      "supportedOperations": [
+        "text_to_video",
+        "image_to_video",
+        "first_last_frame_to_video",
+        "reference_to_video",
+        "audio_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan30-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wan3.0-video-prime",
+      "displayName": "万相 3.0 全能视频 Prime",
+      "providerModelKey": "wan3.0-video-prime",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "file_to_video",
+        "first_last_frame_to_video",
+        "image_to_video",
+        "link_to_video",
+        "reference_audio_to_video",
+        "reference_to_video",
+        "text_to_video"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan30-video/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    },
+    {
+      "id": "wanx2.1-vace-plus",
+      "displayName": "wanx2.1-vace-plus",
+      "providerModelKey": "wanx2.1-vace-plus",
+      "capability": "video",
+      "protocol": "dashscope-video",
+      "supportedEndpointTypes": [
+        "video"
+      ],
+      "apiPath": "/api/v1/services/aigc/video-generation/video-synthesis",
+      "supportStatus": "planned",
+      "supportReason": "项目模型专属 Adapter 与合同测试尚未完成",
+      "supportedOperations": [
+        "video_edit"
+      ],
+      "documentationPaths": [
+        "api-reference/video-generation/wan-general-video-editing/create-task.md"
+      ],
+      "catalogSource": "bailian-official-docs",
+      "catalogVersion": "2026-08-25"
+    }
+  ]
+}

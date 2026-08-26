@@ -29,21 +29,20 @@ import (
 // - wan2.7-i2v: 图生视频（首帧），1张输入图像
 // - wan2.7-r2v: 参考生视频，最多5个参考素材（图片或视频）
 // - happyhorse-1.1-t2v/i2v/r2v: HappyHorse 系列，物理真实
-// - wan3.0-video: 全能模型（邀测中）
+// - wan3.0-video: 全能模型
 //
 // API 流程：
-// 1. POST /services/aigc/video-generation/video-synthesis (Header: X-DashScope-Async: enable)
-//    → 返回 task_id
-// 2. 轮询 GET /tasks/{task_id}，每15秒一次
-//    → task_status: PENDING → RUNNING → SUCCEEDED / FAILED
-// 3. 任务成功后从 video_url 下载视频（24小时有效期）
-// 4. 上传到OSS或转换为data URL返回
+//  1. POST /services/aigc/video-generation/video-synthesis (Header: X-DashScope-Async: enable)
+//     → 返回 task_id
+//  2. 轮询 GET /tasks/{task_id}，每15秒一次
+//     → task_status: PENDING → RUNNING → SUCCEEDED / FAILED
+//  3. 任务成功后从 video_url 下载视频（24小时有效期）
+//  4. 转换为 data URL 返回，由前端资源同步链写入平台 OSS
 //
 // 参数限制由配置系统管理，在 validateVideoTask 中统一验证
 func runDashScopeVideoTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
 	log.Printf("[DashScope Video] ========== 开始处理视频生成任务 ==========")
-	log.Printf("[DashScope Video] Model: %s, Prompt: %s", input.Config.Model, input.Prompt)
-	log.Printf("[DashScope Video] Metadata: %+v", input.Metadata)
+	log.Printf("[DashScope Video] Model: %s", input.Config.Model)
 
 	// 1. 构建请求体（自动识别 t2v/i2v/r2v 模式）
 	requestBody, err := buildDashScopeVideoRequest(input)
@@ -68,9 +67,9 @@ func runDashScopeVideoTask(ctx context.Context, input canvasGenerationInput) (ma
 		log.Printf("[DashScope Video] ❌ 轮询任务失败: %v", err)
 		return nil, err
 	}
-	log.Printf("[DashScope Video] ✅ 任务完成，视频URL: %s", result.Output.VideoURL)
+	log.Printf("[DashScope Video] ✅ 任务完成，已收到临时视频地址")
 
-	// 5. 下载视频并保存（优先OSS，降级到内存）
+	// 5. 下载视频并交给统一资源化链
 	videoDataURL, mimeType, err := downloadDashScopeVideo(ctx, input.Config, result.Output.VideoURL)
 	if err != nil {
 		log.Printf("[DashScope Video] ❌ 下载视频失败: %v", err)
@@ -93,10 +92,17 @@ func runDashScopeVideoTask(ctx context.Context, input canvasGenerationInput) (ma
 // 根据模型ID和输入自动识别 t2v/i2v/r2v 模式
 func buildDashScopeVideoRequest(input canvasGenerationInput) (map[string]interface{}, error) {
 	model := input.Config.Model
+	if isWan30VideoModel(model) || strings.HasPrefix(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(model), "models/")), "wan3.0-") {
+		return buildWan30VideoRequest(input)
+	}
+	if isWan27ReadyVideoModel(model) || strings.HasPrefix(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(model), "models/")), "wan2.7-") {
+		return buildWan27VideoRequest(input)
+	}
+	if isHappyHorse11ReadyVideoModel(model) || strings.HasPrefix(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(model), "models/")), "happyhorse-") {
+		return buildHappyHorseVideoRequest(input)
+	}
 	log.Printf("[DashScope Video] --- 开始构建请求体 ---")
 	log.Printf("[DashScope Video] Input Model: %s", model)
-	log.Printf("[DashScope Video] Input Prompt: %s", input.Prompt)
-	log.Printf("[DashScope Video] Raw Metadata: %+v", input.Metadata)
 
 	// 参数转换前后对比
 	// 视频参数统一从 input.Config 读取，与其他视频协议保持一致；
@@ -153,7 +159,7 @@ func buildDashScopeVideoRequest(input canvasGenerationInput) (map[string]interfa
 	if negativePrompt := metadataString(input.Metadata, "negative_prompt"); negativePrompt != "" {
 		if inputMap, ok := body["input"].(map[string]interface{}); ok {
 			inputMap["negative_prompt"] = negativePrompt
-			log.Printf("[DashScope Video] ✅ 负向提示词已添加: %s", negativePrompt)
+			log.Printf("[DashScope Video] ✅ 已添加负向提示词")
 		}
 	}
 
@@ -172,14 +178,9 @@ func buildDashScopeVideoRequest(input canvasGenerationInput) (map[string]interfa
 		if referenceVoice != "" {
 			if inputMap, ok := body["input"].(map[string]interface{}); ok {
 				inputMap["reference_voice"] = referenceVoice
-				log.Printf("[DashScope Video] ✅ 声音克隆音频已添加: %s", mediaURLPrefixForLog(referenceVoice))
+				log.Printf("[DashScope Video] ✅ 已添加参考音色")
 			}
 		}
-	}
-
-	// 打印最终构建的请求体（格式化JSON）
-	if bodyJSON, marshalErr := json.MarshalIndent(body, "", "  "); marshalErr == nil {
-		log.Printf("[DashScope Video] 最终请求体:\n%s", string(bodyJSON))
 	}
 
 	return body, nil
@@ -210,7 +211,7 @@ func buildDashScopeVideoMedia(model string, input canvasGenerationInput) ([]map[
 				return nil, fmt.Errorf("读取首帧图地址失败：%w", err)
 			}
 			media = append(media, map[string]interface{}{"type": "first_frame", "url": url})
-			log.Printf("[DashScope Video] media[%d] type=first_frame urlPrefix=%s", len(media)-1, mediaURLPrefixForLog(url))
+			log.Printf("[DashScope Video] media[%d] type=first_frame", len(media)-1)
 
 			// 末帧（仅 Wan 2.7 支持，HappyHorse 不支持）
 			if isWan27 && imageCount >= 2 {
@@ -219,7 +220,7 @@ func buildDashScopeVideoMedia(model string, input canvasGenerationInput) ([]map[
 					return nil, fmt.Errorf("读取末帧图地址失败：%w", err)
 				}
 				media = append(media, map[string]interface{}{"type": "last_frame", "url": url})
-				log.Printf("[DashScope Video] media[%d] type=last_frame urlPrefix=%s", len(media)-1, mediaURLPrefixForLog(url))
+				log.Printf("[DashScope Video] media[%d] type=last_frame", len(media)-1)
 			}
 		}
 	} else {
@@ -240,7 +241,7 @@ func buildDashScopeVideoMedia(model string, input canvasGenerationInput) ([]map[
 
 			mediaType := "reference_image"
 			media = append(media, map[string]interface{}{"type": mediaType, "url": url})
-			log.Printf("[DashScope Video] media[%d] type=%s urlPrefix=%s", len(media)-1, mediaType, mediaURLPrefixForLog(url))
+			log.Printf("[DashScope Video] media[%d] type=%s", len(media)-1, mediaType)
 		}
 	}
 
@@ -255,7 +256,7 @@ func buildDashScopeVideoMedia(model string, input canvasGenerationInput) ([]map[
 				return nil, fmt.Errorf("读取第 %d 个参考视频地址失败：%w", i+1, err)
 			}
 			media = append(media, map[string]interface{}{"type": "reference_video", "url": url})
-			log.Printf("[DashScope Video] media[%d] type=reference_video urlPrefix=%s", len(media)-1, mediaURLPrefixForLog(url))
+			log.Printf("[DashScope Video] media[%d] type=reference_video", len(media)-1)
 		}
 	}
 
@@ -267,23 +268,12 @@ func buildDashScopeVideoMedia(model string, input canvasGenerationInput) ([]map[
 				return nil, fmt.Errorf("读取驱动音频地址失败：%w", err)
 			}
 			media = append(media, map[string]interface{}{"type": "driving_audio", "url": url})
-			log.Printf("[DashScope Video] media[%d] type=driving_audio urlPrefix=%s", len(media)-1, mediaURLPrefixForLog(url))
+			log.Printf("[DashScope Video] media[%d] type=driving_audio", len(media)-1)
 			break // 只支持 1 个驱动音频
 		}
 	}
 
 	return media, nil
-}
-
-// mediaURLPrefixForLog 只输出地址前缀，便于判断是对象存储公网地址、本机地址还是内嵌 data URL，同时避免签名泄露。
-func mediaURLPrefixForLog(value string) string {
-	if strings.HasPrefix(value, "data:") {
-		return "data:...(内嵌数据，DashScope 视频接口不接受)"
-	}
-	if len(value) > 60 {
-		return value[:60] + "..."
-	}
-	return value
 }
 
 // submitDashScopeVideoTask 提交异步视频生成任务
@@ -306,10 +296,11 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 		return "", fmt.Errorf("序列化请求体失败：%w", err)
 	}
 	log.Printf("[DashScope Video] ✅ 请求体序列化成功，大小: %d bytes", len(data))
-	log.Printf("[DashScope Video] 请求体JSON:\n%s", string(data))
 
-	url := strings.TrimRight(config.BaseURL, "/") + path
-	log.Printf("[DashScope Video] 请求URL: %s", url)
+	url, err := dashScopeNativeEndpoint(config.BaseURL, path)
+	if err != nil {
+		return "", err
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
@@ -326,7 +317,6 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 	log.Printf("[DashScope Video] HTTP Headers:")
 	log.Printf("[DashScope Video]   Content-Type: %s", req.Header.Get("Content-Type"))
 	log.Printf("[DashScope Video]   X-DashScope-Async: %s", req.Header.Get("X-DashScope-Async"))
-	log.Printf("[DashScope Video]   Authorization: Bearer %s", maskAPIKey(config.APIKey))
 
 	log.Printf("[DashScope Video] 开始调用 doJSON...")
 	var response dashScopeVideoSubmitResponse
@@ -338,10 +328,7 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 	elapsed := time.Since(startTime)
 	log.Printf("[DashScope Video] ✅ doJSON 成功 (耗时 %v)", elapsed)
 
-	// 打印完整响应
-	if responseJSON, err := json.MarshalIndent(response, "", "  "); err == nil {
-		log.Printf("[DashScope Video] API响应:\n%s", string(responseJSON))
-	}
+	log.Printf("[DashScope Video] 响应已接收 request_id=%s task_status=%s has_task_id=%v", response.RequestID, response.Output.TaskStatus, response.Output.TaskID != "")
 
 	// 检查是否有错误
 	if response.Code != "" && response.Code != "Success" {
@@ -363,14 +350,6 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 	return taskID, nil
 }
 
-// maskAPIKey 遮蔽API Key用于日志
-func maskAPIKey(key string) string {
-	if len(key) <= 8 {
-		return "***"
-	}
-	return key[:4] + "..." + key[len(key)-4:]
-}
-
 // pollDashScopeVideoTask 轮询视频任务状态
 // 轮询间隔 15 秒（官方 query-result.md 建议值）；
 // 超时上限跟随系统任务策略（ctx deadline，默认 30 分钟），与其他视频协议统一。
@@ -385,7 +364,9 @@ func pollDashScopeVideoTask(ctx context.Context, config providerConfig, taskID s
 
 	// 首次延迟，避免立即轮询
 	log.Printf("[DashScope Video] 等待 %v 后开始首次轮询...", initialDelay)
-	time.Sleep(initialDelay)
+	if err := sleepContext(ctx, initialDelay); err != nil {
+		return nil, err
+	}
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -416,40 +397,47 @@ func pollDashScopeVideoTask(ctx context.Context, config providerConfig, taskID s
 				log.Printf("[DashScope Video] ❌ 第 %d 轮查询失败：%v", round, err)
 				return nil, err
 			}
-			log.Printf("[DashScope Video] 第 %d 轮 task_status=%q video_url=%q message=%q", round, result.Output.TaskStatus, result.Output.VideoURL, result.Output.Message)
+			log.Printf("[DashScope Video] 第 %d 轮 task_status=%q has_video_url=%v message=%q", round, result.Output.TaskStatus, result.Output.VideoURL != "", result.Output.Message)
 
-			switch result.Output.TaskStatus {
-			case "SUCCEEDED":
-				// 任务成功
-				if result.Output.VideoURL == "" {
-					log.Printf("[DashScope Video] ❌ 状态 SUCCEEDED 但未返回视频 URL")
-					return nil, errors.New("任务成功但未返回视频 URL")
-				}
+			done, outcomeErr := dashScopeVideoTaskOutcome(config.Model, result)
+			if outcomeErr != nil {
+				return nil, outcomeErr
+			}
+			if done {
 				log.Printf("[DashScope Video] ✅ 轮询成功（共 %d 轮，耗时 %v）", round, time.Since(pollStart))
 				return result, nil
-
-			case "FAILED":
-				// 任务失败
-				message := result.Output.Message
-				if message == "" {
-					message = "未知错误"
-				}
-				log.Printf("[DashScope Video] ❌ DashScope 侧任务失败：%s", message)
-				// 翻译常见错误为用户可读提示
-				if strings.Contains(message, "Field required") && strings.Contains(message, "input.media") {
-					return nil, fmt.Errorf("模型 %s 需要参考素材（图片/视频），请先添加后再生成", config.Model)
-				}
-				return nil, fmt.Errorf("视频生成失败：%s", message)
-
-			case "PENDING", "RUNNING":
-				// 继续轮询
-				continue
-
-			default:
-				log.Printf("[DashScope Video] ❌ 未知任务状态：%q", result.Output.TaskStatus)
-				return nil, fmt.Errorf("未知任务状态：%s", result.Output.TaskStatus)
 			}
 		}
+	}
+}
+
+func dashScopeVideoTaskOutcome(modelName string, result *dashScopeVideoTaskResult) (bool, error) {
+	if result == nil {
+		return false, errors.New("DashScope 视频任务状态响应为空")
+	}
+	switch result.Output.TaskStatus {
+	case "SUCCEEDED":
+		if strings.TrimSpace(result.Output.VideoURL) == "" {
+			return false, errors.New("任务成功但未返回视频 URL")
+		}
+		return true, nil
+	case "FAILED":
+		message := strings.TrimSpace(result.Output.Message)
+		if message == "" {
+			message = "未知错误"
+		}
+		if strings.Contains(message, "Field required") && strings.Contains(message, "input.media") {
+			return false, fmt.Errorf("模型 %s 需要参考素材（图片/视频），请先添加后再生成", modelName)
+		}
+		return false, fmt.Errorf("视频生成失败：%s", message)
+	case "CANCELED":
+		return false, errors.New("DashScope 视频任务已取消")
+	case "UNKNOWN":
+		return false, errors.New("DashScope 视频任务不存在或任务 ID 已过期")
+	case "PENDING", "RUNNING":
+		return false, nil
+	default:
+		return false, fmt.Errorf("未知任务状态：%s", result.Output.TaskStatus)
 	}
 }
 
@@ -457,7 +445,10 @@ func pollDashScopeVideoTask(ctx context.Context, config providerConfig, taskID s
 func fetchDashScopeVideoTaskStatus(ctx context.Context, config providerConfig, taskID string) (*dashScopeVideoTaskResult, error) {
 	path := fmt.Sprintf("/api/v1/tasks/%s", taskID)
 
-	url := strings.TrimRight(config.BaseURL, "/") + path
+	url, err := dashScopeNativeEndpoint(config.BaseURL, path)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -479,22 +470,21 @@ func fetchDashScopeVideoTaskStatus(ctx context.Context, config providerConfig, t
 	return &result, nil
 }
 
-// downloadDashScopeVideo 下载视频并转换
-// 优先流式上传到OSS，降级到内存方案
-func downloadDashScopeVideo(ctx context.Context, config providerConfig, videoURL string) (string, string, error) {
+// downloadDashScopeVideo 下载短期结果并转换为统一 data URL；持久化由前端资源同步链负责。
+func downloadDashScopeVideo(ctx context.Context, _ providerConfig, videoURL string) (string, string, error) {
 	// 创建下载超时上下文（5分钟）
 	downloadCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
+	if _, err := ValidateOutboundURL(videoURL); err != nil {
+		return "", "", fmt.Errorf("视频结果地址不安全：%w", err)
+	}
 
 	req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, videoURL, nil)
 	if err != nil {
 		return "", "", err
 	}
-
-	// DashScope 视频 URL 通常不需要 Authorization
-	// 但为了安全起见，仍然带上
-	req.Header.Set("Authorization", "Bearer "+config.APIKey)
-	ApplyOutboundHeaders(req, config.Headers)
+	// 结果 URL 是短期签名地址，通常属于独立 OSS 主机。API Key 和渠道
+	// 自定义请求头只允许发往模型端点，禁止跨主机转发到结果下载地址。
 
 	// ✅ 修复问题5：使用自定义HTTP Client，设置超时
 	client := &http.Client{
@@ -519,11 +509,6 @@ func downloadDashScopeVideo(ctx context.Context, config providerConfig, videoURL
 			}
 		}
 	}
-
-	// TODO: 阶段二实现流式上传到OSS
-	// if s.ossAvailable() {
-	//     return s.uploadVideoStreamToOSS(ctx, resp.Body, mimeType)
-	// }
 
 	// 当前实现：下载到内存（带500MB软限制）
 	limitedReader := io.LimitReader(resp.Body, maxVideoSize)

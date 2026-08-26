@@ -2,11 +2,11 @@ package service
 
 import (
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"sync"
 
+	"infinite-canvas/backend/internal/model"
 	"infinite-canvas/backend/internal/provider"
 	"infinite-canvas/backend/internal/provider/bailian"
 )
@@ -70,8 +70,17 @@ func providerCatalogItem(item provider.Model) ChannelModelCatalogItem {
 	return ChannelModelCatalogItem{
 		ID:                     strings.TrimPrefix(strings.TrimSpace(item.ID), "models/"),
 		DisplayName:            strings.TrimSpace(item.DisplayName),
+		ProviderModelKey:       strings.TrimPrefix(strings.TrimSpace(firstNonEmpty(item.ProviderModelKey, item.ID)), "models/"),
 		ModelType:              modelType,
+		Protocol:               strings.TrimSpace(item.Protocol),
 		SupportedEndpointTypes: normalizeCatalogEndpointTypes(item.SupportedEndpointTypes),
+		SupportedOperations:    uniqueCatalogStrings(item.SupportedOperations),
+		SupportStatus:          normalizeCatalogSupportStatus(string(item.SupportStatus)),
+		SupportReason:          strings.TrimSpace(item.SupportReason),
+		CatalogSource:          strings.TrimSpace(item.CatalogSource),
+		CatalogVersion:         strings.TrimSpace(item.CatalogVersion),
+		DocumentationPaths:     uniqueCatalogStrings(item.DocumentationPaths),
+		APIPath:                strings.TrimSpace(item.APIPath),
 	}
 }
 
@@ -79,13 +88,68 @@ func enrichCatalogItem(current ChannelModelCatalogItem, fallback ChannelModelCat
 	if current.DisplayName == "" {
 		current.DisplayName = fallback.DisplayName
 	}
+	if current.ProviderModelKey == "" {
+		current.ProviderModelKey = fallback.ProviderModelKey
+	}
 	if current.ModelType == "" {
 		current.ModelType = fallback.ModelType
 	}
 	if len(current.SupportedEndpointTypes) == 0 {
 		current.SupportedEndpointTypes = fallback.SupportedEndpointTypes
 	}
+	if current.Protocol == "" {
+		current.Protocol = fallback.Protocol
+	}
+	current.SupportedOperations = uniqueCatalogStrings(append(current.SupportedOperations, fallback.SupportedOperations...))
+	current.DocumentationPaths = uniqueCatalogStrings(append(current.DocumentationPaths, fallback.DocumentationPaths...))
+	if fallback.SupportStatus != "" {
+		current.SupportStatus = fallback.SupportStatus
+	}
+	if fallback.SupportReason != "" {
+		current.SupportReason = fallback.SupportReason
+	}
+	if fallback.CatalogSource != "" {
+		if current.CatalogSource == "" || current.CatalogSource == fallback.CatalogSource {
+			current.CatalogSource = fallback.CatalogSource
+		} else {
+			current.CatalogSource = current.CatalogSource + "+" + fallback.CatalogSource
+		}
+	}
+	if fallback.CatalogVersion != "" {
+		current.CatalogVersion = fallback.CatalogVersion
+	}
+	if fallback.APIPath != "" {
+		current.APIPath = fallback.APIPath
+	}
 	return current
+}
+
+func normalizeCatalogSupportStatus(value string) model.ChannelModelSupportStatus {
+	switch model.ChannelModelSupportStatus(strings.ToLower(strings.TrimSpace(value))) {
+	case model.ChannelModelSupportReady:
+		return model.ChannelModelSupportReady
+	case model.ChannelModelSupportUnsupported:
+		return model.ChannelModelSupportUnsupported
+	case model.ChannelModelSupportDeprecated:
+		return model.ChannelModelSupportDeprecated
+	default:
+		return model.ChannelModelSupportPlanned
+	}
+}
+
+func uniqueCatalogStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func outboundHeadersMap(headers []OutboundHeader) map[string]string {
@@ -109,9 +173,4 @@ func modelCatalogRegion(baseURL string) string {
 		return "ap-southeast-1"
 	}
 	return "cn-beijing"
-}
-
-func (s *Service) isPluginEnabled() bool {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("ENABLE_PROVIDER_PLUGINS")))
-	return value == "true" || value == "1"
 }

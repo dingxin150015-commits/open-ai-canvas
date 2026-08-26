@@ -95,6 +95,9 @@ func MigrateSchema(db *gorm.DB) error {
 	if err := db.AutoMigrate(Models()...); err != nil {
 		return err
 	}
+	if err := backfillChannelModelCatalogState(db); err != nil {
+		return err
+	}
 	if err := migrateChannelModelPriceTierSelectors(db); err != nil {
 		return err
 	}
@@ -128,6 +131,39 @@ func MigrateSchema(db *gorm.DB) error {
 		return err
 	}
 	return db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_nonempty ON users(lower(email)) WHERE email <> ''").Error
+}
+
+func backfillChannelModelCatalogState(db *gorm.DB) error {
+	if err := db.Model(&model.ChannelModel{}).
+		Where("provider_model_key = '' OR provider_model_key IS NULL").
+		Update("provider_model_key", gorm.Expr("model_key")).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&model.ChannelModel{}).
+		Where("(catalog_source = '' OR catalog_source IS NULL) AND capability <> '' AND protocol <> '' AND capability_config_json <> ''").
+		Updates(map[string]any{
+			"support_status": model.ChannelModelSupportReady,
+			"catalog_source": "manual",
+		}).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&model.ChannelModel{}).
+		Where("catalog_source = '' OR catalog_source IS NULL").
+		Updates(map[string]any{
+			"support_status": model.ChannelModelSupportPlanned,
+			"support_reason": "升级前目录记录，等待官方目录补齐",
+			"catalog_source": "legacy",
+		}).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&model.ChannelModel{}).
+		Where("supported_operations_json = '' OR supported_operations_json IS NULL").
+		Update("supported_operations_json", "[]").Error; err != nil {
+		return err
+	}
+	return db.Model(&model.ChannelModel{}).
+		Where("documentation_paths_json = '' OR documentation_paths_json IS NULL").
+		Update("documentation_paths_json", "[]").Error
 }
 
 // migrateChannelModelPriceTierSelectors upgrades the old video-only unique key to

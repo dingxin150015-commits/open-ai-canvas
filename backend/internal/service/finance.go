@@ -452,7 +452,16 @@ func (s *Service) taskBillingOrder(userID string, task *model.Task, input map[st
 		capability = capabilityFromTaskType(task.Type)
 	}
 	scene := firstNonEmpty(strings.TrimSpace(task.Operation), task.Type)
-	return s.newBillingOrder(userID, task.ID, "task:"+task.ID+":"+newID(), channelID, modelKey, capability, scene, billingQuantity(capability, config["videoSeconds"]), estimateTaskBillingTokens(input, capability))
+	channelModel, err := s.repo.ChannelModelByKey(channelID, modelKey)
+	if err != nil {
+		return nil, BadAuthRequest("当前模型暂时不可用，请重新选择")
+	}
+	intent := ModelRequestIntentFromTaskInput(input, task.Type, task.Operation)
+	priceTier := channelModelPriceTierForIntent(*channelModel, intent)
+	if priceTier == nil {
+		return nil, BadAuthRequest("当前模型尚未配置所选规格的用户积分价格")
+	}
+	return s.newBillingOrderWithPriceTier(userID, task.ID, "task:"+task.ID+":"+newID(), channelID, modelKey, capability, scene, billingQuantity(capability, config["videoSeconds"]), estimateTaskBillingTokens(input, capability), priceTier.ID)
 }
 
 func (s *Service) newLogicalModelBillingOrder(userID string, task *model.Task, input map[string]any) (*model.BillingOrder, error) {

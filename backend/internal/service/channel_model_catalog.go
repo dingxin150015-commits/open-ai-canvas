@@ -76,8 +76,17 @@ func (s *Service) FetchChannelModels(ctx context.Context, actor *model.User, inp
 type ChannelModelCatalogItem struct {
 	ID                     string                               `json:"id"`
 	DisplayName            string                               `json:"displayName,omitempty"`
+	ProviderModelKey       string                               `json:"providerModelKey,omitempty"`
 	ModelType              string                               `json:"modelType,omitempty"`
+	Protocol               string                               `json:"protocol,omitempty"`
 	SupportedEndpointTypes []string                             `json:"supportedEndpointTypes,omitempty"`
+	SupportedOperations    []string                             `json:"supportedOperations,omitempty"`
+	SupportStatus          model.ChannelModelSupportStatus      `json:"supportStatus"`
+	SupportReason          string                               `json:"supportReason,omitempty"`
+	CatalogSource          string                               `json:"catalogSource,omitempty"`
+	CatalogVersion         string                               `json:"catalogVersion,omitempty"`
+	DocumentationPaths     []string                             `json:"documentationPaths,omitempty"`
+	APIPath                string                               `json:"apiPath,omitempty"`
 	DefaultParameters      ChannelModelCatalogDefaultParameters `json:"defaultParameters,omitempty"`
 	Options                ChannelModelCatalogOptions           `json:"options,omitempty"`
 	SupportsImages         *bool                                `json:"supportsImages,omitempty"`
@@ -176,11 +185,19 @@ func (s *Service) FetchChannelModelCatalog(ctx context.Context, actor *model.Use
 			continue
 		}
 		seen[name] = true
+		modelType := normalizeCatalogModelType(item.ModelType)
+		endpointTypes := normalizeCatalogEndpointTypes(item.SupportedEndpointTypes)
 		catalog = append(catalog, ChannelModelCatalogItem{
 			ID:                     name,
 			DisplayName:            strings.TrimSpace(item.DisplayName),
-			ModelType:              normalizeCatalogModelType(item.ModelType),
-			SupportedEndpointTypes: normalizeCatalogEndpointTypes(item.SupportedEndpointTypes),
+			ProviderModelKey:       name,
+			ModelType:              modelType,
+			Protocol:               catalogProtocol(modelType, endpointTypes, apiFormat),
+			SupportedEndpointTypes: endpointTypes,
+			SupportStatus:          model.ChannelModelSupportPlanned,
+			SupportReason:          "上游目录未提供经过项目验证的执行器合同",
+			CatalogSource:          "upstream",
+			CatalogVersion:         "upstream",
 			DefaultParameters: ChannelModelCatalogDefaultParameters{
 				AspectRatio:     strings.TrimSpace(item.DefaultParameters.AspectRatio),
 				DurationSeconds: strings.TrimSpace(item.DefaultParameters.DurationSeconds),
@@ -199,10 +216,42 @@ func (s *Service) FetchChannelModelCatalog(ctx context.Context, actor *model.Use
 	sort.Slice(catalog, func(left int, right int) bool {
 		return catalog[left].ID < catalog[right].ID
 	})
-	if s.isPluginEnabled() {
-		catalog = extendChannelModelCatalog(baseURL, apiFormat, headers, catalog)
-	}
+	// 官方厂商 Manifest 是目录事实的一部分，不受实验插件开关控制；
+	// 支持状态仍会阻止未完成 Adapter 的模型被定价、启用或路由。
+	catalog = extendChannelModelCatalog(baseURL, apiFormat, headers, catalog)
 	return catalog, nil
+}
+
+func catalogProtocol(modelType string, endpointTypes []string, apiFormat string) string {
+	normalized := make(map[string]bool, len(endpointTypes))
+	for _, endpointType := range endpointTypes {
+		normalized[strings.ToLower(strings.TrimSpace(endpointType))] = true
+	}
+	switch {
+	case normalized["openai-chat"] || normalized["chat-completion"] || normalized["chat"]:
+		return string(model.ChannelInterfaceChatCompletion)
+	case normalized["openai-response"] || normalized["responses"]:
+		return string(model.ChannelInterfaceOpenAIResponse)
+	case normalized["openai-image"] || normalized["image"]:
+		return string(model.ChannelInterfaceOpenAIImage)
+	case normalized["openai-video"] || normalized["video"]:
+		return string(model.ChannelInterfaceNewAPIChannel2)
+	case normalized["openai-audio"] || normalized["audio"]:
+		return string(model.ChannelInterfaceOpenAIAudio)
+	}
+	if strings.EqualFold(strings.TrimSpace(apiFormat), "openai") {
+		switch modelType {
+		case "text":
+			return string(model.ChannelInterfaceChatCompletion)
+		case "image":
+			return string(model.ChannelInterfaceOpenAIImage)
+		case "video":
+			return string(model.ChannelInterfaceNewAPIChannel2)
+		case "audio":
+			return string(model.ChannelInterfaceOpenAIAudio)
+		}
+	}
+	return ""
 }
 
 func normalizeCatalogModelType(value string) string {

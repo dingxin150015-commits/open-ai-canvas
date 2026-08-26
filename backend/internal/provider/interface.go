@@ -1,5 +1,14 @@
 package provider
 
+type ModelSupportStatus string
+
+const (
+	ModelSupportReady       ModelSupportStatus = "ready"
+	ModelSupportPlanned     ModelSupportStatus = "planned"
+	ModelSupportUnsupported ModelSupportStatus = "unsupported"
+	ModelSupportDeprecated  ModelSupportStatus = "deprecated"
+)
+
 // ModelCatalogPlugin 只补充标准 /models 没有暴露的厂商目录项。
 // 标准目录请求、鉴权和出站安全边界仍由 service 统一负责。
 type ModelCatalogPlugin interface {
@@ -27,12 +36,20 @@ type DiscoveryConfig struct {
 
 // Model 统一的模型定义
 type Model struct {
-	ID                     string         // 模型 ID
-	DisplayName            string         // 显示名称
-	Provider               string         // 提供商标识
-	Capability             []string       // 能力列表：text, image, video, audio, 3d
-	SupportedEndpointTypes []string       // 支持的端点类型
-	APIPath                string         // API 路径（如果非标准）
+	ID                     string   // 模型 ID
+	DisplayName            string   // 显示名称
+	ProviderModelKey       string   // 上游真实模型 ID
+	Provider               string   // 提供商标识
+	Capability             []string // 能力列表：text, image, video, audio, 3d
+	Protocol               string   // 项目请求协议
+	SupportedEndpointTypes []string // 支持的端点类型
+	SupportedOperations    []string // 项目可识别的操作集合
+	APIPath                string   // API 路径（如果非标准）
+	SupportStatus          ModelSupportStatus
+	SupportReason          string
+	CatalogSource          string
+	CatalogVersion         string
+	DocumentationPaths     []string
 	Metadata               map[string]any // 额外元数据
 	Deprecated             bool           // 是否已废弃
 	RequiresPlan           bool           // 是否需要特殊权限

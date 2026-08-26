@@ -52,10 +52,20 @@ type ChannelModelPriceTierRequest struct {
 	Enabled                      *bool             `json:"enabled"`
 }
 
-// AdminChannelModelFetchResult 是管理员从上游拉目录后的汇总：models 为去重后的标识，added 为本次新建条数。
+// AdminChannelModelFetchResult 是管理员从上游和官方 Manifest 合并目录后的汇总。
 type AdminChannelModelFetchResult struct {
-	Models []string `json:"models"`
-	Added  int64    `json:"added"`
+	Models               []string       `json:"models"`
+	Added                int64          `json:"added"`
+	Updated              int64          `json:"updated"`
+	UpstreamCount        int            `json:"upstreamCount"`
+	SupplementalCount    int            `json:"supplementalCount"`
+	CapabilityCounts     map[string]int `json:"capabilityCounts"`
+	SupportStatusCounts  map[string]int `json:"supportStatusCounts"`
+	SkippedRetired       int            `json:"skippedRetired"`
+	SkippedConfigured    int            `json:"skippedConfigured"`
+	Unchanged            int            `json:"unchanged"`
+	OfficialCatalogReady bool           `json:"officialCatalogReady"`
+	UpdateFieldCounts    map[string]int `json:"updateFieldCounts,omitempty"`
 }
 
 type AdminChannelModelTestResult struct {
@@ -94,6 +104,7 @@ func (s *Service) AdminChannelModels(actor *model.User, channelID string) ([]mod
 		return nil, err
 	}
 	for index := range items {
+		populateChannelModelCatalogMetadata(&items[index])
 		if strings.TrimSpace(items[index].CapabilityConfigJSON) == "" {
 			continue
 		}
@@ -145,8 +156,8 @@ func (s *Service) FetchAdminChannelModels(ctx context.Context, actor *model.User
 	if err != nil {
 		return nil, err
 	}
-	// 使用服务端保存的渠道密钥和请求头访问上游，避免敏感配置再次经过浏览器。
-	models, err := s.FetchChannelModels(ctx, actor, ChannelModelsRequest{BaseURL: channel.BaseURL, AllowLocalChannel: channel.AllowLocalChannel, APIKey: channel.APIKey, APIFormat: channel.APIFormat, Headers: headers})
+	// 使用完整 CatalogItem，避免模型标识列表丢掉官方能力、协议、操作与支持状态。
+	catalog, err := s.FetchChannelModelCatalog(ctx, actor, ChannelModelsRequest{BaseURL: channel.BaseURL, AllowLocalChannel: channel.AllowLocalChannel, APIKey: channel.APIKey, APIFormat: channel.APIFormat, Headers: headers})
 	if err != nil {
 		return nil, err
 	}
@@ -155,33 +166,72 @@ func (s *Service) FetchAdminChannelModels(ctx context.Context, actor *model.User
 	if err != nil {
 		return nil, err
 	}
-	known := make(map[string]struct{}, len(existing))
+	existingByKey := make(map[string]model.ChannelModel, len(existing))
 	for _, item := range existing {
-		known[channelModelCatalogKey(item.ModelKey)] = struct{}{}
+		existingByKey[channelModelCatalogKey(item.ModelKey)] = item
 	}
 	retired := retiredChannelModelKeys(channel.RetiredModelsJSON)
-	missing := make([]model.ChannelModel, 0, len(models))
-	for _, name := range models {
-		name = strings.TrimPrefix(strings.TrimSpace(name), "models/")
-		key := channelModelCatalogKey(name)
-		if _, ok := known[key]; ok || retired[key] {
+	missing := make([]model.ChannelModel, 0, len(catalog))
+	updates := make([]repository.ChannelModelCatalogUpdate, 0, len(catalog))
+	result := &AdminChannelModelFetchResult{
+		Models:              make([]string, 0, len(catalog)),
+		CapabilityCounts:    map[string]int{},
+		SupportStatusCounts: map[string]int{},
+		UpdateFieldCounts:   map[string]int{},
+	}
+	for _, catalogItem := range catalog {
+		name := strings.TrimPrefix(strings.TrimSpace(catalogItem.ID), "models/")
+		if name == "" {
 			continue
 		}
-		// 自动发现不能绕过定价边界；新模型由管理员定价后再手动启用。
+		result.Models = append(result.Models, name)
+		result.CapabilityCounts[normalizeCatalogModelType(catalogItem.ModelType)]++
+		result.SupportStatusCounts[string(normalizeCatalogSupportStatus(string(catalogItem.SupportStatus)))]++
+		if strings.Contains(catalogItem.CatalogSource, "upstream") {
+			result.UpstreamCount++
+		}
+		if strings.Contains(catalogItem.CatalogSource, "official") {
+			result.SupplementalCount++
+			result.OfficialCatalogReady = true
+		}
+		key := channelModelCatalogKey(name)
+		if retired[key] {
+			result.SkippedRetired++
+			continue
+		}
+		desired := channelModelFromCatalog("", channelID, catalogItem)
+		if current, ok := existingByKey[key]; ok {
+			if !catalogMayBeEnriched(current) {
+				result.SkippedConfigured++
+			} else if update := catalogEnrichmentUpdate(current, desired); update != nil {
+				for field := range update.Changes {
+					result.UpdateFieldCounts[field]++
+				}
+				updates = append(updates, *update)
+			} else {
+				result.Unchanged++
+			}
+			continue
+		}
+		// 自动发现不能绕过支持状态或定价边界。
 		modelID, idErr := s.repo.NextPrefixedID("MODEL")
 		if idErr != nil {
 			return nil, idErr
 		}
-		missing = append(missing, model.ChannelModel{ID: modelID, ChannelID: channelID, ModelKey: name, DisplayName: name, BillingMode: "fixed_request", Enabled: false, PriceVersion: 1})
+		desired.ID = modelID
+		missing = append(missing, desired)
 	}
-	added, err := s.repo.CreateMissingChannelModels(missing)
+	result.Added, result.Updated, err = s.repo.SyncChannelModelCatalog(missing, updates)
 	if err != nil {
 		return nil, err
 	}
-	if added > 0 {
+	if result.Added > 0 || result.Updated > 0 {
 		s.invalidateRouteCatalog()
 	}
-	return &AdminChannelModelFetchResult{Models: models, Added: added}, nil
+	if len(result.UpdateFieldCounts) > 0 {
+		log.Printf("channel model catalog sync summary added=%d updated=%d update_fields=%v", result.Added, result.Updated, result.UpdateFieldCounts)
+	}
+	return result, nil
 }
 
 func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id string, req ChannelModelRequest) (*model.ChannelModel, error) {
@@ -204,6 +254,15 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 	if conflict != nil && conflict.ID != strings.TrimSpace(id) {
 		return nil, BadAuthRequest("该渠道已存在模型 " + modelKey + "，请直接编辑已有模型")
 	}
+	if id != "" {
+		existingItem, lookupErr := s.repo.ChannelModelByID(channelID, id)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		if err := requireReadyChannelModel(existingItem); err != nil {
+			return nil, err
+		}
+	}
 	if capability == "text" || capability == "image" || capability == "video" {
 		if _, err := NormalizeModelCapabilityConfig(capability, string(protocol), req.CapabilityConfig); err != nil {
 			return nil, err
@@ -224,6 +283,12 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 			return nil, err
 		}
 		item.PriceVersion++
+	} else {
+		item.SupportStatus = model.ChannelModelSupportReady
+		item.CatalogSource = "manual"
+		item.CatalogVersion = "manual"
+		item.SupportedOperationsJSON = "[]"
+		item.DocumentationPathsJSON = "[]"
 	}
 	item.ModelKey = modelKey
 	item.ProviderModelKey = providerModelKey
@@ -535,6 +600,13 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	if err != nil {
 		return nil, err
 	}
+	if existingItem, lookupErr := s.repo.ChannelModelByKeyIncludingDisabled(channelID, modelKey); lookupErr == nil {
+		if err := requireReadyChannelModel(existingItem); err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+		return nil, lookupErr
+	}
 	if capability == "text" || capability == "image" || capability == "video" {
 		if _, err := NormalizeModelCapabilityConfig(capability, string(protocol), req.CapabilityConfig); err != nil {
 			return nil, err
@@ -719,10 +791,14 @@ func (s *Service) DeleteAdminChannelModel(actor *model.User, channelID string, i
 		}
 		return err
 	}
-	if _, err := s.repo.ChannelModelByID(channelID, id); err != nil {
+	item, err := s.repo.ChannelModelByID(channelID, id)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return BadAuthRequest("渠道模型不存在或已删除")
 		}
+		return err
+	}
+	if err := requireReadyChannelModel(item); err != nil {
 		return err
 	}
 	items, err := s.repo.ChannelModels(channelID, false)

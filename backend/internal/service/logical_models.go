@@ -191,11 +191,11 @@ func publicLogicalModel(cached cachedLogicalModel, available bool) PublicLogical
 		Description: item.Description, Capability: item.Capability, SortOrder: item.SortOrder,
 		PricePolicy: item.PricePolicy, PricingMode: pricingMode, DisplayPrice: displayPrice,
 		PriceLabel: priceLabel, BillingMode: item.BillingMode,
-		UnitPriceMicrocredits: item.UnitPriceMicrocredits,
-		InputPriceMicrocredits: item.InputPriceMicrocredits,
+		UnitPriceMicrocredits:   item.UnitPriceMicrocredits,
+		InputPriceMicrocredits:  item.InputPriceMicrocredits,
 		OutputPriceMicrocredits: item.OutputPriceMicrocredits,
 		CachedPriceMicrocredits: item.CachedPriceMicrocredits,
-		PriceTiers: priceTiers, LegacyModelIDs: decodeLegacyModelIDs(item.LegacyModelIDsJSON),
+		PriceTiers:              priceTiers, LegacyModelIDs: decodeLegacyModelIDs(item.LegacyModelIDsJSON),
 		CapabilitySpec: productSpec, CapabilityProfiles: profiles,
 		DefaultOptions: cached.Defaults, Available: available,
 	}
@@ -666,6 +666,9 @@ func (s *Service) logicalModelBundle(actor *model.User, id string, req LogicalMo
 			return nil, nil, nil, false, BadAuthRequest("供应线路能力类型与前台模型不一致")
 		}
 		if input.Enabled {
+			if channelModel.SupportStatus != model.ChannelModelSupportReady {
+				return nil, nil, nil, false, BadAuthRequest("计划支持、不支持或已废弃的渠道模型不能加入启用线路")
+			}
 			enabledRouteProtocols = append(enabledRouteProtocols, channelModel.Protocol)
 		}
 		if req.Enabled && input.Enabled && input.Weight <= 0 {
