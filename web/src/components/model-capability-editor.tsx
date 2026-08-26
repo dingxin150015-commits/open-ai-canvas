@@ -5,10 +5,11 @@ import { defaultImageCapabilityConfig, defaultModelCapabilityConfig, normalizeMo
 import type { ModelProtocol } from "@/lib/model-protocols";
 import { VIDEO_RESOLUTION_CAPABILITY_OPTIONS } from "@/lib/video-generation-options";
 
-const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
+const ratioOptions = ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "4:5", "5:4", "9:21", "21:9"];
 const operationOptions = [
     { label: "文生视频", value: "text_to_video" },
     { label: "图生视频", value: "image_to_video" },
+    { label: "参考素材生视频", value: "reference_to_video" },
     { label: "视频续写", value: "extend" },
     { label: "局部修改", value: "inpaint" },
     { label: "元素替换", value: "replace_element" },
@@ -50,19 +51,24 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
             <CapabilityGroup title="引用限制">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <NumberField label="提示词字符数" value={profile.references.promptMaxChars} min={1} disabled={disabled} onChange={(value) => updateReferences({ promptMaxChars: value || 1 })} />
+                    <NumberField label="最少视觉素材" value={profile.references.minVisualReferences} min={0} max={profile.references.maxVisualReferences} disabled={disabled} onChange={(value) => updateReferences({ minVisualReferences: value || 0 })} />
+                    <NumberField label="最大视觉素材" value={profile.references.maxVisualReferences} min={0} disabled={disabled} onChange={(value) => { const maxVisualReferences = value || 0; updateReferences({ maxVisualReferences, minVisualReferences: Math.min(profile.references.minVisualReferences || 0, maxVisualReferences) }); }} />
                     <NumberField label="最少图片引用" value={profile.references.minImages} min={0} max={profile.references.maxImages} disabled={disabled} onChange={(value) => updateReferences({ minImages: value || 0 })} />
                     <NumberField label="最大图片引用" value={profile.references.maxImages} min={0} disabled={disabled} onChange={(value) => { const maxImages = value || 0; updateReferences({ maxImages, minImages: Math.min(profile.references.minImages, maxImages) }); }} />
                     <NumberField label="图片上限 MB" value={bytesToMB(profile.references.maxImageBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxImageBytes: mbToBytes(value) })} />
                     <NumberField label="最大视频引用" value={profile.references.maxVideos} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideos: value || 0 })} />
                     <NumberField label="视频上限 MB" value={bytesToMB(profile.references.maxVideoBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideoBytes: mbToBytes(value) })} />
                     <NumberField label="视频最长秒数" value={profile.references.maxVideoDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideoDurationSeconds: value || 0 })} />
+                    <NumberField label="含视频时输出最长秒数" value={profile.references.maxOutputDurationWithVideoSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxOutputDurationWithVideoSeconds: value || 0 })} />
                     <NumberField label="最大音频引用" value={profile.references.maxAudios} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudios: value || 0 })} />
                     <NumberField label="音频上限 MB" value={bytesToMB(profile.references.maxAudioBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudioBytes: mbToBytes(value) })} />
                     <NumberField label="音频最长秒数" value={profile.references.maxAudioDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudioDurationSeconds: value || 0 })} />
                 </div>
+                <ParameterField label="音频不得长于输出" description="避免上游静默截断驱动音频" supported={profile.references.audioMustFitOutput === true} disabled={disabled} onChange={(audioMustFitOutput) => updateReferences({ audioMustFitOutput })} />
             </CapabilityGroup>
 
             <CapabilityGroup title="视频时长">
+                <ParameterField label="智能时长（-1）" description="允许模型自动推荐输出时长" supported={profile.duration.smartSupported === true} disabled={disabled} onChange={(smartSupported) => updateDuration({ smartSupported })} />
                 <Segmented block disabled={disabled} value={profile.duration.selection} options={[{ label: "范围", value: "range" }, { label: "固定值", value: "enum" }]} onChange={(value) => updateDuration(value === "enum" ? { selection: "enum", values: profile.duration.values?.length ? profile.duration.values : [profile.duration.default] } : { selection: "range", min: profile.duration.min || 1, max: profile.duration.max || 15, step: profile.duration.step || 1 })} />
                 {profile.duration.selection === "enum" ? (
                     <Field label="固定时长（秒）"><Input disabled={disabled} value={durationValues} placeholder="例如：5,10" onChange={(event) => updateDuration({ values: parseIntegerList(event.target.value), default: parseIntegerList(event.target.value)[0] || profile.duration.default })} /></Field>

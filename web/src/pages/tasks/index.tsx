@@ -315,7 +315,9 @@ export default function TasksPage() {
         }
         Modal.confirm({
             title: "删除本机任务记录？",
-            content: "这只会删除本机任务记录，不会删除已生成的素材。",
+            content: task.receiptRecorded
+                ? "任务已由官方接受；删除本机记录不会取消官方任务，且本应用将不再同步该记录。已生成素材不受影响。"
+                : "这只会删除本机任务记录，不会删除已生成的素材。",
             okText: "删除本机记录",
             okButtonProps: { danger: true },
             cancelText: "保留",

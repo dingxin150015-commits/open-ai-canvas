@@ -20,7 +20,7 @@ import { useExternalAssetSources } from "@/hooks/use-external-asset-sources";
 import { buildImageResolutionOptions, formatImageResolutionSize, imageRatioForSize, imageResolutionChoices, imageResolutionOption, imageSizeForResolution, supportsImageResolutionPresets, type ImageResolutionChoice } from "@/lib/image-resolution-tiers";
 import { VIDEO_RESOLUTION_OPTIONS } from "@/lib/video-generation-options";
 import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationAllowed, videoDurationOptions, type ImageCapabilityConfig, type VideoCapabilityConfig } from "@/lib/model-capabilities";
-import { resolveCompatibleModel, mergedImageCapabilityConfig, type ModelRequirements } from "@/lib/model-selection";
+import { inferVideoOperation, resolveCompatibleModel, mergedImageCapabilityConfig, type ModelRequirements } from "@/lib/model-selection";
 import { isGenerationTaskCancelled, logicalModelIDForConfig, runBackendGenerationTask, runBackendGenerationTaskBatch, type BackendGenerationResult } from "@/services/api/generation-task";
 import { requestImageQuestion, type AiTextContentPart } from "@/services/api/image";
 import { listAddedSkills, type Skill } from "@/services/api/skills";
@@ -627,7 +627,7 @@ export default function CreatePage() {
                     referenceVideos,
                     referenceAudios,
                     signal: requestLifecycle.signal,
-                    metadata: { source: "create-page", conversationId: activeConversation.id, messageId: assistantMessage.id, videoEditOperation: referenceAudios.length && !referenceImages.length && !referenceVideos.length ? "audio_to_video" : attachments.length ? "image_to_video" : "text_to_video", ...referenceMetadata },
+                    metadata: { source: "create-page", conversationId: activeConversation.id, messageId: assistantMessage.id, videoEditOperation: inferVideoOperation({ textCount: 0, imageCount: referenceImages.length, videoCount: referenceVideos.length, audioCount: referenceAudios.length, characterCount: 0 }), ...referenceMetadata },
                     onTaskUpdate: bindTask,
                     ...retryContext,
                 }));
@@ -822,6 +822,7 @@ export default function CreatePage() {
         videoProfile,
         config,
         onModelChange: (value: string) => updateConfig(mode === "text" ? "textModel" : mode === "image" ? "imageModel" : "videoModel", value),
+        onVideoOutputChange: (key: "videoGenerateAudio" | "videoWatermark", value: string) => updateConfig(key, value),
         ratio,
         setRatio,
         seconds,
@@ -1088,6 +1089,7 @@ type ComposerProps = {
     imageProfile: ImageCapabilityConfig;
     config: ReturnType<typeof useEffectiveConfig>;
     onModelChange: (value: string) => void;
+    onVideoOutputChange: (key: "videoGenerateAudio" | "videoWatermark", value: string) => void;
     ratio: string;
     setRatio: (value: string) => void;
     seconds: string;
@@ -1234,15 +1236,33 @@ function GenerationSettingsMenu(props: ComposerProps) {
         setCustomRatioOpen(false);
     };
     const videoResolutionSupported = props.mode === "video" && resolutions.length > 0;
+    const videoGenerateAudio = props.config.videoGenerateAudio === "true";
+    const videoWatermark = props.config.videoWatermark === "true";
     const imageSummary = [
         ...(mergedProfile.size.parameter !== "none" ? [referenceImageSizeSelected ? referenceImageSizeLabel : usesImageResolutionPicker ? formatImageResolutionSize(props.ratio, imageResolutionOptions) : props.ratio] : []),
         ...(props.imageProfile.quality.supported ? [qualityLabel] : []),
         ...(props.imageProfile.maxOutputs > 1 ? [props.count] : []),
     ].join(" · ");
-    const summary = props.mode === "video" ? [props.ratio, ...(videoResolutionSupported ? [videoResolutionLabel(props.videoQuality)] : [])].join(" · ") : imageSummary;
+    const summary = props.mode === "video"
+        ? [
+              props.ratio,
+              ...(videoResolutionSupported ? [videoResolutionLabel(props.videoQuality)] : []),
+              ...(props.videoProfile.generateAudio.supported ? [videoGenerateAudio ? "有声" : "无声"] : []),
+              ...(props.videoProfile.watermark.supported ? [videoWatermark ? "有水印" : "无水印"] : []),
+          ].join(" · ")
+        : imageSummary;
     const panel = <div className="creation-parameter-menu">
         {props.mode === "video" || mergedProfile.size.parameter !== "none" ? <SettingSection title="画幅" value={referenceImageSizeSelected ? referenceImageSizeLabel : props.mode === "image" && usesImageResolutionPicker ? activeImageRatio : props.ratio}><div className="creation-parameter-content"><div className="creation-choice-grid is-ratio">{referenceImageSizeValue ? <button type="button" aria-pressed={referenceImageSizeSelected} aria-label={"使用参考图尺寸 " + referenceImageSizeLabel} title={"使用参考图尺寸 " + referenceImageSizeLabel} className={"creation-reference-size-choice" + (referenceImageSizeSelected ? " is-selected" : "")} onClick={selectReferenceImageSize}><span className="creation-ratio-preview"><span style={ratioPreviewStyle(referenceImageSizeRatio)} /></span><span>参考图</span></button> : null}{ratios.map((value) => { const selected = props.mode === "image" && usesImageResolutionPicker ? value === activeImageRatio : value === props.ratio; return <button key={value} type="button" aria-pressed={selected} className={selected ? "is-selected" : ""} onClick={() => { if (props.mode === "image") selectImageRatio(value); else props.setRatio(value); setCustomRatioOpen(false); }}><span className="creation-ratio-preview"><span style={ratioPreviewStyle(value)} /></span><span>{value}</span></button>; })}</div>{props.mode !== "video" && mergedProfile.size.allowCustom && (customRatioOpen ? <label className="creation-custom-value"><span>宽 x 高</span><input value={props.ratio} onFocus={(event) => event.currentTarget.select()} onChange={(event) => props.setRatio(event.target.value)} placeholder="1920x1080 或 2:1" aria-label="自定义图片尺寸或比例" /></label> : <button type="button" className="creation-custom-trigger" onClick={() => setCustomRatioOpen(true)}><Plus />输入自定义尺寸</button>)}</div></SettingSection> : null}
-        {props.mode === "video" ? (videoResolutionSupported ? <SettingSection title="清晰度" value={videoResolutionLabel(props.videoQuality)}><div className="creation-choice-grid is-resolution">{resolutions.map((option) => <button key={option.value} type="button" aria-pressed={option.value === props.videoQuality} className={option.value === props.videoQuality ? "is-selected" : ""} onClick={() => props.setVideoQuality(option.value)}>{option.label}</button>)}</div></SettingSection> : null) : <>
+        {props.mode === "video" ? <>
+            {videoResolutionSupported ? <SettingSection title="清晰度" value={videoResolutionLabel(props.videoQuality)}><div className="creation-choice-grid is-resolution">{resolutions.map((option) => <button key={option.value} type="button" aria-pressed={option.value === props.videoQuality} className={option.value === props.videoQuality ? "is-selected" : ""} onClick={() => props.setVideoQuality(option.value)}>{option.label}</button>)}</div></SettingSection> : null}
+            {props.videoProfile.generateAudio.supported || props.videoProfile.watermark.supported ? <SettingSection title="输出" value={[
+                ...(props.videoProfile.generateAudio.supported ? [videoGenerateAudio ? "有声" : "无声"] : []),
+                ...(props.videoProfile.watermark.supported ? [videoWatermark ? "有水印" : "无水印"] : []),
+            ].join(" · ")}><div className="creation-choice-grid is-quality">
+                {props.videoProfile.generateAudio.supported ? <button type="button" aria-pressed={videoGenerateAudio} className={videoGenerateAudio ? "is-selected" : ""} onClick={() => props.onVideoOutputChange("videoGenerateAudio", String(!videoGenerateAudio))}><span>生成声音</span><small>{videoGenerateAudio ? "开启" : "关闭"}</small></button> : null}
+                {props.videoProfile.watermark.supported ? <button type="button" aria-pressed={videoWatermark} className={videoWatermark ? "is-selected" : ""} onClick={() => props.onVideoOutputChange("videoWatermark", String(!videoWatermark))}><span>添加水印</span><small>{videoWatermark ? "开启" : "关闭"}</small></button> : null}
+            </div></SettingSection> : null}
+        </> : <>
             {imageResolutionChoiceOptions.length ? <SettingSection title="分辨率" value={activeImageResolutionChoice === "auto" ? "自动" : activeImageResolutionChoice.toUpperCase()}><div className="creation-choice-grid is-resolution">{imageResolutionChoiceOptions.map((choice) => <button key={choice} type="button" aria-pressed={choice === activeImageResolutionChoice} className={choice === activeImageResolutionChoice ? "is-selected" : ""} onClick={() => selectImageResolution(choice)}>{choice === "auto" ? "自动" : choice.toUpperCase()}</button>)}</div></SettingSection> : null}
             {props.imageProfile.quality.supported ? <SettingSection title={activeQualityOptions.some((item) => item.value === "1k" || item.value === "2k") ? "分辨率" : "图片质量"} value={qualityLabel}><div className="creation-choice-grid is-quality">{activeQualityOptions.map((option) => <button key={option.value} type="button" aria-pressed={option.value === props.quality} className={option.value === props.quality ? "is-selected" : ""} onClick={() => props.setQuality(option.value)}><span>{option.label}</span><small>{option.description}</small></button>)}</div></SettingSection> : null}
             {props.imageProfile.maxOutputs > 1 ? <SettingSection title="生成数量" value={`${props.count} 张`}><div className="creation-parameter-content"><div className="creation-choice-grid is-count">{countOptions.filter((option) => Number(option) <= props.imageProfile.maxOutputs).map((option) => <button key={option} type="button" aria-pressed={option === props.count} className={option === props.count ? "is-selected" : ""} onClick={() => props.setCount(option)}>{option}</button>)}</div><label className="creation-custom-value"><span>自定义</span><input inputMode="numeric" pattern="[0-9]*" value={props.count} onChange={(event) => props.setCount(String(Math.max(1, Math.min(props.imageProfile.maxOutputs, Number(event.target.value) || 1))))} aria-label={`生成数量，范围 1 到 ${props.imageProfile.maxOutputs}`} /><em>张</em></label></div></SettingSection> : null}
@@ -1265,13 +1285,15 @@ function DurationMenu({ profile, seconds, onChange }: { profile: VideoCapability
     const min = profile.duration.selection === "range" ? profile.duration.min || 1 : Math.min(...fallbackPreset);
     const max = profile.duration.selection === "range" ? Math.max(min, profile.duration.max || min) : Math.max(...fallbackPreset);
     const step = Math.max(1, profile.duration.step || 1);
-    const durationControl = profile.duration.selection === "range" ? <>
-        <input className="h-8 w-full" style={{ accentColor: "var(--creation-text)" }} type="range" min={min} max={max} step={step} value={value} aria-label="视频时长（秒）" onChange={(event) => onChange(event.target.value)} />
+    const rangeValue = value === -1 ? profile.duration.default : value;
+    const durationControl = <>{profile.duration.smartSupported ? <div className="creation-duration-choices"><button type="button" className={value === -1 ? "is-selected" : ""} onClick={() => onChange("-1")}>智能时长</button></div> : null}{profile.duration.selection === "range" ? <>
+        <input className="h-8 w-full" style={{ accentColor: "var(--creation-text)" }} type="range" min={min} max={max} step={step} value={rangeValue} aria-label="视频时长（秒）" onChange={(event) => onChange(event.target.value)} />
         <div className="flex justify-between px-0.5 text-[var(--fs-tiny)] text-[var(--creation-muted)]"><span>{min}s</span><span>{max}s</span></div>
-        <label className="creation-custom-value is-duration"><span>自定义时长</span><span className="creation-duration-custom-field"><input type="number" min={min} max={max} step={step} inputMode="numeric" value={seconds} onFocus={(event) => event.currentTarget.select()} onBlur={() => onChange(String(value))} onChange={(event) => onChange(event.target.value)} aria-label="自定义视频时长，单位秒" /><em>秒</em></span></label>
-    </> : <div className="creation-duration-choices">{presets.map((item) => <button key={item} type="button" className={item === value ? "is-selected" : ""} onClick={() => onChange(String(item))}>{item}s</button>)}</div>;
-    return <Popover open={open} onOpenChange={setOpen} trigger="click" placement="bottom" arrow={false} classNames={{ root: "creation-control-popover", container: "creation-control-popover-surface", content: "creation-control-popover-content" }} content={<div className="creation-duration-menu"><div className="creation-duration-heading"><span>时长</span><strong>{value} 秒</strong></div>{durationControl}</div>}>
-        <button type="button" className="creation-chat-control is-duration" aria-label={`视频时长：${value}秒`}><Clock3 /><span>{value}s</span><ChevronDown className={open ? "is-open" : ""} /></button>
+        <label className="creation-custom-value is-duration"><span>自定义时长</span><span className="creation-duration-custom-field"><input type="number" min={min} max={max} step={step} inputMode="numeric" value={rangeValue} onFocus={(event) => event.currentTarget.select()} onBlur={() => onChange(String(rangeValue))} onChange={(event) => onChange(event.target.value)} aria-label="自定义视频时长，单位秒" /><em>秒</em></span></label>
+    </> : <div className="creation-duration-choices">{presets.map((item) => <button key={item} type="button" className={item === value ? "is-selected" : ""} onClick={() => onChange(String(item))}>{item}s</button>)}</div>}</>;
+    const durationLabel = value === -1 ? "智能时长" : `${value} 秒`;
+    return <Popover open={open} onOpenChange={setOpen} trigger="click" placement="bottom" arrow={false} classNames={{ root: "creation-control-popover", container: "creation-control-popover-surface", content: "creation-control-popover-content" }} content={<div className="creation-duration-menu"><div className="creation-duration-heading"><span>时长</span><strong>{durationLabel}</strong></div>{durationControl}</div>}>
+        <button type="button" className="creation-chat-control is-duration" aria-label={`视频时长：${durationLabel}`}><Clock3 /><span>{value === -1 ? "智能" : `${value}s`}</span><ChevronDown className={open ? "is-open" : ""} /></button>
     </Popover>;
 }
 

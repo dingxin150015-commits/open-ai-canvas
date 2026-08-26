@@ -54,6 +54,12 @@ export type ChannelModel = {
     displayName: string;
     capability: "text" | "image" | "video" | "audio" | "";
     protocol?: import("@/lib/model-protocols").ModelProtocol;
+    supportStatus: ChannelModelSupportStatus;
+    supportReason?: string;
+    catalogSource?: string;
+    catalogVersion?: string;
+    supportedOperations?: string[];
+    documentationPaths?: string[];
     billingMode: "fixed_request" | "per_second" | "token";
     unitPriceMicrocredits: number;
     inputTokenPriceMicrocredits: number;
@@ -67,6 +73,23 @@ export type ChannelModel = {
 	priceTiers: ChannelModelPriceTier[];
     createdAt: string;
     updatedAt: string;
+};
+
+export type ChannelModelSupportStatus = "ready" | "planned" | "unsupported" | "deprecated";
+
+export type ChannelModelFetchResult = {
+    models: string[];
+    added: number;
+    updated: number;
+    upstreamCount: number;
+    supplementalCount: number;
+    capabilityCounts: Record<string, number>;
+    supportStatusCounts: Record<ChannelModelSupportStatus, number>;
+    skippedRetired: number;
+    skippedConfigured: number;
+    unchanged: number;
+    officialCatalogReady: boolean;
+    updateFieldCounts?: Record<string, number>;
 };
 
 export type ChannelModelPriceTier = {
@@ -265,9 +288,9 @@ export function listAdminChannelModels(channelId: string) {
     return request<{ models: ChannelModel[] }>(api.get(`/admin/channels/${encodeURIComponent(channelId)}/models`));
 }
 
-// 管理员从上游拉取模型目录；服务端只导入缺失项，价格和启用仍需人工确认。
+// 管理员从上游和官方 Manifest 拉取完整目录；非 ready 项只能查看。
 export function fetchAdminChannelModels(channelId: string) {
-    return request<{ models: string[]; added: number }>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/fetch`));
+    return request<ChannelModelFetchResult>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/fetch`));
 }
 
 export function testAdminChannelModel(channelId: string, input: Pick<ChannelModel, "modelKey" | "providerModelKey" | "capability" | "protocol"> & { capabilityConfig?: ChannelModel["capabilityConfig"] }) {

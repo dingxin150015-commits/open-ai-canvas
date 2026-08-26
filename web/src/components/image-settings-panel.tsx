@@ -51,7 +51,8 @@ type ImageSettingsPanelProps = {
 
 export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = true, showCount = true, className = "w-[304px] space-y-3 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 3 }: ImageSettingsPanelProps) {
     const [snapDimensionToStep, setSnapDimensionToStep] = useState(true);
-    const profile = mergedImageCapabilityConfig(config, config.model || config.imageModel);
+    const modelName = config.model || config.imageModel;
+    const profile = mergedImageCapabilityConfig(config, modelName);
     const normalized = normalizeImageValue(profile, config);
     const quality = normalized.quality;
     const transparentBackground = normalized.transparentBackground === "true";
@@ -72,6 +73,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
         : usesResolutionPicker && activeResolution
         ? resolutionOptions.filter((item) => item.tier === activeResolution.tier).map((item) => ({ value: item.ratio, label: item.ratio, size: item.size, width: item.width, height: item.height, icon: item.width === item.height ? "square" : item.width > item.height ? "landscape" : "portrait" }))
         : imageAspectOptions(profile);
+
     const selectedAspect = availableAspects.find((item) => imageOptionValue(profile, item) === activeSize || item.value === activeSize) || availableAspects.find((item) => item.label === activeRatio);
     const dimensions = readSizeDimensions(activeSize, selectedAspect || aspectOptions[0]);
 	const activeQualityOptions = profile.quality.values.map((value) => qualityOptions.find((item) => item.value === value) || { value, label: value });
@@ -207,6 +209,7 @@ function imageOptionAllowed(profile: ImageCapabilityConfig, option: AspectOption
 function imageAspectOptions(profile: ImageCapabilityConfig): AspectOption[] {
     if (profile.size.parameter === "none") return [];
     const values = profile.size.values.filter((value) => value.trim().toLowerCase() !== "auto");
+
     if (!values.length) return profile.size.allowCustom ? aspectOptions.filter((item) => item.value !== "auto") : [];
     return values.map((value) => {
         const known = aspectOptions.find((item) => (item.size || item.value) === value || item.value === value);

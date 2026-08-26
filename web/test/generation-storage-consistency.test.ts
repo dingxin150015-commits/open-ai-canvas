@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
 
+import { generationArtifactStorageKey } from "../src/services/generation-artifact-sink";
+import { localArtifactStoreForStorageKey } from "../src/services/local-artifact-storage-key";
+
 type Scenario = "image-cleanup" | "scope-cleanup-switch" | "scope-cleanup-late-canvas-reference" | "video-commit-race" | "audio-commit-race";
 type ScenarioResponse<T> = { ok: true; result: T } | { ok: false; error: string };
 
@@ -49,4 +52,17 @@ test("generation video and audio materialization cannot race cleanup into a cata
         expect(result.blobPresent).toBe(true);
         expect(result.generationAssetCount).toBe(1);
     }
+}, 15_000);
+
+test("remote sync routes generated artifacts to the store that materialized them", () => {
+    expect(localArtifactStoreForStorageKey(generationArtifactStorageKey("effect-image", "image", "user-1"))).toBe("image");
+    expect(localArtifactStoreForStorageKey(generationArtifactStorageKey("effect-video", "video", "user-1"))).toBe("media");
+    expect(localArtifactStoreForStorageKey(generationArtifactStorageKey("effect-audio", "audio", "user-1"))).toBe("media");
+});
+
+test("remote sync preserves existing local artifact key families", () => {
+    for (const key of ["image:user-1:id", "generation-image:user-1:id"]) expect(localArtifactStoreForStorageKey(key)).toBe("image");
+    for (const key of ["video:user-1:id", "audio:user-1:id", "file:user-1:id", "video-reference:user-1:id", "audio-reference:user-1:id", "generation-video:user-1:id", "generation-audio:user-1:id"])
+        expect(localArtifactStoreForStorageKey(key)).toBe("media");
+    for (const key of ["", "resource:remote-id", "blob:https://example.com/id", "https://example.com/video.mp4"]) expect(localArtifactStoreForStorageKey(key)).toBeNull();
 });

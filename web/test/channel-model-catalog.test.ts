@@ -259,7 +259,7 @@ describe("public channel model catalog", () => {
 
         const html = renderToStaticMarkup(React.createElement(CanvasVideoSettingsPopover, { config, onConfigChange: () => undefined }));
 
-        expect(html).toContain("横屏 · 10s");
+        expect(html).toContain("16:9 · 10s");
         expect(html).not.toContain("720P");
     });
 
@@ -278,7 +278,7 @@ describe("public channel model catalog", () => {
             scope: "system",
             apiKey: "system",
             models: ["frontend-image"],
-            modelCosts: [{ model: "frontend-image", capability: "image", billingMode: "fixed_request", unitPriceMicrocredits: 0 }],
+            modelCosts: [{ model: "frontend-image", capability: "image", billingMode: "fixed_request", unitPriceMicrocredits: 1 }],
         });
         const custom = createModelChannel({
             id: "custom-channel",

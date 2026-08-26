@@ -62,4 +62,22 @@ describe("creation library button", () => {
         expect(source).toContain("secondaryAttachments.map((item) => <CreationAttachmentThumbnail");
         expect(source).toContain('className={primary ? "creation-chat-reference is-paper creation-chat-reference-media" : "creation-chat-attachment"}');
     });
+
+    test("shows capability-driven audio and watermark controls in the real Create settings menu", () => {
+        const source = readFileSync(resolve(import.meta.dir, "../src/pages/create/index.tsx"), "utf8");
+        const menuStart = source.indexOf("function GenerationSettingsMenu");
+        const menuEnd = source.indexOf("function SettingSection", menuStart);
+        const menuSource = compactSource(source.slice(menuStart, menuEnd));
+
+        expect(menuStart).toBeGreaterThanOrEqual(0);
+        expect(menuEnd).toBeGreaterThan(menuStart);
+        expect(menuSource).toContain("props.videoProfile.generateAudio.supported");
+        expect(menuSource).toContain("props.videoProfile.watermark.supported");
+        expect(menuSource).toContain('props.onVideoOutputChange("videoGenerateAudio", String(!videoGenerateAudio))');
+        expect(menuSource).toContain('props.onVideoOutputChange("videoWatermark", String(!videoWatermark))');
+        expect(menuSource).toContain("生成声音");
+        expect(menuSource).toContain("添加水印");
+        expect(menuSource).toContain('videoGenerateAudio ? "有声" : "无声"');
+        expect(menuSource).toContain('videoWatermark ? "有水印" : "无水印"');
+    });
 });

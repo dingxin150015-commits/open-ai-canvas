@@ -35,7 +35,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
 		return <SeedanceVideoSettingsPanel config={config} profile={profile} priceTiers={priceTiers} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
     }
 
-    const seconds = normalizeVideoDuration(config.videoSeconds);
+    const seconds = profile.duration.smartSupported && String(config.videoSeconds).trim() === "-1" ? -1 : normalizeVideoDuration(config.videoSeconds);
     const size = normalizeVideoSizeValue(config.size);
     const dimensions = readSizeDimensions(size);
     const resolution = normalizeVideoResolutionValue(config.vquality);
@@ -273,13 +273,14 @@ function VideoDurationControl({ profile, value, theme, disabled, onChange }: { p
         const min = profile.duration.min || VIDEO_DURATION_MIN;
         const max = Math.max(min, profile.duration.max || min);
         const step = Math.max(1, profile.duration.step || 1);
-        const normalized = normalizeDurationValue(value, profile.duration.default, min, max, step);
-		return <DurationRangeControl value={normalized} min={min} max={max} step={step} theme={theme} onChange={(next) => { if (!disabled?.(next)) onChange(next); }} />;
+        const normalized = normalizeDurationValue(value === -1 ? profile.duration.default : value, profile.duration.default, min, max, step);
+		return <div className="space-y-2">{profile.duration.smartSupported ? <OptionPill selected={value === -1} disabled={disabled?.(-1)} theme={theme} onClick={() => onChange(-1)}>智能时长</OptionPill> : null}<DurationRangeControl value={normalized} min={min} max={max} step={step} theme={theme} onChange={(next) => { if (!disabled?.(next)) onChange(next); }} /></div>;
     }
 
     const options = videoDurationOptions(profile);
-    return <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(options.length, 4)}, minmax(0, 1fr))` }}>
-		{options.map((option) => <OptionPill key={option} selected={normalizedNumber(value) === option} disabled={disabled?.(option)} theme={theme} onClick={() => onChange(option)}>{option}s</OptionPill>)}
+	const allOptions = profile.duration.smartSupported ? [-1, ...options] : options;
+    return <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(allOptions.length, 4)}, minmax(0, 1fr))` }}>
+		{allOptions.map((option) => <OptionPill key={option} selected={normalizedNumber(value) === option} disabled={disabled?.(option)} theme={theme} onClick={() => onChange(option)}>{option === -1 ? "智能" : `${option}s`}</OptionPill>)}
     </div>;
 }
 
@@ -293,6 +294,7 @@ function hasPriceTierForVideoSelection(tiers: ReturnType<typeof modelPriceTiers>
 	if (!tiers.length) return true;
 	const normalizedResolution = normalizeTierResolution(resolution);
 	return tiers.some((tier) => {
+		if (seconds === -1 && tier.billingMode !== "fixed_request") return false;
 		const selector = tier.selector || {};
 		const tierResolution = selector.vquality || tier.resolution;
 		const tierSeconds = selector.videoSeconds ? Number(selector.videoSeconds) : tier.videoSeconds;

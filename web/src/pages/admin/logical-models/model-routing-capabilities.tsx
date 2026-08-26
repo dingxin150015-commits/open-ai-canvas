@@ -27,6 +27,7 @@ const inputDefinitions: Record<CapabilityKind, Array<{ name: string; label: stri
         { name: "mask", label: "蒙版", unit: "张" },
     ],
     video: [
+        { name: "visual", label: "图片/视频视觉素材", unit: "个" },
         { name: "image", label: "参考图片", unit: "张" },
         { name: "video", label: "参考视频", unit: "个" },
         { name: "audio", label: "参考音频", unit: "个" },
@@ -45,6 +46,7 @@ const optionDefinitions: Record<CapabilityKind, Array<{ name: string; label: str
     video: [
         { name: "size", label: "画面比例" },
         { name: "videoSeconds", label: "视频时长", unit: "秒" },
+        { name: "videoSecondsWithReferenceVideo", label: "含参考视频时长", unit: "秒" },
         { name: "vquality", label: "输出分辨率" },
         { name: "videoGenerateAudio", label: "同步生成音频" },
         { name: "videoWatermark", label: "输出水印" },
@@ -115,12 +117,14 @@ export function capabilitySpecFromChannelModel(item?: ChannelModel): CapabilityS
             capability,
             operations: video.operations,
             inputs: compactInputs({
+                ...(video.references.maxVisualReferences ? { visual: { min: video.references.minVisualReferences || 0, max: video.references.maxVisualReferences } } : {}),
                 image: { min: video.references.minImages, max: video.references.maxImages },
                 video: { min: 0, max: video.references.maxVideos },
                 audio: { min: 0, max: video.references.maxAudios },
             }),
             options: compactOptions({
                 videoSeconds: duration,
+                ...(video.references.maxOutputDurationWithVideoSeconds ? { videoSecondsWithReferenceVideo: { min: video.duration.min, max: video.references.maxOutputDurationWithVideoSeconds, step: video.duration.step || 1 } } : {}),
                 size: { values: video.ratios },
                 vquality: video.resolutions.length ? { values: video.resolutions } : undefined,
                 videoGenerateAudio: { values: video.generateAudio.supported ? [false, true] : [false] },

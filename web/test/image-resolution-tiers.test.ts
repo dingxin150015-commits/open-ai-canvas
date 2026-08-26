@@ -8,7 +8,7 @@ import {
     imageSizeForResolution,
     supportsImageResolutionPresets,
 } from "../src/lib/image-resolution-tiers";
-import { defaultImageCapabilityConfig } from "../src/lib/model-capabilities";
+import { defaultImageCapabilityConfig, defaultModelCapabilityConfig, imageSizeRequest, modelCapabilityConfigFor } from "../src/lib/model-capabilities";
 
 const sizes = [
     "1024x1024", "1360x1024", "1024x1360", "1536x1024", "1024x1536", "1024x1280", "1280x1024", "2048x878", "1824x1024", "1024x1824",
@@ -58,5 +58,26 @@ describe("image resolution tiers", () => {
 
         expect(options.map((item) => item.tier)).toEqual(["1k", "2k", "4k"]);
         expect(imageResolutionOption(options, "3840x1920")).toMatchObject({ tier: "4k", ratio: "2:1" });
+    });
+
+    test("显式空尺寸与通配符保留管理员语义，不回填协议预设", () => {
+        const capabilityConfig = defaultModelCapabilityConfig("openai-image", "fixture-image");
+        const channel = {
+            id: "channel",
+            models: ["fixture-image"],
+            modelCosts: [{ model: "fixture-image", protocol: "openai-image" as const, capabilityConfig }],
+        };
+        capabilityConfig.image!.size = { parameter: "size", values: [], default: "auto", allowCustom: false };
+
+        const explicitEmpty = modelCapabilityConfigFor({ channels: [channel] }, "channel::fixture-image").image!;
+        expect(explicitEmpty.size.values).toEqual([]);
+        expect(explicitEmpty.size.allowCustom).toBe(false);
+        expect(imageSizeRequest(explicitEmpty, "1024x1024")).toBeUndefined();
+
+        capabilityConfig.image!.size = { parameter: "size", values: ["*"], default: "auto", allowCustom: false };
+        const wildcard = modelCapabilityConfigFor({ channels: [channel] }, "channel::fixture-image").image!;
+        expect(wildcard.size.values).toEqual([]);
+        expect(wildcard.size.allowCustom).toBe(true);
+        expect(imageSizeRequest(wildcard, "1234x777")).toEqual({ parameter: "size", value: "1234x777" });
     });
 });

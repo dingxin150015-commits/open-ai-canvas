@@ -2,6 +2,7 @@ import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob } from "@/services/image-storage";
 import { deleteRemoteAsset, deleteRemoteCanvasProject, getRemoteUserDataSnapshot, upsertRemoteAsset, upsertRemoteCanvasProject } from "@/services/api/user-data";
 import { resourceFileUrl, resourceIdFromStorageKey, resourceStorageKey, uploadResourceFile } from "@/services/api/resources";
+import { localArtifactStoreForStorageKey } from "@/services/local-artifact-storage-key";
 import type { Asset } from "@/stores/use-asset-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
@@ -20,8 +21,6 @@ const activeRemoteSyncOperations = new Set<Promise<void>>();
 let subscriptionsInstalled = false;
 let remoteAssetVersions = new Map<string, string>();
 let remoteProjectVersions = new Map<string, string>();
-
-const LOCAL_STORAGE_KEY_PATTERN = /^(image|video|audio|file|video-reference|audio-reference):/;
 
 export async function syncRemoteUserData(userId?: string | null) {
     await runRemoteUserDataSyncOperation(async () => {
@@ -289,13 +288,12 @@ async function ensureRemoteResourceReferences<T>(value: T, uploaded = new Map<st
     if (!isLocalStorageKey(storageKey)) {
         const inline = inlineMediaDataUrl(next);
         if (!inline) return next as T;
-        const resourceStorage = await uploadInlineDataUrl(inline).catch(() => "");
-        return (resourceStorage ? applyResourceReference(next, resourceStorage) : next) as T;
+        return applyResourceReference(next, await uploadInlineDataUrl(inline)) as T;
     }
 
     const cached = uploaded.get(storageKey);
-    const resourceStorage = cached || (await uploadLocalStorageKey(storageKey, next).catch(() => ""));
-    if (!resourceStorage) return next as T;
+    const resourceStorage = cached || (await uploadLocalStorageKey(storageKey, next));
+    if (!resourceStorage) throw new Error("本地素材内容不存在，暂不能同步到服务器");
     uploaded.set(storageKey, resourceStorage);
     return applyResourceReference(next, resourceStorage) as T;
 }
@@ -325,7 +323,8 @@ async function uploadInlineDataUrl(dataUrl: string) {
 }
 
 async function uploadLocalStorageKey(storageKey: string, payload: Record<string, unknown>) {
-    const blob = storageKey.startsWith("image:") ? await getImageBlob(storageKey) : await getMediaBlob(storageKey);
+    const artifactStore = localArtifactStoreForStorageKey(storageKey);
+    const blob = artifactStore === "image" ? await getImageBlob(storageKey) : artifactStore === "media" ? await getMediaBlob(storageKey) : null;
     if (!blob) return "";
     const kind = blob.type.startsWith("image/") ? "image" : blob.type.startsWith("video/") ? "video" : blob.type.startsWith("audio/") ? "audio" : "file";
     const resource = await uploadResourceFile(blob, kind, {
@@ -373,7 +372,7 @@ function sameVersion(remote?: string, local?: string) {
 }
 
 function isLocalStorageKey(value: string) {
-    return LOCAL_STORAGE_KEY_PATTERN.test(value) && !resourceIdFromStorageKey(value);
+    return localArtifactStoreForStorageKey(value) !== null && !resourceIdFromStorageKey(value);
 }
 
 function numberValue(value: unknown) {

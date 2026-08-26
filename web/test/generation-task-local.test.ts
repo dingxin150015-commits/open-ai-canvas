@@ -192,7 +192,7 @@ test("task center deletion accepts only local Dreamina records", async () => {
     const deleteActionSource = sourceSection(source, "const deleteLocalTask =", "const refreshLocalTaskStatus =");
 
     expect(compactedSource).toMatch(/\{detailTask\.provider === "dreamina-cli" \? \( <Button .*?aria-label="删除本机记录".*?onClick=\{\(\) => deleteLocalTask\(detailTask\)\}> 删除本机记录 <\/Button> \) : null\}/);
-    expect(compactedSource).toContain("任务已由官方接受；删除后仍会在后台同步官方状态。");
+    expect(compactedSource).toContain("任务已由官方接受；删除本机记录不会取消官方任务，且本应用将不再同步该记录。已生成素材不受影响。");
     expect(deleteActionSource).toContain("await deleteGenerationTask(task.id);");
 });
 
@@ -1677,7 +1677,7 @@ test("Create audio upload converts, previews, removes, and submits through the s
         operation?: string;
         input?: { referenceAudios?: Array<Record<string, unknown>> };
     };
-    expect(submitted.operation).toBe("reference_to_video");
+    expect(submitted.operation).toBe("audio_to_video");
     expect(submitted.input?.referenceAudios).toEqual([
         {
             id: attachment.id,

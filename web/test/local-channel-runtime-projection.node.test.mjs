@@ -1,33 +1,25 @@
 import assert from "node:assert/strict";
-import { after, afterEach, test } from "node:test";
-import os from "node:os";
-import path from "node:path";
+import { afterAll, afterEach, test } from "bun:test";
 import axios from "axios";
-import { createServer } from "vite";
 
-const webRoot = process.cwd();
 const originalWindow = globalThis.window;
-const viteRuntime = createServer({
-    root: webRoot,
-    configFile: false,
-    cacheDir: path.join(os.tmpdir(), `framefield-local-channel-runtime-${process.pid}`),
-    resolve: { alias: { "@": path.join(webRoot, "src") } },
-    define: { __APP_VERSION__: JSON.stringify("test"), __APP_CHANGELOG__: JSON.stringify("") },
-    server: { middlewareMode: true },
-    appType: "custom",
-    logLevel: "silent",
-});
+const originalVersion = globalThis.__APP_VERSION__;
+const originalChangelog = globalThis.__APP_CHANGELOG__;
+globalThis.__APP_VERSION__ = "test";
+globalThis.__APP_CHANGELOG__ = "";
 
-const runtime = await viteRuntime;
-const configStore = await runtime.ssrLoadModule("/src/stores/use-config-store.ts");
-const userStore = await runtime.ssrLoadModule("/src/stores/use-user-store.ts");
-const generationTask = await runtime.ssrLoadModule("/src/services/api/generation-task.ts");
-const relay = await runtime.ssrLoadModule("/src/services/api/custom-channel-relay.ts");
-const imageApi = await runtime.ssrLoadModule("/src/services/api/image.ts");
+const configStore = await import("../src/stores/use-config-store.ts");
+const userStore = await import("../src/stores/use-user-store.ts");
+const generationTask = await import("../src/services/api/generation-task.ts");
+const relay = await import("../src/services/api/custom-channel-relay.ts");
+const imageApi = await import("../src/services/api/image.ts");
 const originalAxiosPost = axios.post;
 
-after(async () => {
-    await runtime.close();
+afterAll(() => {
+    if (originalVersion === undefined) delete globalThis.__APP_VERSION__;
+    else globalThis.__APP_VERSION__ = originalVersion;
+    if (originalChangelog === undefined) delete globalThis.__APP_CHANGELOG__;
+    else globalThis.__APP_CHANGELOG__ = originalChangelog;
 });
 
 afterEach(() => {

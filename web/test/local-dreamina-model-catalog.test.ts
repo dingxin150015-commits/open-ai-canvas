@@ -344,7 +344,7 @@ test("effective config removes custom channels when administrators disable them"
                     baseUrl: "/api/ai/system/system-1",
                     apiKey: "system",
                     models: ["system-model"],
-                    modelCosts: [{ model: "system-model", capability: "text", billingMode: "fixed_request", unitPriceMicrocredits: 0 }],
+                    modelCosts: [{ model: "system-model", capability: "text", billingMode: "fixed_request", unitPriceMicrocredits: 1 }],
                 }),
                 createModelChannel({ id: "custom-1", scope: "user", name: "自定义渠道", baseUrl: "https://example.com", apiKey: "private-key", models: ["custom-model"] }),
             ],

@@ -6,7 +6,7 @@ import { scopedLocalStorage, setActiveUserScope } from "@/lib/user-scope";
 import { CANVAS_STORE_KEY, flushCanvasStorePersistence, useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { ASSET_STORE_KEY, flushAssetStorePersistence, useAssetStore } from "@/stores/use-asset-store";
 import { CONFIG_STORE_KEY, PUBLIC_MODEL_CATALOG_ID, defaultConfig, normalizeConfigSnapshot, useConfigStore, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
-import { defaultModelCapabilityConfig, STANDARD_IMAGE_SIZE_VALUES, type ModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultModelCapabilityConfig, defaultImageCapabilityConfig, STANDARD_IMAGE_SIZE_VALUES, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { useUserStore } from "@/stores/use-user-store";
 import { installRemoteUserDataAutoSync, resetRemoteUserDataSync, syncRemoteUserData, withRemoteUserDataSyncPaused } from "@/services/user-data-sync";
 import { withGenerationConsumersPaused } from "@/services/generation-consumer-lifecycle";
@@ -196,7 +196,8 @@ function projectLogicalCapability(spec: CapabilitySpec, defaults: Record<string,
         const sizeValues = stringValues(sizeOption);
         const sizeAllowsCustom = sizeValues.includes("*");
         const concreteSizeValues = sizeValues.filter((value) => value !== "*");
-        const sizePresets = concreteSizeValues.length ? concreteSizeValues : sizeAllowsCustom ? [...STANDARD_IMAGE_SIZE_VALUES] : [];
+        // 修改：移除硬编码，使用完整的 defaultImageCapabilityConfig
+        const sizePresets = concreteSizeValues.length ? concreteSizeValues : sizeAllowsCustom ? defaultImageCapabilityConfig().size.values : [];
         if (sizePresets.length || sizeAllowsCustom) {
             projected.image!.size = { parameter: "size", values: sizePresets, default: concreteDefault(defaults.size, sizePresets, "1:1"), allowCustom: sizeAllowsCustom };
         }
@@ -211,11 +212,25 @@ function projectLogicalCapability(spec: CapabilitySpec, defaults: Record<string,
         projected.video.references.maxImages = spec.inputs?.image?.max ?? 0;
         projected.video.references.maxVideos = spec.inputs?.video?.max ?? 0;
         projected.video.references.maxAudios = spec.inputs?.audio?.max ?? 0;
+        projected.video.references.minVisualReferences = spec.inputs?.visual?.min ?? 0;
+        projected.video.references.maxVisualReferences = spec.inputs?.visual?.max ?? 0;
         projected.video.operations = spec.operations || [];
         projected.video.defaultOperation = spec.operations?.[0] || "";
         const duration = spec.options?.videoSeconds || spec.options?.duration;
-        if (duration?.values?.length) projected.video.duration = { selection: "enum", values: duration.values.map(Number).filter(Number.isFinite), default: Number(defaults.videoSeconds ?? duration.values[0]) };
+        if (duration?.values?.length) {
+            const durationValues = duration.values.map(Number).filter(Number.isFinite);
+            const smartSupported = durationValues.includes(-1);
+            const positiveValues = durationValues.filter((value) => value > 0).sort((left, right) => left - right);
+            const step = positiveValues.length > 1 ? positiveValues[1]! - positiveValues[0]! : 1;
+            const isRange = positiveValues.length > 1 && positiveValues.every((value, index) => index === 0 || value - positiveValues[index - 1]! === step);
+            const requestedDefault = Number(defaults.videoSeconds ?? positiveValues[0] ?? -1);
+            projected.video.duration = isRange
+                ? { selection: "range", min: positiveValues[0], max: positiveValues.at(-1), step, default: requestedDefault === -1 ? (positiveValues[0] || 1) : requestedDefault, smartSupported }
+                : { selection: "enum", values: positiveValues, default: requestedDefault === -1 ? (positiveValues[0] || 1) : requestedDefault, smartSupported };
+        }
         else if (duration?.min !== undefined && duration.max !== undefined) projected.video.duration = { selection: "range", min: duration.min, max: duration.max, step: duration.step || 1, default: Number(defaults.videoSeconds ?? duration.min) };
+        const durationWithVideo = spec.options?.videoSecondsWithReferenceVideo;
+        if (durationWithVideo?.max !== undefined) projected.video.references.maxOutputDurationWithVideoSeconds = durationWithVideo.max;
         projected.video.ratios = stringValues(spec.options?.size || spec.options?.aspectRatio);
         projected.video.defaultRatio = concreteDefault(defaults.size, projected.video.ratios, "");
         projected.video.resolutions = stringValues(spec.options?.vquality || spec.options?.resolution);

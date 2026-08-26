@@ -9,10 +9,11 @@ import { ModelCapabilityEditor } from "@/components/model-capability-editor";
 import { CapabilityCardPicker, ProtocolCardPicker, type ModelCapabilityChoice } from "@/components/model-protocol-picker";
 import { defaultModelCapabilityConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { MODEL_PROTOCOLS, modelProtocolCapability, modelProtocolDefinition, modelProtocolLabel, modelProtocolSupportsTokenBilling, type ModelProtocol } from "@/lib/model-protocols";
-import { createAdminChannelModel, deleteAdminChannelModel, fetchAdminChannelModels, listAdminChannelModels, testAdminChannelModel, updateAdminChannelModel, type ChannelModel, type ChannelModelPriceTier } from "@/services/api/wallet";
+import { createAdminChannelModel, deleteAdminChannelModel, fetchAdminChannelModels, listAdminChannelModels, testAdminChannelModel, updateAdminChannelModel, type ChannelModel, type ChannelModelPriceTier, type ChannelModelSupportStatus } from "@/services/api/wallet";
 import type { ModelChannel } from "@/stores/use-config-store";
 import { AdminPageFrame } from "./admin-shell";
 import { AdminDataTable, AdminFilterChip, AdminStatusBadge } from "./admin-ui";
+import { channelModelFetchSummary, channelModelSupportMeta, isChannelModelReadOnly } from "./channel-model-support";
 
 type EditableCapability = ModelCapabilityChoice;
 
@@ -56,6 +57,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
     const [keyword, setKeyword] = useState("");
     const [capability, setCapability] = useState<ChannelModel["capability"] | "all">("all");
     const [status, setStatus] = useState<"all" | "enabled" | "disabled">("all");
+    const [supportStatus, setSupportStatus] = useState<ChannelModelSupportStatus | "all">("all");
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [form] = Form.useForm<FormValues>();
@@ -84,6 +86,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
         setKeyword("");
         setCapability("all");
         setStatus("all");
+        setSupportStatus("all");
         setPage(1);
     }, [channel.id]);
 
@@ -94,9 +97,9 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
             const result = await fetchAdminChannelModels(channel.id);
             await reload();
             await onChanged();
-            if (result.models.length === 0) message.warning("上游没有返回可用模型");
-            else if (result.added > 0) message.success(`已拉取 ${result.models.length} 个模型，新增 ${result.added} 个待配置模型`);
-            else message.info(`已拉取 ${result.models.length} 个模型，没有需要新增的模型`);
+            if (result.models.length === 0) message.warning("上游与官方目录均未返回模型");
+            else if (result.added > 0 || result.updated > 0) message.success(channelModelFetchSummary(result));
+            else message.info(channelModelFetchSummary(result));
         } catch (error) {
             message.error(error instanceof Error ? error.message : "拉取模型失败");
         } finally {
@@ -137,6 +140,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
     };
 
     const save = async () => {
+        if (isChannelModelReadOnly(editing)) return;
         const values = await form.validateFields();
         const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
         const capabilityConfig = values.capability === "text" || values.capability === "image" || values.capability === "video"
@@ -181,6 +185,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
     };
 
     const testModel = async () => {
+        if (isChannelModelReadOnly(editing)) return;
         const values = await form.validateFields(["modelKey", "providerModelKey", "capability", "protocol", ...(modelCapability === "text" || modelCapability === "image" || modelCapability === "video" ? ["capabilityConfig"] : [])]);
         const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
         const capabilityConfig = values.capability === "text" || values.capability === "image" || values.capability === "video"
@@ -260,6 +265,15 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
         },
         { title: "能力", dataIndex: "capability", width: 90, render: capabilityLabel },
         {
+            title: "支持状态",
+            dataIndex: "supportStatus",
+            width: 110,
+            render: (value: ChannelModelSupportStatus, item) => {
+                const meta = channelModelSupportMeta(value);
+                return <AdminStatusBadge label={meta.label} tone={meta.tone} title={item.supportReason} />;
+            },
+        },
+        {
             title: "请求协议",
             dataIndex: "protocol",
             width: 230,
@@ -282,11 +296,11 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
             render: (_, item) => (
                 <Space>
                     <Button size="small" onClick={() => startEdit(item)}>
-                        编辑
+                        {isChannelModelReadOnly(item) ? "查看" : "编辑"}
                     </Button>
-                    <Popconfirm title="删除模型" description="已被前台供应线路或进行中任务使用的模型不能删除；删除后模型不再显示，且不能在页面恢复。" okText="删除" cancelText="取消" onConfirm={() => void remove(item)}>
+                    {!isChannelModelReadOnly(item) ? <Popconfirm title="删除模型" description="已被前台供应线路或进行中任务使用的模型不能删除；删除后模型不再显示，且不能在页面恢复。" okText="删除" cancelText="取消" onConfirm={() => void remove(item)}>
                         <Button size="small" danger title="删除模型" aria-label="删除模型" icon={<Trash2 className="size-3.5" />} />
-                    </Popconfirm>
+                    </Popconfirm> : null}
                 </Space>
             ),
         },
@@ -298,6 +312,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
         if (capability !== "all" && item.capability !== capability) return false;
         if (status === "enabled" && !item.enabled) return false;
         if (status === "disabled" && item.enabled) return false;
+        if (supportStatus !== "all" && item.supportStatus !== supportStatus) return false;
         return true;
     });
     const pagedItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
@@ -329,8 +344,8 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                         setPage(1);
                     }}
                 />}
-                toolbarActiveFilters={<>{keyword ? <AdminFilterChip label={`搜索：${keyword}`} onRemove={() => { setKeyword(""); setPage(1); }} /> : null}{capability !== "all" ? <AdminFilterChip label={`能力：${capability}`} onRemove={() => { setCapability("all"); setPage(1); }} /> : null}{status !== "all" ? <AdminFilterChip label={`状态：${status === "enabled" ? "已启用" : "已停用"}`} onRemove={() => { setStatus("all"); setPage(1); }} /> : null}</>}
-                toolbarActive={Boolean(keyword || capability !== "all" || status !== "all")}
+                toolbarActiveFilters={<>{keyword ? <AdminFilterChip label={`搜索：${keyword}`} onRemove={() => { setKeyword(""); setPage(1); }} /> : null}{capability !== "all" ? <AdminFilterChip label={`能力：${capability}`} onRemove={() => { setCapability("all"); setPage(1); }} /> : null}{status !== "all" ? <AdminFilterChip label={`状态：${status === "enabled" ? "已启用" : "已停用"}`} onRemove={() => { setStatus("all"); setPage(1); }} /> : null}{supportStatus !== "all" ? <AdminFilterChip label={`支持：${channelModelSupportMeta(supportStatus).label}`} onRemove={() => { setSupportStatus("all"); setPage(1); }} /> : null}</>}
+                toolbarActive={Boolean(keyword || capability !== "all" || status !== "all" || supportStatus !== "all")}
                 toolbarFilters={
                     <>
                         <Select
@@ -351,12 +366,19 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                             }}
                             options={[{ label: "全部状态", value: "all" }, { label: "已启用", value: "enabled" }, { label: "已停用", value: "disabled" }]}
                         />
+                        <Select
+                            className="w-32"
+                            value={supportStatus}
+                            onChange={(value) => { setSupportStatus(value); setPage(1); }}
+                            options={[{ label: "全部支持状态", value: "all" }, { label: "可用", value: "ready" }, { label: "计划支持", value: "planned" }, { label: "暂不支持", value: "unsupported" }, { label: "已废弃", value: "deprecated" }]}
+                        />
                     </>
                 }
                 onReset={() => {
                     setKeyword("");
                     setCapability("all");
                     setStatus("all");
+                    setSupportStatus("all");
                     setPage(1);
                 }}
                 table={{
@@ -372,12 +394,14 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                 footer={<PaginationBar alwaysShow current={page} pageSize={pageSize} total={filteredItems.length} onChange={(nextPage, nextPageSize) => { setPage(nextPageSize !== pageSize ? 1 : nextPage); setPageSize(nextPageSize); }} />}
             />
             <Drawer
-                title={editing ? `编辑模型 / ${editing.displayName || editing.modelKey}` : "新增模型"}
+                title={editing ? `${isChannelModelReadOnly(editing) ? "查看" : "编辑"}模型 / ${editing.displayName || editing.modelKey}` : "新增模型"}
                 open={editorOpen}
                 size="min(1080px, 100vw)"
                 onClose={() => !saving && setEditorOpen(false)}
                 rootClassName="admin-drawer"
-                footer={
+                footer={isChannelModelReadOnly(editing) ? (
+                    <div className="flex justify-end"><Button onClick={() => setEditorOpen(false)}>关闭</Button></div>
+                ) : (
                     <div className="flex items-center justify-between gap-3">
                         <Button icon={<FlaskConical className="size-4" />} loading={testing} disabled={saving} onClick={() => void testModel()}>测试模型</Button>
                         <div className="flex items-center gap-2">
@@ -385,7 +409,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                             <Button type="primary" loading={saving} disabled={testing} onClick={() => void save()}>{editing ? "保存修改" : "添加模型"}</Button>
                         </div>
                     </div>
-                }
+                )}
                 extra={
                     editing ? (
                         <Button size="small" icon={<Plus className="size-3.5" />} onClick={startCreate}>
@@ -394,7 +418,8 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                     ) : null
                 }
             >
-                <Form form={form} layout="vertical" requiredMark={false} onValuesChange={handleFormValuesChange}>
+                <Form form={form} layout="vertical" requiredMark={false} disabled={isChannelModelReadOnly(editing)} onValuesChange={handleFormValuesChange}>
+                    {isChannelModelReadOnly(editing) ? <div className="mb-4 rounded-md border border-border bg-muted/20 p-3 text-sm text-foreground/70">{editing?.supportReason || "该模型尚未完成项目执行器适配与验证，本阶段仅展示官方目录信息。"}</div> : null}
                     <section className="admin-form-section">
                         <div className="mb-4">
                             <h2 className="text-sm font-semibold">模型身份</h2>

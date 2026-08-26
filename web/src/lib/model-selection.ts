@@ -81,7 +81,11 @@ export function modelCompatibilityError(config: AiConfig, model: string, require
     if (capability === "video") {
         const profile = modelCapabilityConfigFor(config, model).video!;
         if (requirements.videoSeconds && !videoDurationAllowed(profile, Number(requirements.videoSeconds))) return "不支持当前视频时长";
+        if (input?.videoCount && requirements.videoSeconds && profile.references.maxOutputDurationWithVideoSeconds && Number(requirements.videoSeconds) > profile.references.maxOutputDurationWithVideoSeconds) return `包含参考视频时最多支持 ${profile.references.maxOutputDurationWithVideoSeconds} 秒`;
         if (!input) return "";
+        const visualReferenceCount = visualInputCount + input.videoCount;
+        if (profile.references.maxVisualReferences && visualReferenceCount > profile.references.maxVisualReferences) return `最多支持 ${profile.references.maxVisualReferences} 个图片/视频视觉素材`;
+        if (visualReferenceCount < (profile.references.minVisualReferences || 0)) return `至少需要 ${profile.references.minVisualReferences} 个图片/视频视觉素材`;
         if (visualInputCount > profile.references.maxImages) return `最多支持 ${profile.references.maxImages} 张参考图`;
         if (input.videoCount > profile.references.maxVideos) return `最多支持 ${profile.references.maxVideos} 个参考视频`;
         if (input.audioCount > profile.references.maxAudios) return `最多支持 ${profile.references.maxAudios} 个参考音频`;
@@ -122,6 +126,7 @@ function logicalModelCompatibilityError(spec: NonNullable<NonNullable<AiConfig["
         video: input?.videoCount || 0,
         audio: input?.audioCount || 0,
     };
+    if (spec.inputs?.visual) counts.visual = visualInputCount + (input?.videoCount || 0);
     for (const [kind, count] of Object.entries(counts)) {
         const constraint = spec.inputs?.[kind];
         if (!constraint && count > 0) return `不支持${kind}输入`;
@@ -218,7 +223,8 @@ export function mergedImageCapabilityConfig(config: AiConfig, selected: string):
     if (profiles.length <= 1) return selectedProfile || defaultImageCapabilityConfig();
     const concreteValues = Array.from(new Set(profiles.flatMap((profile) => profile.size.values).filter((value) => value !== "*")));
     const allowCustom = profiles.some((profile) => profile.size.allowCustom || profile.size.values.includes("*"));
-    const values = concreteValues.length ? concreteValues : allowCustom ? [...STANDARD_IMAGE_SIZE_VALUES] : [];
+    // 修改：移除硬编码，使用完整的 defaultImageSizes
+    const values = concreteValues.length ? concreteValues : allowCustom ? defaultImageCapabilityConfig().size.values : [];
     const base = selectedProfile || profiles[0];
     return { ...base, size: { ...base.size, values, allowCustom } };
 }
