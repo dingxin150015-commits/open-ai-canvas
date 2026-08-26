@@ -51,13 +51,14 @@ async function rejectedCode(
     return error instanceof DreaminaCliError ? error.code : "accepted";
 }
 
-test("Dreamina safe staging rejects traversal, root escape, links, oversize, header mismatch, and TOCTOU for all media groups", async () => {
+test("Dreamina safe staging rejects traversal, root escape, links, oversize, header mismatch, and TOCTOU for all media groups", async (context) => {
     const box = await fs.mkdtemp(path.join(os.tmpdir(), "dreamina-staging-security-"));
     const owned = path.join(box, "owned");
     const outside = path.join(box, "outside");
     const stateRoot = path.join(box, "state");
     await Promise.all([fs.mkdir(owned), fs.mkdir(outside)]);
     const failures: string[] = [];
+    let symlinkUnavailable = false;
 
     try {
         for (const media of mediaCases) {
@@ -77,10 +78,19 @@ test("Dreamina safe staging rejects traversal, root escape, links, oversize, hea
                 failures.push(`${media.kind}:root-escape`);
             }
 
-            const symbolic = path.join(owned, `symbolic-${media.kind}${media.extension}`);
-            await fs.symlink(valid, symbolic, "file");
-            if (await rejectedCode(media, symbolic, owned, stateRoot) !== "dreamina_reference_invalid") {
-                failures.push(`${media.kind}:symlink`);
+            if (!symlinkUnavailable) {
+                const symbolic = path.join(owned, `symbolic-${media.kind}${media.extension}`);
+                try {
+                    await fs.symlink(valid, symbolic, "file");
+                    if (await rejectedCode(media, symbolic, owned, stateRoot) !== "dreamina_reference_invalid") {
+                        failures.push(`${media.kind}:symlink`);
+                    }
+                } catch (error) {
+                    const code = (error as NodeJS.ErrnoException).code;
+                    if (process.platform !== "win32" || (code !== "EPERM" && code !== "EACCES")) throw error;
+                    symlinkUnavailable = true;
+                    context.diagnostic("Windows symlink privilege is unavailable; Linux CI retains the symlink rejection gate.");
+                }
             }
 
             const hardSource = path.join(owned, `hard-source-${media.kind}${media.extension}`);

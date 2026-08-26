@@ -1,4 +1,6 @@
 .git
+.claude
+.codex
 .idea
 .cursor
 .playwright-mcp
@@ -12,12 +14,17 @@ backend/*.db
 .serena
 .local
 web/.next
+web/dist
 web/node_modules
 web/out
 *.log
 *.db
 *.sqlite
 *.sqlite3
+*.exe
+backend/*.exe
 .settings-key
 .env*
 !.env.example
+百炼千问文档
+百炼千问文档.zip

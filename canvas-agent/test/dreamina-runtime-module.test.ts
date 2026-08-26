@@ -133,8 +133,13 @@ test("Dreamina production module startup reconciles due accepted work without ro
         assert.equal(typeof startup, "function");
         await startup?.();
         await waitForCondition(async () => {
-            const disk = JSON.parse(await fs.readFile(journalFile, "utf8"));
-            return disk.records[0]?.state === "cancelled";
+            try {
+                const disk = JSON.parse(await fs.readFile(journalFile, "utf8"));
+                return disk.records[0]?.state === "cancelled";
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+                throw error;
+            }
         });
         assert.equal(queries, 1);
         assert.deepEqual(await invoke(module, "/dreamina/run", Buffer.from(JSON.stringify({
@@ -1142,7 +1147,7 @@ async function invoke(
 }
 
 async function waitForCondition(condition: () => Promise<boolean>) {
-    const deadline = Date.now() + 2_000;
+    const deadline = Date.now() + 15_000;
     while (!(await condition())) {
         if (Date.now() >= deadline) throw new Error("timed out waiting for Dreamina module state");
         await new Promise((resolve) => setTimeout(resolve, 10));

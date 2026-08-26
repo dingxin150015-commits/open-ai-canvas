@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # 构建 Vite 前端产物。
-FROM oven/bun:1.3.13 AS web-build
+FROM oven/bun:1.4.0 AS web-build
 
 WORKDIR /app/web
 ARG VITE_TLDRAW_LICENSE_KEY

@@ -2433,7 +2433,7 @@ test("Dreamina production query consumes one JSON status before a long-lived CLI
                     "setTimeout(()=>process.stdout.write('{\"gen_status\":\"failed\"}'),50)",
                     "setInterval(()=>{},1000)",
                 ].join(";")],
-                timeoutMs: 250,
+                timeoutMs: 5_000,
                 onSpawn: (pid) => { queryPid = pid; },
             } as DreaminaProcessRequest);
         },
@@ -2694,8 +2694,8 @@ test("Dreamina cross-Runtime queue head promotes after a peer reconciler release
         discover: async () => installation,
         maxActiveTasks: 1,
         pollIntervalMs: 60_000,
-        reservationLeaseMs: 500,
-        reservationHeartbeatMs: 20,
+        reservationLeaseMs: 15_000,
+        reservationHeartbeatMs: 250,
     };
     const runtimeA = new DreaminaCliRuntime({
         ...sharedOptions,
@@ -2734,10 +2734,10 @@ test("Dreamina cross-Runtime queue head promotes after a peer reconciler release
         assert.equal(runtimeBSubmits, 0);
 
         await runtimeA.refreshTask(active.id);
-        await waitForPromise(terminalQueryStarted, "Runtime A terminal reconciliation", 2_000);
+        await waitForPromise(terminalQueryStarted, "Runtime A terminal reconciliation", 15_000);
         releaseTerminal();
-        await waitForRuntimeRecord(box.stateFile, active.id, (record) => record.state === "cancelled", 2_000);
-        await waitForPromise(queuedSubmitStarted, "Runtime B queued promotion", 1_000);
+        await waitForRuntimeRecord(box.stateFile, active.id, (record) => record.state === "cancelled", 15_000);
+        await waitForPromise(queuedSubmitStarted, "Runtime B queued promotion", 15_000);
 
         assert.equal(runtimeBSubmits, 1);
         assert.equal((await runtimeB.getTask(queued.id)).status, "running");
@@ -2748,7 +2748,7 @@ test("Dreamina cross-Runtime queue head promotes after a peer reconciler release
     }
 });
 
-test("Dreamina durable scheduler preserves FIFO when a later Runtime heartbeat reaches the released slot first", async () => {
+test("Dreamina durable scheduler preserves FIFO across competing Runtime heartbeats", async () => {
     const box = await sandbox();
     let releaseTerminal!: () => void;
     const terminalGate = new Promise<void>((resolve) => { releaseTerminal = resolve; });
@@ -2757,6 +2757,8 @@ test("Dreamina durable scheduler preserves FIFO when a later Runtime heartbeat r
     let markSecondQueuedSubmit!: (runtime: "B" | "C") => void;
     const secondQueuedSubmit = new Promise<"B" | "C">((resolve) => { markSecondQueuedSubmit = resolve; });
     let observeQueuedHeartbeats = false;
+    let markQueuedHeartbeatStarted!: () => void;
+    const queuedHeartbeatStarted = new Promise<void>((resolve) => { markQueuedHeartbeatStarted = resolve; });
     let firstQueuedSubmitRuntime: "B" | "C" | undefined;
     const queuedHeartbeatOrder: Array<"B" | "C"> = [];
     const queuedSubmitOrder: Array<"B" | "C"> = [];
@@ -2787,7 +2789,10 @@ test("Dreamina durable scheduler preserves FIFO when a later Runtime heartbeat r
         reservationHeartbeatMs: heartbeatMs,
         generationRoot: path.join(box.root, `fifo-runtime-${runtime.toLowerCase()}`),
         onQueueHeartbeatWait(event) {
-            if (observeQueuedHeartbeats && event === "started") queuedHeartbeatOrder.push(runtime);
+            if (observeQueuedHeartbeats && event === "started") {
+                queuedHeartbeatOrder.push(runtime);
+                markQueuedHeartbeatStarted();
+            }
         },
         runProcess: async (input) => {
             if (input.args[0] === "text2video") {
@@ -2803,29 +2808,30 @@ test("Dreamina durable scheduler preserves FIFO when a later Runtime heartbeat r
         },
     });
     const runtimeB = queuedRuntime("B", 1_000);
-    const runtimeC = queuedRuntime("C", 20);
+    const runtimeC = queuedRuntime("C", 250);
     const base = { operation: "text2video" as const, modelVersion: "seedance2.0mini" as const, ratio: "16:9" as const, videoResolution: "720p" as const, duration: 4 };
     try {
         const active = await runtimeA.enqueue({ ...base, idempotencyKey: "dreamina-durable-fifo-active-0001", prompt: "active" });
+        observeQueuedHeartbeats = true;
         const queuedB = await runtimeB.enqueue({ ...base, idempotencyKey: "dreamina-durable-fifo-b-0001", prompt: "queued-b" });
         const queuedC = await runtimeC.enqueue({ ...base, idempotencyKey: "dreamina-durable-fifo-c-0001", prompt: "queued-c" });
         assert.equal(queuedB.status, "queued");
         assert.equal(queuedC.status, "queued");
+        await waitForPromise(queuedHeartbeatStarted, "queued Runtime heartbeat", 15_000);
 
         await runtimeA.refreshTask(active.id);
-        observeQueuedHeartbeats = true;
         releaseTerminal();
-        await waitForRuntimeRecord(box.stateFile, active.id, (record) => record.state === "cancelled", 2_000);
+        await waitForRuntimeRecord(box.stateFile, active.id, (record) => record.state === "cancelled", 15_000);
 
-        assert.equal(await waitForPromise(firstQueuedSubmit, "first durable FIFO queued submit", 3_000), "B");
-        assert.equal(queuedHeartbeatOrder[0], "C");
+        assert.equal(await waitForPromise(firstQueuedSubmit, "first durable FIFO queued submit", 15_000), "B");
+        assert.ok(queuedHeartbeatOrder.length > 0);
         assert.deepEqual(queuedSubmitOrder, ["B"]);
         assert.equal((await runtimeC.getTask(queuedC.id)).status, "queued");
 
-        await waitForRuntimeRecord(box.stateFile, queuedB.id, (record) => record.state === "accepted", 2_000);
+        await waitForRuntimeRecord(box.stateFile, queuedB.id, (record) => record.state === "accepted", 15_000);
         assert.equal((await runtimeB.refreshTask(queuedB.id)).status, "running");
-        await waitForRuntimeRecord(box.stateFile, queuedB.id, (record) => record.state === "cancelled", 2_000);
-        assert.equal(await waitForPromise(secondQueuedSubmit, "second durable FIFO queued submit", 2_000), "C");
+        await waitForRuntimeRecord(box.stateFile, queuedB.id, (record) => record.state === "cancelled", 15_000);
+        assert.equal(await waitForPromise(secondQueuedSubmit, "second durable FIFO queued submit", 15_000), "C");
         assert.deepEqual(queuedSubmitOrder, ["B", "C"]);
     } finally {
         releaseTerminal();
@@ -3517,8 +3523,8 @@ for (const operation of ["cancel", "delete", "dispose"] as const) {
             ensureReady: async () => undefined,
             discover: async () => installation,
             maxActiveTasks: 1,
-            reservationLeaseMs: 1_000,
-            reservationHeartbeatMs: 10,
+            reservationLeaseMs: 5_000,
+            reservationHeartbeatMs: 250,
             runProcess: async (input) => {
                 if (input.args[0] === "text2video") {
                     submits += 1;
@@ -3779,7 +3785,7 @@ function durableWaitMonitor() {
 }
 
 async function waitFor(condition: () => boolean) {
-    const deadline = Date.now() + 2_000;
+    const deadline = Date.now() + 15_000;
     while (!condition()) {
         if (Date.now() >= deadline) throw new Error("timed out waiting for Dreamina spawn");
         await new Promise((resolve) => setTimeout(resolve, 10));

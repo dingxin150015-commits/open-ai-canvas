@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.25-alpine AS backend-build
+FROM golang:1.25-alpine AS backend-base
 
 ARG GOPROXY=https://proxy.golang.org,direct
 ENV GOPROXY=$GOPROXY
@@ -11,6 +11,19 @@ WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY backend ./
+
+FROM backend-base AS backend-test
+
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+ENV CANVAS_BACKEND_DATA_DIR=/tmp/open-ai-canvas-tests
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go test -count=1 ./...
+
+FROM backend-base AS backend-build
+
 RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/infinite-canvas-backend ./cmd/server \
     && CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate-sqlite-postgres ./cmd/migrate-sqlite-postgres
 

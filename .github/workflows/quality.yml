@@ -13,6 +13,8 @@ jobs:
   backend:
     name: Backend checks
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
     defaults:
       run:
         working-directory: backend
@@ -22,10 +24,18 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache: true
+      - name: Verify CGO toolchain
+        run: |
+          if ! command -v gcc >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+          fi
+          test "$(go env CGO_ENABLED)" = "1"
+          gcc --version
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Run Go tests
-        run: go test ./...
+        run: go test -count=1 ./...
 
   web:
     name: Web checks
@@ -39,11 +49,8 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version-file: .bun-version
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Install Canvas Agent dependencies
-        working-directory: canvas-agent
         run: bun install --frozen-lockfile
       - name: Check formatting
         env:
@@ -76,3 +83,23 @@ jobs:
         run: bun run typecheck
       - name: Run tests
         run: bun run test
+      - name: Build production bundle
+        run: bun run build
+
+  canvas-agent:
+    name: Canvas Agent checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: canvas-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run tests
+        run: bun run test
+      - name: Build
+        run: bun run build

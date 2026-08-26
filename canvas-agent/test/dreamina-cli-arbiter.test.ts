@@ -491,8 +491,9 @@ test("expired owner cannot commit a late submit result after another arbiter tak
     const arbiterFile = path.join(root, "arbiter.json");
     const stateA = path.join(root, "runtime-a.json");
     const stateB = path.join(root, "runtime-b.json");
-    const arbiterA = new DreaminaCliArbiter({ stateFile: arbiterFile, leaseMs: 100, heartbeatMs: 0, pollMs: 5 });
-    const arbiterB = new DreaminaCliArbiter({ stateFile: arbiterFile, leaseMs: 100, heartbeatMs: 0, pollMs: 5 });
+    let arbiterNow = 0;
+    const arbiterA = new DreaminaCliArbiter({ stateFile: arbiterFile, now: () => arbiterNow, leaseMs: 100, heartbeatMs: 0, pollMs: 5 });
+    const arbiterB = new DreaminaCliArbiter({ stateFile: arbiterFile, now: () => arbiterNow, leaseMs: 100, heartbeatMs: 0, pollMs: 5 });
     await fs.writeFile(stateB, JSON.stringify({
         version: 1,
         records: [acceptedRuntimeRecord("dreamina-fenced-owner-B-0001", "receipt-owner-B-query", "d", "2020-01-01T00:00:00.000Z")],
@@ -534,7 +535,7 @@ test("expired owner cannot commit a late submit result after another arbiter tak
             resolutionType: "2k",
         });
         await waitFor(() => submitEntered);
-        await new Promise((resolve) => setTimeout(resolve, 140));
+        arbiterNow = 140;
         await runtimeB.start();
         await waitFor(() => ownerBQueries === 1);
         releaseSubmit();
@@ -865,8 +866,11 @@ test("a live reservation heartbeat survives beyond its TTL while waiting for the
         ownerId,
         stateFile,
         arbiter: runtimeArbiter,
-        reservationLeaseMs: 500,
-        reservationHeartbeatMs: 50,
+        // Windows/exFAT state-lock operations can take multiple seconds under load.
+        // Keep the test lease well above one lock round-trip while still proving
+        // that heartbeats preserve the reservation beyond its original TTL.
+        reservationLeaseMs: 5_000,
+        reservationHeartbeatMs: 250,
         ensureReady: async () => undefined,
         discover: async () => installation,
         maxPollAttempts: 1,
@@ -883,8 +887,8 @@ test("a live reservation heartbeat survives beyond its TTL while waiting for the
         ownerId,
         stateFile,
         arbiter: observerArbiter,
-        reservationLeaseMs: 500,
-        reservationHeartbeatMs: 50,
+        reservationLeaseMs: 5_000,
+        reservationHeartbeatMs: 250,
         ensureReady: async () => undefined,
         discover: async () => installation,
         runProcess: async () => { throw new Error("observer must not invoke provider"); },
@@ -902,7 +906,7 @@ test("a live reservation heartbeat survives beyond its TTL while waiting for the
         await waitForAsync(async () => (await readJournalRecord(stateFile, "dreamina-heartbeat-reservation-0001"))?.state === "pending");
         const first = await readJournalRecord(stateFile, "dreamina-heartbeat-reservation-0001");
         const firstExpiry = Date.parse(String(first?.reservationExpiresAt));
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 6_000));
         const observed = await runtimeB.listTasks();
         const after = await readJournalRecord(stateFile, "dreamina-heartbeat-reservation-0001");
         assert.equal(observed.find((task) => task.id === "dreamina-heartbeat-reservation-0001")?.stage, "submitting");
@@ -930,7 +934,7 @@ test("an expired pre-spawn reservation releases its slot and fences the former o
         ownerId,
         stateFile,
         arbiter: new DreaminaCliArbiter({ stateFile: arbiterFile, pollMs: 1 }),
-        reservationLeaseMs: 100,
+        reservationLeaseMs: 2_000,
         reservationHeartbeatMs: 0,
         ensureReady: async () => undefined,
         discover: async () => installation,
@@ -944,7 +948,7 @@ test("an expired pre-spawn reservation releases its slot and fences the former o
         ownerId,
         stateFile,
         arbiter: new DreaminaCliArbiter({ stateFile: arbiterFile, pollMs: 1 }),
-        reservationLeaseMs: 100,
+        reservationLeaseMs: 2_000,
         reservationHeartbeatMs: 0,
         ensureReady: async () => undefined,
         discover: async () => installation,
@@ -961,7 +965,7 @@ test("an expired pre-spawn reservation releases its slot and fences the former o
             duration: 4,
         });
         await waitForAsync(async () => (await readJournalRecord(stateFile, "dreamina-expired-reserved-0001"))?.state === "pending");
-        await new Promise((resolve) => setTimeout(resolve, 140));
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
         const recovered = await runtimeB.getTask("dreamina-expired-reserved-0001");
         assert.equal(recovered.status, "failed");
         assert.equal(recovered.errorCode, "dreamina_interrupted_before_submission");
@@ -1641,7 +1645,7 @@ async function waitFor(condition: () => boolean) {
 }
 
 async function waitForAsync(condition: () => Promise<boolean>) {
-    const deadline = Date.now() + 2_000;
+    const deadline = Date.now() + 15_000;
     while (!(await condition())) {
         if (Date.now() >= deadline) throw new Error("timed out waiting for Dreamina arbiter fixture");
         await new Promise((resolve) => setTimeout(resolve, 5));
