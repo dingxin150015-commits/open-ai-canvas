@@ -246,3 +246,4 @@
 - 创建并验证 `BKP-20260827-160505-STAGE16-FINAL`，数据库完整性 `ok`、外键 0、60 表、OSS 密文可恢复；给当前 Backend/Web 镜像增加阶段 16 最终本地标签。
 - Web 镜像内 `index.html` 与容器 HTTP 首页哈希一致；容器 healthy、RestartCount=0、OOMKilled=false，数据卷未替换，安全日志计数正常。
 - 生成 `STAGE16_FINAL_HANDOFF.md`，保留插件安装态、文档站、远程 CI、付费模型和 Planned 模型等明确后续门禁；按用户要求停在远程 push/PR 前。
+- 最终交付报告、恢复点、Edge 人工证据和记忆清理由本地提交 `058f64b` 固化；没有远程写入。

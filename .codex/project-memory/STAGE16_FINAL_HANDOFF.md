@@ -8,6 +8,7 @@
 
 - 分支：`main`。
 - 阶段 16 执行前 Git：`2b54c2e`；最终运行代码来自 `f9317fa`，后续阶段 16 提交只更新交付文档和工程记忆。
+- 阶段 16 最终交付文档提交：`058f64b`。
 - Backend 容器：`e9261b627b37`，镜像 `sha256:f94f555bbdf74bda2c4b36f04ed83c7dae428045a25eab8698ed51bdfad99d9d`。
 - Web 容器：`6a66c52b0882`，镜像 `sha256:3141706386beba3bbe4dedae77f0c4420d4ea20782266fb33f55a149a13fff83`。
 - 两个容器均 `running/healthy`、RestartCount=0、OOMKilled=false。
