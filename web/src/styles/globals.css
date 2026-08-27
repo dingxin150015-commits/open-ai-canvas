@@ -9261,6 +9261,47 @@ html:not(.dark) .creation-media-preview-modal .ant-modal-container { background:
     color: var(--control-selected-fg) !important;
 }
 
+.creation-output-switches {
+    display: grid;
+    gap: 6px;
+}
+
+.creation-output-switch {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, .035);
+    padding: 7px 9px;
+}
+
+.creation-output-switch > span {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.creation-output-switch strong {
+    color: var(--creation-text);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.creation-output-switch small {
+    overflow: hidden;
+    color: var(--creation-muted);
+    font-size: 9px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.creation-output-switch .ant-switch { flex: 0 0 auto; }
+
+html:not(.dark) .creation-output-switch { background: rgba(28, 32, 37, .045); }
+
 .creation-choice-grid .creation-ratio-preview {
     display: grid;
     width: 18px !important;

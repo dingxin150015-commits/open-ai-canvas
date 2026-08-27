@@ -445,4 +445,11 @@ ACL 复核：目录关闭继承；仅 `<current-windows-user>`、SYSTEM、Admini
 - 删除：可再生成的 `.local/cache` 大部分缓存、`web/dist`、`canvas-agent/dist`、`backend/server.exe`。
 - 已确认释放下限：775,473,371 bytes（约 739.55 MiB）；不把未能完整计量的部分删除计入结果。
 - 保留依赖：`web/node_modules` 与 `canvas-agent/node_modules`，避免阶段 10–16 重复联网安装。
-- 未完成：`.local/cache/stage1-go-mod` 尚有残余。直接 `Remove-Item`、清除只读属性后删除、显式 `GOMODCACHE` 的 `go clean -modcache` 均未完整成功；按三次同类失败门禁停止，不使用跨 Shell 强制清理。
+- 后续复核：显式 `GOMODCACHE` 的 `go clean -modcache` 最终完成延迟清理；`.local/cache` 和 `stage1-go-mod` 均已不存在，没有待手工删除的已确认缓存。
+
+## 2026-08-27：阶段 11 Web 回滚登记
+
+- 更新前 Web：容器 `7b71d615ca98`，镜像 `sha256:3900fbb49fceda5da019be3991b818d36c2e4f6831c688f4d1adaaeab1e7daa2`。
+- 回滚标签：`open-ai-canvas-web:pre-stage11-20260826-2350`。
+- 更新后 Web：容器 `25816ac62175`，镜像 `sha256:b7cec94c5ce9c42a78a00a0129915dbd7f1ef8790cf480554d5bd793b60120f7`，healthy、RestartCount=0、OOMKilled=false。
+- Backend 保持容器 `f97220ae4273` 和镜像 `sha256:0d3b2403dbcf106f8dd61dcb3cd88692e2858c17a591b2aeec8d3aca6a08cdca`，数据卷未操作。

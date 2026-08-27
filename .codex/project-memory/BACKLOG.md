@@ -18,6 +18,7 @@
 - [ ] 按 Qwen、Wan、HappyHorse 具体模型建立保守能力矩阵：Wan 2.7、HappyHorse 1.1、Wan 3.0 已完成；Qwen 图片仍 Planned。
 - [ ] 移除执行器不支持或会被静默改写的图片/视频参数：Ready 视频模型已完成；Planned/手工图片与通用 fallback 尚未全量收敛。
 - [ ] 统一 Create、Canvas、Admin 和逻辑模型的尺寸派生纯函数。
+- [x] Create 参数按用户、模型和生成方式持久化；刷新保持画幅/分辨率/时长/声音/水印，明确 Switch 与请求 payload 一致，并完成 Edge 验证。
 - [ ] 在真实 `/create` 设置菜单上验证 Qwen 比例、分辨率、质量和自定义尺寸。
 - [x] 删除 Qwen 临时 DEBUG、完整提示词/请求体/签名 URL/API Key 片段日志和未使用导入；Provider 只保留结构化安全状态。
 - [x] 为官方发现目录增加 ready/planned/unsupported/deprecated 支持状态，并由 Backend 强制限制非 Ready 状态不可定价、启用、测试、删除或路由。

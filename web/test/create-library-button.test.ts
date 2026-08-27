@@ -73,11 +73,23 @@ describe("creation library button", () => {
         expect(menuEnd).toBeGreaterThan(menuStart);
         expect(menuSource).toContain("props.videoProfile.generateAudio.supported");
         expect(menuSource).toContain("props.videoProfile.watermark.supported");
-        expect(menuSource).toContain('props.onVideoOutputChange("videoGenerateAudio", String(!videoGenerateAudio))');
-        expect(menuSource).toContain('props.onVideoOutputChange("videoWatermark", String(!videoWatermark))');
+        expect(menuSource).toContain('onChange={props.onVideoGenerateAudioChange} aria-label="生成声音"');
+        expect(menuSource).toContain('onChange={props.onVideoWatermarkChange} aria-label="添加水印"');
+        expect(menuSource).toContain('className="creation-output-switches"');
         expect(menuSource).toContain("生成声音");
         expect(menuSource).toContain("添加水印");
         expect(menuSource).toContain('videoGenerateAudio ? "有声" : "无声"');
         expect(menuSource).toContain('videoWatermark ? "有水印" : "无水印"');
+    });
+
+    test("persists Create settings by user, model, and operation and submits the visible output values", () => {
+        const source = compactSource(readFileSync(resolve(import.meta.dir, "../src/pages/create/index.tsx"), "utf8"));
+
+        expect(source).toContain("loadCreationSettingsDraft(settingsDraftIdentity, creationSettingsScope)");
+        expect(source).toContain("saveCreationSettingsDraft(settingsDraftIdentity, draft, creationSettingsScope)");
+        expect(source).toContain("operation: settingsOperation");
+        expect(source).toContain("videoGenerateAudio: String(videoProfile.generateAudio.supported && videoGenerateAudio)");
+        expect(source).toContain("videoWatermark: String(videoProfile.watermark.supported && videoWatermark)");
+        expect(source).toContain("const canSubmit = Boolean(props.prompt.trim()) && !props.busy && props.settingsReady");
     });
 });

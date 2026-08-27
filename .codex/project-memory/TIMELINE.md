@@ -186,3 +186,12 @@
 - 测试夹具增加精确终止能力探测：受限环境继续用注入终止器验证业务语义并明确 skip 精确树能力；主机环境真实终止专项 12/12。
 - 全量测试首次 286/287，唯一失败是在原子替换窗口读取 `runtime.json` 得到 `ENOENT`；按既有规则仅重试瞬时 `ENOENT`，其他错误继续 fail closed。专项连续 5 次通过，最终全量 287/287、TypeScript 构建通过。
 - 本阶段没有修改生产进程管理代码、没有运行容器、操作数据库、打开浏览器或调用外部模型。
+
+## 2026-08-27：阶段 11 Create 设置持久化与输出开关
+
+- 确认根因是 Create 的图片/视频 Effect 在刷新和模型重算时总把比例、时长、清晰度重置为模型默认值；声音和水印又依赖全局配置，无法按模型和生成方式隔离。
+- 新增用户作用域 IndexedDB 草稿，以用户选择模型和生成方式为键；并发写入串行合并，损坏文档 fail closed，设置未加载完成前禁止提交。
+- Create 的声音、水印改为真实 Ant Design Switch；摘要、消息历史和任务 requestConfig 使用同一显式状态。
+- 专项 13/13、Web 主套件 453/453、跨 Runtime 1/1、TypeScript 和生产构建通过；构建 11,022 个模块，无 Rolldown panic。
+- 旧 Web 镜像标记 `open-ai-canvas-web:pre-stage11-20260826-2350`，只重建 Web；Backend ID/镜像不变，双方 healthy、RestartCount=0，首页和 API health 均为 200。
+- 用户在已登录 Microsoft Edge 确认 16:9、480P、2 秒和无声/无水印刷新后保持，声音/水印 Switch 与摘要同步；未点击发送、没有模型调用或费用。

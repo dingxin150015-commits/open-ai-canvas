@@ -82,8 +82,8 @@
 | 远程 GitHub CI | 待验证 | workflow 已补 Backend/Web/Canvas Agent 门禁，但尚未 push/PR 触发。 |
 | Canvas Agent Windows 进程清理测试 | 当前失败，未修复 | 4 个 `dreamina-cli-process` 用例失败且遗留子进程；构建通过。按用户要求本轮只记录，不改生产进程代码。 |
 | SQLite 卷诊断权限 | 已恢复，自动防护未完成 | DB/WAL/SHM 已为服务 UID/GID 100:101、0660；以后诊断容器必须同 UID/GID。 |
-| Create 刷新后画幅回默认值 | 未修复 | 真实调用从 16:9 回到 adaptive；需要单独产品状态设计。 |
-| 音频/水印控件视觉像普通方框 | 可用但交互表达仍可优化 | 整块按钮可点击且摘要准确；可后续改为更明确的 Switch/Checkbox。 |
+| Create 刷新后画幅回默认值 | 阶段 11 已修复 | 按用户、模型和生成方式保存 IndexedDB 草稿；Edge 确认 16:9、480P、2 秒刷新后保持。 |
+| 音频/水印控件视觉像普通方框 | 阶段 11 已修复 | 已改为明确 Switch；Edge 确认开关和“有声/无声、有水印/无水印”摘要同步。 |
 | `LogicalModelPriceSKU` 死结构 | 未修复 | 类型仍存在但未进入实际 schema/repository/service 主链。 |
 | `.claude/settings.local.json` 宽泛权限 | 未修复，本地治理项 | `.claude/` 已 Git 忽略；应由用户在 Claude 环境单独收敛。 |
 

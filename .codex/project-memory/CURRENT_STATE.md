@@ -65,7 +65,15 @@
 
 - 已删除可再生成的 `.local/cache` 大部分缓存、`web/dist`、`canvas-agent/dist` 和 `backend/server.exe`，按清理前精确计数至少释放 775,473,371 bytes（约 739.55 MiB）。
 - `node_modules` 是阶段 10–16 持续开发依赖，未删除；阶段 0/6/7/8 的 verified/protected 恢复点和运行数据卷均未触碰。
-- `.local/cache/stage1-go-mod` 因 Windows 只读属性、目录并发消失和访问拒绝，在三次安全清理路径后仍有残余；已停止盲目强删，后续可在无占用的主机维护窗口处理。
+- `.local/cache/stage1-go-mod` 初次清理因 Windows 文件属性和访问限制延迟完成；后续 `go clean -modcache` 已清除它，`.local/cache` 当前不存在，阶段 10 没有未删除或未停止的已确认目标。
+
+## 阶段 11：Create 设置持久化与明确开关
+
+- Create 设置现在按“用户作用域 + 用户选择的模型 + 生成方式”写入 IndexedDB；文生视频、图生视频、文生图和图片编辑不会互相覆盖设置。
+- 页面不再在刷新或模型重算时无条件覆盖用户比例；设置草稿读取完成前禁止提交，读取失败才安全回退模型默认值。
+- 生成声音和添加水印使用真实 Ant Design Switch；页面摘要、消息历史和任务请求显式使用当前 Switch 值，不再由旧全局默认静默决定。
+- 阶段 11 验证：专项 13/13、Web 主套件 453/453、跨 Runtime 1/1、TypeScript 和生产构建通过；用户在已登录 Microsoft Edge 确认 16:9、480P、2 秒及无声/无水印刷新后保持，Switch 开关与摘要同步，未提交生成任务。
+- 运行 Web 为 `sha256:b7cec94c5ce9c42a78a00a0129915dbd7f1ef8790cf480554d5bd793b60120f7`，容器 `25816ac62175` healthy、RestartCount=0；Backend 容器和镜像未变。旧 Web 镜像保留为 `open-ai-canvas-web:pre-stage11-20260826-2350`。
 
 ## 百炼官方文档与全局技能
 

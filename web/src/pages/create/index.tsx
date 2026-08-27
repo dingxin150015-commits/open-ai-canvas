@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { App, Button, Drawer, Modal, Popover, Spin, Tooltip } from "antd";
+import { App, Button, Drawer, Modal, Popover, Spin, Switch, Tooltip } from "antd";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Clapperboard, Clock3, Copy, Download, FileText, Film, FolderOpen, History, Image as ImageIcon, LoaderCircle, Maximize2, MessageSquareText, Music2, Paperclip, Plus, RefreshCw, Search, SlidersHorizontal, Sparkles, Trash2, X } from "lucide-react";
 import { Link } from "react-router";
 
@@ -32,6 +32,7 @@ import { uploadImage } from "@/services/image-storage";
 import { consumeGenerationTaskMessage, generationTaskMaterializedUrls, materializeGenerationTaskAssets, projectGenerationTaskResult } from "@/services/project-asset-sync";
 import { applyGenerationConsumerEffect } from "@/services/generation-consumer-dedupe";
 import { beginGenerationConsumer, runGenerationConsumer } from "@/services/generation-consumer-lifecycle";
+import { creationSettingsDraftKey, loadCreationSettingsDraft, saveCreationSettingsDraft, type CreationSettingsDraftIdentity } from "@/services/creation-settings-store";
 import { loadCreationConversations, pendingCreationTaskIds, pendingCreationTaskKey, removeCreationConversationSnapshot, saveCreationConversations, updateCreationConversationSnapshot } from "@/services/creation-conversation-store";
 import { recoverCreationTextTask } from "@/services/creation-text-task-recovery";
 import { modelDisplayName, modelOptionName, resolveModelChannel, selectableModelsByCapability, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
@@ -43,7 +44,7 @@ import { creationAttachmentFromAsset, creationAttachmentFromAudio, creationAttac
 type CreationMode = "text" | "image" | "video";
 type CreationViewMode = "chat" | "storyboard";
 type CreationStatus = "streaming" | "pending" | "done" | "error" | "cancelled";
-type CreationSettings = { ratio: string; seconds: string; quality: string; videoQuality: string; count: string };
+type CreationSettings = { ratio: string; seconds: string; quality: string; videoQuality: string; count: string; videoGenerateAudio?: boolean; videoWatermark?: boolean };
 type CreationRetryContext = GenerationRetryContext & { retryContextsByBatchIndex?: GenerationRetryContext[] };
 type CreationMessage = {
     id: string;
@@ -129,6 +130,7 @@ export default function CreatePage() {
     const { message: toast, modal } = App.useApp();
     const config = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
+    const creationSettingsScope = useUserStore((state) => state.user?.id || "guest");
     const assets = useAssetStore((state) => state.assets);
     const addAsset = useAssetStore((state) => state.addAsset);
     const [conversations, setConversations] = useState<CreationConversation[]>([]);
@@ -146,6 +148,9 @@ export default function CreatePage() {
     const [quality, setQuality] = useState("auto");
     const [videoQuality, setVideoQuality] = useState(config.vquality || "720");
     const [count, setCount] = useState(String(Math.max(1, Math.min(4, Number(config.count) || 1))));
+    const [videoGenerateAudio, setVideoGenerateAudio] = useState(config.videoGenerateAudio === "true");
+    const [videoWatermark, setVideoWatermark] = useState(config.videoWatermark === "true");
+    const [settingsReady, setSettingsReady] = useState(false);
     const [busy, setBusy] = useState(false);
     const [viewMode, setViewMode] = useState<CreationViewMode>("chat");
     const [selectedShotIndex, setSelectedShotIndex] = useState(-1);
@@ -170,6 +175,18 @@ export default function CreatePage() {
     );
     const preferredModel = mode === "text" ? config.textModel : mode === "image" ? config.imageModel : config.videoModel;
     const hasPrompt = Boolean(prompt.trim());
+    const settingsOperation = useMemo(() => {
+        const imageCount = attachments.filter(isImageAttachment).length;
+        if (mode === "image") return imageCount ? "image_edit" : "text_to_image";
+        if (mode !== "video") return "text";
+        return inferVideoOperation({
+            textCount: 0,
+            imageCount,
+            videoCount: attachments.filter(isVideoAttachment).length,
+            audioCount: attachments.filter((attachment) => creationAttachmentKind(attachment) === "audio").length,
+            characterCount: 0,
+        });
+    }, [attachments, mode]);
     const modelRequirements = useMemo<ModelRequirements>(() => ({
         capability: mode,
         input: {
@@ -184,12 +201,20 @@ export default function CreatePage() {
 		options: mode === "image"
 			? { size: ratio, quality, count: Number(count), transparentBackground: config.transparentBackground === "true" }
 			: mode === "video"
-				? { size: ratio, videoSeconds: Number(seconds), vquality: videoQuality, videoGenerateAudio: config.videoGenerateAudio === "true", videoWatermark: config.videoWatermark === "true" }
+				? { size: ratio, videoSeconds: Number(seconds), vquality: videoQuality, videoGenerateAudio, videoWatermark }
 				: {},
-	}), [attachments, config.transparentBackground, config.videoGenerateAudio, config.videoWatermark, count, hasPrompt, mode, quality, ratio, seconds, videoQuality]);
+	}), [attachments, config.transparentBackground, count, hasPrompt, mode, quality, ratio, seconds, videoGenerateAudio, videoQuality, videoWatermark]);
     const selectedModel = resolveCompatibleModel(config, preferredModel, modelRequirements) || preferredModel;
     const imageProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).image!, [config, selectedModel]);
     const videoProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).video!, [config, selectedModel]);
+    const settingsDraftIdentity = useMemo<CreationSettingsDraftIdentity | undefined>(() => mode === "text" ? undefined : ({
+        mode,
+        model: preferredModel || selectedModel,
+        operation: settingsOperation,
+    }), [mode, preferredModel, selectedModel, settingsOperation]);
+    const settingsDraftKey = settingsDraftIdentity ? creationSettingsDraftKey(settingsDraftIdentity) : "text";
+    const settingsDraftPersistenceKey = `${creationSettingsScope}\0${settingsDraftKey}`;
+    const settingsDraftReadyKeyRef = useRef("");
     const maxReferences = mode === "video" ? videoProfile.operations.includes("image_to_video") ? videoProfile.references.maxImages : 0 : mode === "image" ? imageProfile.references.maxImages : 6;
     const referenceImageSize = useMemo(() => {
         const imageAttachments = attachments.filter(isImageAttachment);
@@ -206,32 +231,58 @@ export default function CreatePage() {
     const visibleShotIndex = shots.length ? selectedShotIndex >= 0 && selectedShotIndex < shots.length ? selectedShotIndex : shots.length - 1 : -1;
 
     useEffect(() => {
-        if (mode !== "image") return;
-        // 前台逻辑模型的默认参数优先于旧的全局创作参数；否则旧的合法值会一直覆盖后台刚配置的默认值。
-        const normalized = normalizeImageValue(imageProfile, {
-            size: imageProfile.size.default,
-            quality: imageProfile.quality.default,
-            count,
+        settingsDraftReadyKeyRef.current = "";
+        if (!settingsDraftIdentity) {
+            setSettingsReady(true);
+            return;
+        }
+        setSettingsReady(false);
+        let cancelled = false;
+        void loadCreationSettingsDraft(settingsDraftIdentity, creationSettingsScope).catch((error) => {
+            console.warn("创作设置草稿读取失败，将使用模型默认值", error);
+            return undefined;
+        }).then((draft) => {
+            if (cancelled) return;
+            if (mode === "image") {
+                const normalized = normalizeImageValue(imageProfile, {
+                    size: draft?.ratio || imageProfile.size.default,
+                    quality: draft?.quality || imageProfile.quality.default,
+                    count: draft?.count || String(Math.min(imageProfile.maxOutputs, Number(count) || 1)),
+                });
+                setRatio(normalized.size);
+                setQuality(normalized.quality);
+                setCount(normalized.count);
+            } else {
+                const normalized = normalizeVideoValue(videoProfile, {
+                    seconds: draft?.seconds || String(videoProfile.duration.default),
+                    ratio: draft?.ratio || videoProfile.defaultRatio,
+                    resolution: draft?.videoQuality || videoProfile.defaultResolution,
+                });
+                setSeconds(normalized.seconds);
+                setRatio(normalized.ratio);
+                setVideoQuality(normalized.resolution.replace(/p$/i, ""));
+                setVideoGenerateAudio(videoProfile.generateAudio.supported ? draft?.videoGenerateAudio ?? videoProfile.generateAudio.default : false);
+                setVideoWatermark(videoProfile.watermark.supported ? draft?.videoWatermark ?? videoProfile.watermark.default : false);
+                const referenceLimit = videoProfile.operations.includes("image_to_video") ? videoProfile.references.maxImages : 0;
+                if (attachments.length > referenceLimit) setAttachments((current) => current.slice(0, referenceLimit));
+            }
+            settingsDraftReadyKeyRef.current = settingsDraftPersistenceKey;
+            setSettingsReady(true);
         });
-        setRatio(normalized.size);
-        setQuality(normalized.quality);
-        setCount(normalized.count);
-    }, [mode, selectedModel, imageProfile]);
+        return () => {
+            cancelled = true;
+        };
+    }, [creationSettingsScope, imageProfile, mode, settingsDraftIdentity, settingsDraftPersistenceKey, videoProfile]);
 
     useEffect(() => {
-        if (mode !== "video") return;
-        // 前台逻辑模型的默认参数必须直接落到创作端状态，提交任务时才不会被旧状态覆盖。
-        const normalized = normalizeVideoValue(videoProfile, {
-            seconds: String(videoProfile.duration.default),
-            ratio: videoProfile.defaultRatio,
-            resolution: videoProfile.defaultResolution,
+        if (!settingsDraftIdentity || settingsDraftReadyKeyRef.current !== settingsDraftPersistenceKey) return;
+        const draft = mode === "image"
+            ? { ratio, quality, count }
+            : { ratio, seconds, videoQuality, videoGenerateAudio, videoWatermark };
+        void saveCreationSettingsDraft(settingsDraftIdentity, draft, creationSettingsScope).catch((error) => {
+            console.warn("创作设置草稿保存失败", error);
         });
-        setSeconds(normalized.seconds);
-        setRatio(normalized.ratio);
-        setVideoQuality(normalized.resolution.replace(/p$/i, ""));
-        const maxReferences = videoProfile.operations.includes("image_to_video") ? videoProfile.references.maxImages : 0;
-        if (attachments.length > maxReferences) setAttachments((current) => current.slice(0, maxReferences));
-    }, [mode, selectedModel, videoProfile]);
+    }, [count, creationSettingsScope, mode, quality, ratio, seconds, settingsDraftIdentity, settingsDraftPersistenceKey, videoGenerateAudio, videoQuality, videoWatermark]);
 
     useEffect(() => {
         const reconciled = reconcileCreationAttachmentLimit(attachments, mentionReferences, maxReferences);
@@ -483,7 +534,7 @@ export default function CreatePage() {
             releaseRetryLock();
             return;
         }
-        const settings = { ratio, seconds, quality, videoQuality, count };
+        const settings = { ratio, seconds, quality, videoQuality, count, videoGenerateAudio, videoWatermark };
         const references = selectedCreationReferences(text, mentionReferences);
         // 后端对图片和视频使用不同的参考字段；这里先拆分，避免媒体类型在写入任务时被误判。
         const { referenceImages, referenceVideos, referenceAudios } = splitCreationAttachments(attachments);
@@ -533,7 +584,13 @@ export default function CreatePage() {
             ...(mode === "image"
                 ? { size: normalizedImage?.size || ratio, quality: normalizedImage?.quality || quality, count: normalizedImage?.count || count, videoSeconds: config.videoSeconds }
                 : mode === "video"
-                  ? { size: normalizedVideo?.ratio || ratio, videoSeconds: normalizedVideo?.seconds || seconds, vquality: (normalizedVideo?.resolution || videoQuality).replace(/p$/i, "") }
+                  ? {
+                        size: normalizedVideo?.ratio || ratio,
+                        videoSeconds: normalizedVideo?.seconds || seconds,
+                        vquality: (normalizedVideo?.resolution || videoQuality).replace(/p$/i, ""),
+                        videoGenerateAudio: String(videoProfile.generateAudio.supported && videoGenerateAudio),
+                        videoWatermark: String(videoProfile.watermark.supported && videoWatermark),
+                    }
                   : {}),
         };
         try {
@@ -742,6 +799,8 @@ export default function CreatePage() {
         setQuality(nextSettings.quality);
         setVideoQuality(nextSettings.videoQuality);
         setCount(nextSettings.count);
+        if (typeof nextSettings.videoGenerateAudio === "boolean") setVideoGenerateAudio(nextSettings.videoGenerateAudio);
+        if (typeof nextSettings.videoWatermark === "boolean") setVideoWatermark(nextSettings.videoWatermark);
     };
 
     const retryFailedMessage = async (item: CreationMessage, index: number) => {
@@ -822,7 +881,11 @@ export default function CreatePage() {
         videoProfile,
         config,
         onModelChange: (value: string) => updateConfig(mode === "text" ? "textModel" : mode === "image" ? "imageModel" : "videoModel", value),
-        onVideoOutputChange: (key: "videoGenerateAudio" | "videoWatermark", value: string) => updateConfig(key, value),
+        videoGenerateAudio,
+        videoWatermark,
+        onVideoGenerateAudioChange: setVideoGenerateAudio,
+        onVideoWatermarkChange: setVideoWatermark,
+        settingsReady,
         ratio,
         setRatio,
         seconds,
@@ -1089,7 +1152,11 @@ type ComposerProps = {
     imageProfile: ImageCapabilityConfig;
     config: ReturnType<typeof useEffectiveConfig>;
     onModelChange: (value: string) => void;
-    onVideoOutputChange: (key: "videoGenerateAudio" | "videoWatermark", value: string) => void;
+    videoGenerateAudio: boolean;
+    videoWatermark: boolean;
+    onVideoGenerateAudioChange: (value: boolean) => void;
+    onVideoWatermarkChange: (value: boolean) => void;
+    settingsReady: boolean;
     ratio: string;
     setRatio: (value: string) => void;
     seconds: string;
@@ -1108,7 +1175,7 @@ type ComposerProps = {
 function CreationComposer(props: ComposerProps) {
     const [previewUrl, setPreviewUrl] = useState("");
     const [previewType, setPreviewType] = useState<"image" | "video">("image");
-    const canSubmit = Boolean(props.prompt.trim()) && !props.busy;
+    const canSubmit = Boolean(props.prompt.trim()) && !props.busy && props.settingsReady;
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const priceChannel = resolveModelChannel(props.config, props.model);
     const credits = requestCreditCost({
@@ -1120,7 +1187,7 @@ function CreationComposer(props: ComposerProps) {
     });
     const showCost = creditsEnabled && credits !== null;
     const formattedCredits = credits?.toLocaleString("zh-CN", { maximumFractionDigits: 6 });
-    const actionLabel = props.busy ? "生成中" : showCost ? `预计消耗 ${formattedCredits} 积分，发送` : "发送";
+    const actionLabel = !props.settingsReady ? "正在加载模型设置" : props.busy ? "生成中" : showCost ? `预计消耗 ${formattedCredits} 积分，发送` : "发送";
     const placeholder = props.mode === "text"
         ? "描述你的故事、角色或想继续讨论的创意"
         : props.mode === "image"
@@ -1236,8 +1303,8 @@ function GenerationSettingsMenu(props: ComposerProps) {
         setCustomRatioOpen(false);
     };
     const videoResolutionSupported = props.mode === "video" && resolutions.length > 0;
-    const videoGenerateAudio = props.config.videoGenerateAudio === "true";
-    const videoWatermark = props.config.videoWatermark === "true";
+    const videoGenerateAudio = props.videoGenerateAudio;
+    const videoWatermark = props.videoWatermark;
     const imageSummary = [
         ...(mergedProfile.size.parameter !== "none" ? [referenceImageSizeSelected ? referenceImageSizeLabel : usesImageResolutionPicker ? formatImageResolutionSize(props.ratio, imageResolutionOptions) : props.ratio] : []),
         ...(props.imageProfile.quality.supported ? [qualityLabel] : []),
@@ -1258,9 +1325,9 @@ function GenerationSettingsMenu(props: ComposerProps) {
             {props.videoProfile.generateAudio.supported || props.videoProfile.watermark.supported ? <SettingSection title="输出" value={[
                 ...(props.videoProfile.generateAudio.supported ? [videoGenerateAudio ? "有声" : "无声"] : []),
                 ...(props.videoProfile.watermark.supported ? [videoWatermark ? "有水印" : "无水印"] : []),
-            ].join(" · ")}><div className="creation-choice-grid is-quality">
-                {props.videoProfile.generateAudio.supported ? <button type="button" aria-pressed={videoGenerateAudio} className={videoGenerateAudio ? "is-selected" : ""} onClick={() => props.onVideoOutputChange("videoGenerateAudio", String(!videoGenerateAudio))}><span>生成声音</span><small>{videoGenerateAudio ? "开启" : "关闭"}</small></button> : null}
-                {props.videoProfile.watermark.supported ? <button type="button" aria-pressed={videoWatermark} className={videoWatermark ? "is-selected" : ""} onClick={() => props.onVideoOutputChange("videoWatermark", String(!videoWatermark))}><span>添加水印</span><small>{videoWatermark ? "开启" : "关闭"}</small></button> : null}
+            ].join(" · ")}><div className="creation-output-switches">
+                {props.videoProfile.generateAudio.supported ? <div className="creation-output-switch"><span><strong>生成声音</strong><small>{videoGenerateAudio ? "视频将包含模型生成的声音" : "生成无声视频"}</small></span><Switch size="small" checked={videoGenerateAudio} onChange={props.onVideoGenerateAudioChange} aria-label="生成声音" /></div> : null}
+                {props.videoProfile.watermark.supported ? <div className="creation-output-switch"><span><strong>添加水印</strong><small>{videoWatermark ? "在生成结果中添加供应商水印" : "不添加供应商水印"}</small></span><Switch size="small" checked={videoWatermark} onChange={props.onVideoWatermarkChange} aria-label="添加水印" /></div> : null}
             </div></SettingSection> : null}
         </> : <>
             {imageResolutionChoiceOptions.length ? <SettingSection title="分辨率" value={activeImageResolutionChoice === "auto" ? "自动" : activeImageResolutionChoice.toUpperCase()}><div className="creation-choice-grid is-resolution">{imageResolutionChoiceOptions.map((choice) => <button key={choice} type="button" aria-pressed={choice === activeImageResolutionChoice} className={choice === activeImageResolutionChoice ? "is-selected" : ""} onClick={() => selectImageResolution(choice)}>{choice === "auto" ? "自动" : choice.toUpperCase()}</button>)}</div></SettingSection> : null}
