@@ -45,10 +45,8 @@
 
 - `values` 缺失、显式空数组和通配符 `*` 的语义尚未统一。
 - 任务失败响应路径可能不记录日志，因此“后端无日志”不能证明请求未发送。
-- 插件备用端口流程把 Vite 写成 Next，且使用源码不读取的环境变量。
-- 插件 MCP 超时为 90 秒，低于 Agent 长任务续接时长。
-- 插件仍使用已被前端拒绝的 `agentUrl/agentToken` 查询参数旧协议。
-- 文档站缺页、Compose 变量透传不一致和 Server CORS 默认值过宽；Canvas Agent CI 门禁已在阶段 4 补入工作流，但远程尚未触发。
+- 阶段 14 已修复插件备用端口/Vite/可信 Origin、90 秒 MCP 超时、URL Token 旧协议和 Compose Provider 插件开关透传；插件本地安装/重载仍需在新线程中验证。
+- 文档站缺页和 Server CORS 默认值过宽仍未修复；Canvas Agent CI 门禁已在阶段 4 补入工作流，但远程尚未触发。
 - `.claude/settings.local.json` 历史上存在大量宽泛写入和破坏性授权，不应继承为 Codex 执行权限。
 
 ## 当前验证状态
@@ -96,6 +94,16 @@
 - 无费用运行验证：未认证任务请求返回 401/authentication；畸形登录 JSON 返回安全 400/validation；合法 request ID 端到端保留，非法 ID 被替换，Backend 日志不包含测试敏感标记。
 - 当前 Backend `975ca3fa982b` / `sha256:71deebc35ad6ce81771c798dbcb45bdf68aa8d03c0092d11363993c1b4683910`，Web `5c5a8a6dd877` / `sha256:58a93110a7f7337f874d6863e417999f83b8c6949d573fccc2c3f4f343853e65`，均 healthy、RestartCount=0、OOMKilled=false。
 - 本阶段没有 Schema/目录/价格变化，没有真实模型调用、OSS 上传或费用；远程 GitHub CI 仍未触发。GORM 的既有 `record not found` SQL 调试输出仍需在后续日志治理中单独收敛，不能视为阶段 13 的业务错误响应泄露。
+
+## 阶段 14：影策 Codex 插件与部署入口合同
+
+- `plugins/yingce` 版本升至 0.1.1；`open-canvas` 只打开 `/canvas?mode=...`，不再读取或传递 `agentUrl/agentToken`，并明确网页通过不可导出浏览器密钥完成签名挑战。
+- 本地网页启动命令统一为 Vite `bun run dev -- --host 127.0.0.1 --port <端口>`；非 3000 端口通过 `FRAMEFIELD_TRUSTED_WEB_ORIGINS` 精确声明 localhost/127.0.0.1 Origin，不再使用无效 `CANVAS_URL` 或 Next 命令。
+- 外部 MCP `tool_timeout_sec=2160`，覆盖 35 分钟生成续接并保留 60 秒清理余量；README 明确 MCP stdio 进程不等于 HTTP Local Runtime。
+- `ENABLE_PROVIDER_PLUGINS` 现在由 root/local/dev/deploy/server 五个 Backend Compose 入口统一透传，默认仍为 false；Server CORS `*` 不在本阶段修改。
+- 验证：插件合同专项 4/4、Web 签名握手/旧凭据拒绝专项 17/17、Canvas Agent 主机全量 291/291、TypeScript 构建、五份 Compose config、官方 manifest validator 和 skill validator 全部通过。
+- 受限环境首次全量运行无法执行 `taskkill`，按分钟遗留测试子进程；精确终止该测试树后改用主机权限，全量通过且最终测试进程计数 0。Backend/Web 容器保持原镜像、healthy、RestartCount=0。
+- 本阶段未重建/重启容器、未操作数据库、未调用模型或 OSS。`codex plugin list` 因 WindowsApps ACL 即使主机权限仍无法启动，未执行 cachebuster、插件重装或新线程运行验证；源码合同已完成，安装态验证待后续明确执行。
 
 ## 百炼官方文档与全局技能
 

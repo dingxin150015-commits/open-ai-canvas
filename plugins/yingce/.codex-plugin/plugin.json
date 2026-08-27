@@ -1,6 +1,6 @@
 {
   "name": "yingce",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Use Codex to read and operate Yingce through the local Canvas Agent MCP server.",
   "author": {
     "name": "ddcat"

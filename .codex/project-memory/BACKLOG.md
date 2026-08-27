@@ -39,10 +39,11 @@
 
 ## P2：插件、部署与 CI
 
-- [ ] 修复插件备用端口、Vite 启动命令和可信 Origin 配置。
-- [ ] 让插件超时与 Agent 长任务续接合同一致。
-- [ ] 用当前本地运行时握手替代 `agentToken` 查询参数旧协议。
-- [ ] 修复不同 Compose 对 `ENABLE_PROVIDER_PLUGINS` 的透传差异。
+- [x] 修复插件备用端口、Vite 启动命令和可信 Origin 配置。
+- [x] 让插件超时与 Agent 35 分钟生成续接合同一致，并保留 60 秒余量。
+- [x] 用签名 Local Runtime 握手替代 `agentToken` 查询参数旧协议；Web 继续主动清除旧参数。
+- [x] 修复不同 Compose 对 `ENABLE_PROVIDER_PLUGINS` 的透传差异，五个 Backend 入口默认均为 false。
+- [ ] 在可调用 Codex CLI 的环境重新安装 `yingce@yingce-local`，新建线程验证插件 skill/MCP 加载和 Microsoft Edge 自动打开；当前 WindowsApps ACL 阻止 `codex plugin list`，不得伪报安装态通过。
 - [ ] 收紧 Server CORS 默认值。
 - [x] 在 CI 中增加 Canvas Agent 测试/构建，并为 Web 增加生产构建；远程 Actions 仍需提交/PR 后验证。
 - [x] 消除 Bun test 内嵌 Vite/Rolldown 的退出竞争，增加 panic guard，并用 `.bun-version` 统一本机/CI；远程 Actions 仍需提交/PR 后验证。

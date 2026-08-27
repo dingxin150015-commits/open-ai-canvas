@@ -51,7 +51,7 @@ codex plugin add yingce@yingce-local
 
 1. 新建 Codex 线程后说“打开影策”。
 2. 插件会确认当前仓库的本地画布服务是否已运行；端口被占用时会检查进程归属，不会把其他项目的 `3000` 当作影策。
-3. 确认或启动后，插件会直接打开新建画布 URL，并自动尝试连接本地 Agent。
+3. 确认或启动后，插件会打开只带 `mode` 的新建画布 URL；网页使用浏览器本地密钥与 Local Runtime 完成签名握手，不把 Agent token 放入 URL。
 4. 画布打开后，让 Codex 读取或操作当前画布。
 
 常用提示：
@@ -64,11 +64,13 @@ codex plugin add yingce@yingce-local
 
 ## 工作机制
 
-插件默认通过以下命令启动 MCP，并会在 MCP 启动时自动尝试拉起本地 Agent：
+插件默认通过以下命令启动 MCP。MCP 进程只注册工具并连接已有的 Local Runtime；`open-canvas` 技能负责检查并启动网页和本地 Agent，不能把 MCP 进程误当成 HTTP Runtime：
 
 ```bash
 npx -y @ddcat666/open-ai-canvas-agent mcp
 ```
+
+外部 MCP 工具超时为 2160 秒，覆盖 Canvas Agent 的 35 分钟生成续接窗口并保留一分钟响应/清理余量。修改本地插件源后需要重新执行 `codex plugin add yingce@yingce-local` 并新建对话，已运行线程不会热加载新的 skill 或 MCP 配置。
 
 ## 手动排查
 
@@ -80,10 +82,19 @@ bun install
 bun run dev
 ```
 
-然后启动本地 Agent。端口不是 `3000` 时，把 `CANVAS_URL` 换成真实本地画布地址：
+然后启动本地 Agent。必须把实际 Vite Origin 作为精确可信来源传入；这里的变量只声明允许握手的网页 Origin，不包含 token：
 
-```bash
-CANVAS_URL=http://localhost:3000 npx -y @ddcat666/open-ai-canvas-agent
+```powershell
+$env:FRAMEFIELD_TRUSTED_WEB_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+npx -y @ddcat666/open-ai-canvas-agent
 ```
 
-手动排查时先从 Agent 输出或 `http://127.0.0.1:17371/config` 读取本地地址和 token，然后直接打开 `<画布网页地址>/canvas?mode=new&agentUrl=<Local URL>&agentToken=<Connect token>`。不要通过页面点击来新建画布；`mode=new` 会让网页自动创建具体画布并连接本地 Agent。
+如果 `3000` 被当前仓库以外的进程占用，使用 Vite 的端口参数启动空闲端口，例如：
+
+```powershell
+bun run dev -- --host 127.0.0.1 --port 3001
+$env:FRAMEFIELD_TRUSTED_WEB_ORIGINS = "http://localhost:3001,http://127.0.0.1:3001"
+npx -y @ddcat666/open-ai-canvas-agent
+```
+
+手动排查时访问 `http://127.0.0.1:17371/runtime/info`，确认返回 `framefield-local-runtime` 且当前网页 Origin 已获信任；`/config` 只返回非敏感状态，不提供 token。随后打开 `<画布网页地址>/canvas?mode=new`。旧的 `agentUrl`、`agentToken` 查询参数会被网页主动移除并拒绝，不能再用于连接。

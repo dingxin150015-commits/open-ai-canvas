@@ -73,10 +73,10 @@
 | 通用视频 fallback 夸大能力 | 部分解决 | Ready Wan/HappyHorse 已脱离通用 fallback；其他 Planned/手工模型仍需逐模型收敛。 |
 | 任务错误响应和结构化日志 | 已在阶段 13 修复 | 统一错误分类、retryable、requestId、前端诊断编号和 handler/service/worker/provider/resource 安全关联日志；无费用运行验证通过。 |
 | 系统渠道 `/model-catalog/quote` | 未修复 | feature off 分支仍返回 501 TODO。 |
-| 插件备用端口/Vite/Origin | 未修复 | skill 仍误写 Next、使用无效 `CANVAS_URL`，未对接 `FRAMEFIELD_TRUSTED_WEB_ORIGINS`。 |
-| 插件 90 秒超时 | 未修复 | 低于 Canvas Agent 35 分钟生成续接合同。 |
-| 插件 `agentToken` 查询参数 | 未修复 | 文档/skill 仍采用已过时且可能泄露的 URL token 协议。 |
-| Compose 插件开关透传 | 未修复 | `ENABLE_PROVIDER_PLUGINS` 只在 local Compose 透传。 |
+| 插件备用端口/Vite/Origin | 已在阶段 14 修复 | 统一 Vite 端口参数和精确 `FRAMEFIELD_TRUSTED_WEB_ORIGINS`，不再使用 Next/`CANVAS_URL`。 |
+| 插件 90 秒超时 | 已在阶段 14 修复 | 外部 MCP 超时 2160 秒，覆盖 35 分钟续接和一分钟余量。 |
+| 插件 `agentToken` 查询参数 | 已在阶段 14 修复源码合同 | 最终 URL 只带 `mode`，Web 主动清除旧参数并使用签名握手；安装态新线程仍待验证。 |
+| Compose 插件开关透传 | 已在阶段 14 修复 | root/local/dev/deploy/server 五个 Backend 入口统一透传且默认关闭。 |
 | Server CORS 默认 `*` | 未修复 | `docker-compose.server.yml` 仍默认允许所有 Origin。 |
 | 文档站构建 | 未修复，用户已暂缓 | `docs/package.json`、`source.config.ts` 和多篇链接页面仍缺失。 |
 | 远程 GitHub CI | 待验证 | workflow 已补 Backend/Web/Canvas Agent 门禁，但尚未 push/PR 触发。 |

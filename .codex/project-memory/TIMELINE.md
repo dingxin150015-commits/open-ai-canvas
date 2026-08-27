@@ -216,3 +216,12 @@
 - 创建并验证 `BKP-20260827-125039-STAGE13-PREDEPLOY`；保留阶段 12 镜像标签后逐个更新 Backend/Web，数据卷未删除或替换。
 - 本地无费用验证返回稳定 401/400 元数据，合法 request ID 保留、非法 ID 替换，测试敏感标记未出现在 Backend 日志；没有创建任务、模型调用、OSS 上传或费用。
 - 代码、测试、文档和工程记忆由本地提交 `f39512a` 固化；未 push、未创建 PR、未触发远程 CI。
+
+## 2026-08-27：阶段 14 影策 Codex 插件与部署入口合同
+
+- 对照当前 Web/Canvas Agent 签名 Local Runtime 实现，确认插件文档仍在指导用户把 master token 放入 URL，并错误使用 Next、`CANVAS_URL` 和 `/config` 读取 token；这些都是已经失效且不安全的历史合同。
+- 将插件深链收敛为只带 `mode`，备用端口改为 Vite，可信网页来源使用精确 `FRAMEFIELD_TRUSTED_WEB_ORIGINS`；MCP 超时从 90 秒提高到 2160 秒。
+- root/local/dev/deploy/server 五个 Backend Compose 入口统一透传 `ENABLE_PROVIDER_PLUGINS`，默认 false；五份 Compose config 校验通过。
+- 插件合同 4/4、Web 本机签名连接 17/17、Canvas Agent 主机全量 291/291、TypeScript、官方插件/skill 校验全部通过。
+- 受限全量测试因 `taskkill` ACL 每分钟遗留子进程；精确终止仅本次测试树后在主机权限复验通过，最终测试进程为 0，运行 Backend/Web 未变化。
+- 未执行插件 cachebuster/reinstall/new-thread 验证；`codex plugin list` 在 WindowsApps ACL 下无法启动。未重建容器、操作数据库或调用外部模型。

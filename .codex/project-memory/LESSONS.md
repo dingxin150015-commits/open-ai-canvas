@@ -72,6 +72,9 @@
 - Go 的结构体嵌入不会自动让外层错误满足 `errors.As(..., *AppError)`；领域错误若要沿错误链投影，必须显式实现 `Unwrap` 并用测试锁定 HTTP 状态、公开错误码、分类和 retryable。
 - 请求编号是诊断关联键，不是可信用户正文。只允许有界 ASCII 标识字符，响应头、响应体、访问日志和业务日志必须使用同一规范化值；前端也必须再次校验后才能展示。
 - 安全日志不能只过滤 API Key。提示词、text/content/input/output、Provider message、签名 URL 和任意非结构化错误都可能包含用户内容或凭据；默认只保留 ID、分类、计数、布尔状态、HTTP 状态、耗时和 Go 错误类型。
+- Local Runtime 的 master token 只服务遗留内部边界，不能作为浏览器深链凭据。网页连接必须依赖精确可信 Origin、浏览器不可导出密钥、挑战交换和逐请求签名；启动 URL 只表达 `mode`。
+- Vite 备用端口必须同时更新网页实际 Origin 和 `FRAMEFIELD_TRUSTED_WEB_ORIGINS`。`CANVAS_URL` 不会配置当前 Agent，Next 命令也不适用于本项目；端口属于其他进程时不得强杀或冒充 Runtime。
+- MCP 超时必须大于最慢业务续接窗口，而不只是大于普通工具超时；35 分钟生成续接使用 36 分钟外部 MCP 合同，留出终态序列化和进程清理余量。
 
 ## 外部调用与成本
 
