@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,8 +16,12 @@ import (
 )
 
 type failureEnvelope struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
+	Code          int    `json:"code"`
+	Msg           string `json:"msg"`
+	ErrorCode     string `json:"errorCode"`
+	ErrorCategory string `json:"errorCategory"`
+	Retryable     bool   `json:"retryable"`
+	RequestID     string `json:"requestId"`
 }
 
 func TestFailServiceProjectsAppError(t *testing.T) {
@@ -26,8 +32,52 @@ func TestFailServiceProjectsAppError(t *testing.T) {
 	failService(context, err)
 
 	response := decodeFailureEnvelope(t, recorder)
-	if recorder.Code != http.StatusTooManyRequests || response.Code != 42901 || response.Msg != err.Message {
+	if recorder.Code != http.StatusTooManyRequests || response.Code != 42901 || response.Msg != err.Message || response.ErrorCode != "request_throttled" || response.ErrorCategory != service.ErrorCategoryQuota || !response.Retryable || !strings.HasPrefix(response.RequestID, "req_") {
 		t.Fatalf("response = status %d, body %#v", recorder.Code, response)
+	}
+}
+
+func TestFailServiceProjectsModelErrorMetadata(t *testing.T) {
+	recorder, context := responseTestContext()
+	failService(context, service.ProviderRequestFailed("模型服务暂时不可用"))
+
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusBadGateway || response.Code != http.StatusBadGateway || response.ErrorCode != string(service.ErrCodeProviderRequestFailed) || response.ErrorCategory != service.ErrorCategoryProvider || !response.Retryable || response.Msg != "模型服务暂时不可用" {
+		t.Fatalf("response = status %d, body %#v", recorder.Code, response)
+	}
+}
+
+func TestFailHidesUnclassifiedClientError(t *testing.T) {
+	recorder, context := responseTestContext()
+	fail(context, http.StatusBadRequest, errors.New("invalid password=secret at C:\\private\\file"))
+
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusBadRequest || response.Msg != "请求格式或参数无效" || response.ErrorCode != "bad_request" || strings.Contains(recorder.Body.String(), "secret") || strings.Contains(recorder.Body.String(), "private") {
+		t.Fatalf("unsafe client failure: %s", recorder.Body.String())
+	}
+}
+
+func TestRequestIDMiddlewareUsesOnlyValidIdentifiers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(RequestIDMiddleware())
+	router.GET("/test", func(c *gin.Context) { ok(c, gin.H{"requestId": RequestID(c)}) })
+
+	valid := httptest.NewRecorder()
+	validRequest := httptest.NewRequest(http.MethodGet, "/test", nil)
+	validRequest.Header.Set("X-Request-ID", "client-request-123")
+	router.ServeHTTP(valid, validRequest)
+	if valid.Header().Get("X-Request-ID") != "client-request-123" || !strings.Contains(valid.Body.String(), "client-request-123") {
+		t.Fatalf("valid request id was not preserved: headers=%v body=%s", valid.Header(), valid.Body.String())
+	}
+
+	invalid := httptest.NewRecorder()
+	invalidRequest := httptest.NewRequest(http.MethodGet, "/test", nil)
+	invalidRequest.Header.Set("X-Request-ID", "Bearer secret value")
+	router.ServeHTTP(invalid, invalidRequest)
+	generated := invalid.Header().Get("X-Request-ID")
+	if !strings.HasPrefix(generated, "req_") || strings.Contains(invalid.Body.String(), "Bearer") {
+		t.Fatalf("invalid request id was accepted: headers=%v body=%s", invalid.Header(), invalid.Body.String())
 	}
 }
 
@@ -54,6 +104,27 @@ func TestFailInternalKeepsStatusWithoutLeakingCause(t *testing.T) {
 	}
 	if strings.Contains(recorder.Body.String(), "private-host") {
 		t.Fatalf("internal cause leaked in response: %s", recorder.Body.String())
+	}
+}
+
+func TestStructuredHandlerLogContainsCorrelationWithoutCause(t *testing.T) {
+	var output bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&output)
+	t.Cleanup(func() { log.SetOutput(previous) })
+	_, context := responseTestContext()
+	context.Set(requestIDContextKey, "req_structured_12345678")
+
+	failInternal(context, http.StatusInternalServerError, errors.New("database password=secret at C:\\private"))
+
+	logged := output.String()
+	for _, expected := range []string{"request_id=req_structured_12345678", "status=500", "category=internal", "error_code=internal_error"} {
+		if !strings.Contains(logged, expected) {
+			t.Fatalf("structured log missing %q: %s", expected, logged)
+		}
+	}
+	if strings.Contains(logged, "secret") || strings.Contains(logged, "private") {
+		t.Fatalf("structured log leaked cause: %s", logged)
 	}
 }
 

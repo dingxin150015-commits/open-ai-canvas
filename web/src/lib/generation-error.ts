@@ -22,6 +22,10 @@ export function generationFailureMetadata(error: unknown, prompt: string): Gener
 }
 
 export function generationErrorMessage(error: unknown) {
+    return withRequestDiagnostic(generationErrorMessageWithoutDiagnostic(error), error);
+}
+
+function generationErrorMessageWithoutDiagnostic(error: unknown) {
     const stableCode = generationErrorCode(error);
     const stableMessage = stableCode ? DREAMINA_SUBMIT_ERROR_MESSAGES[stableCode] : undefined;
     if (stableMessage) return stableMessage;
@@ -41,6 +45,13 @@ export function generationErrorMessage(error: unknown) {
         if (hasHttpStatus(raw, 500, 502, 503, 504) || containsInfrastructureDetails(raw)) return NETWORK_ERROR_MESSAGE;
     }
     return displayMessage || DEFAULT_GENERATION_ERROR_MESSAGE;
+}
+
+function withRequestDiagnostic(message: string, error: unknown) {
+    if (!error || typeof error !== "object" || !("requestId" in error)) return message;
+    const requestId = String((error as { requestId?: unknown }).requestId || "").trim();
+    if (!/^[A-Za-z0-9._:-]{8,128}$/.test(requestId)) return message;
+    return `${message}（诊断编号：${requestId}）`;
 }
 
 export const DREAMINA_SUBMIT_ERROR_MESSAGES: Record<string, string> = {

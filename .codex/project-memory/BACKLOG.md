@@ -33,8 +33,9 @@
 - [x] 增加 Qwen `auto` 省略、`x -> *`、比例映射、1–6 输出、1–3 图编辑、参数依赖和拒绝路径完整序列化测试。
 - [x] 为 Ready 视频模型增加 480P/时长/音频/水印、跨媒体数量、输入相关时长和非法组合拒绝测试。
 - [x] 为系统渠道持久能力边界、目录/准入 fail-closed、Ready Provider payload、精确 SKU 账务和真实幂等增加测试。
-- [ ] 为任务失败建立前端、handler、service、worker、provider 全链路结构化日志。
-- [ ] 修复错误响应不记录日志或可能暴露内部错误的问题。
+- [x] 为任务失败建立前端、handler、service、worker、provider、资源物化全链路结构化日志，并以 request/task/provider/resource ID 关联。
+- [x] 修复错误响应不记录日志或可能暴露内部错误的问题；统一稳定错误分类、retryable、requestId 和前端诊断编号。
+- [ ] 收敛 GORM 默认 `record not found` SQL 调试输出，避免生产日志噪声和未来查询参数暴露风险；不得影响数据库错误诊断。
 
 ## P2：插件、部署与 CI
 

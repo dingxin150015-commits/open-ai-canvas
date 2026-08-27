@@ -15,6 +15,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -382,6 +383,7 @@ func (s *Service) storeResource(userID string, kind string, fileName string, mim
 	if err := s.repo.CreateResource(&resource); err != nil {
 		return nil, err
 	}
+	log.Printf("resource storage started: resource_id=%s provider=%s kind=%s bytes=%d", resource.ID, resource.Provider, resource.Kind, resource.Size)
 	var etag string
 	if provider == "local" {
 		filePath := filepath.Join(s.dataDir, "resources", filepath.FromSlash(objectKey))
@@ -402,10 +404,11 @@ func (s *Service) storeResource(userID string, kind string, fileName string, mim
 	resource.UpdatedAt = time.Now()
 	if err != nil {
 		resource.Status = model.ResourceStatusFailed
-		resource.Error = err.Error()
+		resource.Error = "资源存储失败，请检查存储配置后重试"
 		if saveErr := s.repo.SaveResource(&resource); saveErr != nil {
 			return nil, errors.Join(err, fmt.Errorf("记录资源失败状态失败：%w", saveErr))
 		}
+		log.Printf("resource storage failed: resource_id=%s provider=%s kind=%s error_type=%T", resource.ID, resource.Provider, resource.Kind, err)
 		return nil, err
 	}
 	resource.Status = model.ResourceStatusReady
@@ -420,7 +423,7 @@ func (s *Service) storeResource(userID string, kind string, fileName string, mim
 		}
 
 		resource.Status = model.ResourceStatusFailed
-		resource.Error = fmt.Sprintf("保存资源就绪状态失败，物理对象清理失败：%v", cleanupErr)
+		resource.Error = "资源状态保存失败且物理对象需要人工核对"
 		statusErr := s.repo.SaveResource(&resource)
 		if statusErr != nil {
 			return nil, errors.Join(err, cleanupErr, fmt.Errorf("记录资源失败状态失败：%w", statusErr))
@@ -428,6 +431,7 @@ func (s *Service) storeResource(userID string, kind string, fileName string, mim
 		return nil, errors.Join(err, fmt.Errorf("清理已上传资源对象失败：%w", cleanupErr))
 	}
 	s.recordActivity(userID, "resource", 1)
+	log.Printf("resource storage ready: resource_id=%s provider=%s kind=%s bytes=%d", resource.ID, resource.Provider, resource.Kind, resource.Size)
 	return &resource, nil
 }
 

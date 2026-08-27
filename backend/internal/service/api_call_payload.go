@@ -114,6 +114,9 @@ func sanitizeAPICallJSON(value any, key string) any {
 		}
 		return result
 	case string:
+		if isAPICallTextField(normalizedKey) {
+			return fmt.Sprintf("[文本内容已隐藏，共 %d 字符]", len([]rune(typed)))
+		}
 		if strings.HasPrefix(typed, "data:") {
 			mediaType := strings.TrimPrefix(strings.SplitN(typed, ";", 2)[0], "data:")
 			return fmt.Sprintf("[内嵌媒体 %s，共 %d 字符]", defaultString(mediaType, "未知类型"), len(typed))
@@ -127,6 +130,15 @@ func sanitizeAPICallJSON(value any, key string) any {
 		return typed
 	default:
 		return value
+	}
+}
+
+func isAPICallTextField(normalizedKey string) bool {
+	switch normalizedKey {
+	case "prompt", "negativeprompt", "systemprompt", "text", "content", "input", "output", "instructions":
+		return true
+	default:
+		return false
 	}
 }
 

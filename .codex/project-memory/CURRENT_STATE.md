@@ -1,6 +1,6 @@
 # 当前状态
 
-更新时间：2026-08-26
+更新时间：2026-08-27
 
 ## Git 与远程
 
@@ -84,6 +84,17 @@
 - 隔离 Backend CGO 全量、Web 456/456、跨 Runtime 1/1、TypeScript 和生产构建通过。Microsoft Edge 首次拉取显示上游 242、官方 80、新增 1、补齐 69；第二次新增 0/补齐 0。
 - 运行数据库为 320 模型：Ready 12、Planned 308；Qwen 能力 JSON 558 bytes，停用、未定价。未执行测试模型或真实图片生成，未产生费用。
 - 当前 Backend `3b7b1e526a42` / `sha256:d0926f28a48cc4c6331860cf8006af040cb974caecc23a874eb180f81868b206`，Web `aac0f955c51d` / `sha256:3bf43cf9c603531f14c70d99cce0d7a4d8a93bc324d0f5c75d8c7a0c1420edfa`，均 healthy、RestartCount=0。
+
+## 阶段 13：统一错误链路与安全日志
+
+- Backend 业务失败响应保留既有数字 `code`，新增稳定的 `errorCode`、`errorCategory`、`retryable` 和 `requestId`；`X-Request-ID` 同时写入响应头。合法客户端请求编号会保留，含空格或可疑内容的编号会被替换。
+- `ModelError` 现在可被 `errors.As` 正确投影；能力、价格、路由和 Provider 错误不再被误判为匿名 500。未分类 4xx/5xx、panic 和 JSON 解析错误只返回安全中文，不公开内部路径、SQL、网络错误或请求正文。
+- 任务创建、重试、取消、Worker、Provider 和资源物化日志使用 request/task/provider/resource 关联键、分类、状态、耗时和错误类型；提示词、文本、content/input/output、签名 URL、API Key、Provider 原始 message 和非结构化任务错误均被隐藏。
+- Web `ApiError` 读取 Backend 错误元数据；生成错误仅在请求编号符合安全字符合同后显示“诊断编号”，不能把伪造头或敏感字符串带入用户界面。
+- 当前门禁：Backend 隔离 Linux CGO 全量测试通过；Web 主套件 458/458、跨 Runtime 1/1、TypeScript 与生产构建通过，11,022 个模块且无 Rolldown panic。
+- 无费用运行验证：未认证任务请求返回 401/authentication；畸形登录 JSON 返回安全 400/validation；合法 request ID 端到端保留，非法 ID 被替换，Backend 日志不包含测试敏感标记。
+- 当前 Backend `975ca3fa982b` / `sha256:71deebc35ad6ce81771c798dbcb45bdf68aa8d03c0092d11363993c1b4683910`，Web `5c5a8a6dd877` / `sha256:58a93110a7f7337f874d6863e417999f83b8c6949d573fccc2c3f4f343853e65`，均 healthy、RestartCount=0、OOMKilled=false。
+- 本阶段没有 Schema/目录/价格变化，没有真实模型调用、OSS 上传或费用；远程 GitHub CI 仍未触发。GORM 的既有 `record not found` SQL 调试输出仍需在后续日志治理中单独收敛，不能视为阶段 13 的业务错误响应泄露。
 
 ## 百炼官方文档与全局技能
 

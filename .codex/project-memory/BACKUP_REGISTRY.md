@@ -484,3 +484,21 @@ ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Ad
 | 幂等 | 第二次拉取新增 0、补齐 0 |
 
 ACL 仅当前用户、SYSTEM、Administrators。最终 Backend `3b7b1e526a42` / `sha256:d0926f28a48cc4c6331860cf8006af040cb974caecc23a874eb180f81868b206`，Web `aac0f955c51d` / `sha256:3bf43cf9c603531f14c70d99cce0d7a4d8a93bc324d0f5c75d8c7a0c1420edfa`，均 healthy、RestartCount=0。恢复数据库不会撤销外部费用；本阶段没有 Qwen 外部调用或费用。
+
+## BKP-20260827-125039-STAGE13-PREDEPLOY
+
+| 字段 | 值 |
+| --- | --- |
+| 状态 | `verified`, `protected` |
+| 私有位置 | `<private-backup-root>\stage13-predeploy-20260827-125039` |
+| 数据库/WAL/SHM | 2,650,112 / 4,152,992 / 32,768 bytes |
+| 数据库 SHA-256 | `A0FB0AD53CC415FFE9001062A8F9D904ECF7035D7A355E9B52BC64A85569ADF0` |
+| WAL SHA-256 | `0D3BB9D59C191D8AA787095F88D787DD3D7BC9267FB4D516D9DE99D7B99A28DE` |
+| SHM SHA-256 | `BE9AF431B850E29EBEEFD272EB89143E705994C0010570E617CC9ADBEF084342` |
+| `.settings-key` SHA-256 | `E4B4B107C3060A18D65AD3AAD4E329D063A924A71CCF23EAB15B9ABF8120A6D5` |
+| 完整性 / 外键 / 表 | `ok` / 0 / 60 |
+| 业务计数 | 用户 1、会话 1、渠道 1、模型 320、任务 1、资源 1、素材 1 |
+
+ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Administrators 具有 FullControl。备份时 Backend 短暂停顿后恢复 healthy，RestartCount=0。旧镜像保留为 `open-ai-canvas-backend:pre-stage13-20260827-125039` 与 `open-ai-canvas-web:pre-stage13-20260827-125039`。
+
+阶段 13 最终运行 Backend `975ca3fa982b` / `sha256:71deebc35ad6ce81771c798dbcb45bdf68aa8d03c0092d11363993c1b4683910`，Web `5c5a8a6dd877` / `sha256:58a93110a7f7337f874d6863e417999f83b8c6949d573fccc2c3f4f343853e65`，均 healthy、RestartCount=0、OOMKilled=false；数据卷保持 `open-ai-canvas_backend-data`。本阶段无 Schema 或业务数据写入，无真实模型调用和费用。

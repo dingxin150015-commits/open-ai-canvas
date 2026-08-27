@@ -47,14 +47,14 @@ func runDashScopeVideoTask(ctx context.Context, input canvasGenerationInput) (ma
 	// 1. 构建请求体（自动识别 t2v/i2v/r2v 模式）
 	requestBody, err := buildDashScopeVideoRequest(input)
 	if err != nil {
-		log.Printf("[DashScope Video] ❌ 构建请求体失败: %v", err)
+		log.Printf("[DashScope Video] 构建请求体失败: error_type=%T", err)
 		return nil, err
 	}
 
 	// 2. 提交异步任务
 	taskID, err := submitDashScopeVideoTask(ctx, input.Config, requestBody)
 	if err != nil {
-		log.Printf("[DashScope Video] ❌ 提交任务失败: %v", err)
+		log.Printf("[DashScope Video] 提交任务失败: error_type=%T", err)
 		return nil, fmt.Errorf("提交视频生成任务失败：%w", err)
 	}
 	log.Printf("[DashScope Video] ✅ 任务提交成功，TaskID: %s", taskID)
@@ -64,7 +64,7 @@ func runDashScopeVideoTask(ctx context.Context, input canvasGenerationInput) (ma
 	// 不再自行计算短上限，否则会在 DashScope 侧仍为 RUNNING 时提前放弃。
 	result, err := pollDashScopeVideoTask(ctx, input.Config, taskID)
 	if err != nil {
-		log.Printf("[DashScope Video] ❌ 轮询任务失败: %v", err)
+		log.Printf("[DashScope Video] 轮询任务失败: error_type=%T", err)
 		return nil, err
 	}
 	log.Printf("[DashScope Video] ✅ 任务完成，已收到临时视频地址")
@@ -72,7 +72,7 @@ func runDashScopeVideoTask(ctx context.Context, input canvasGenerationInput) (ma
 	// 5. 下载视频并交给统一资源化链
 	videoDataURL, mimeType, err := downloadDashScopeVideo(ctx, input.Config, result.Output.VideoURL)
 	if err != nil {
-		log.Printf("[DashScope Video] ❌ 下载视频失败: %v", err)
+		log.Printf("[DashScope Video] 下载视频失败: error_type=%T", err)
 		return nil, fmt.Errorf("下载视频失败：%w", err)
 	}
 	log.Printf("[DashScope Video] ✅ 视频下载成功，MimeType: %s", mimeType)
@@ -292,7 +292,7 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 
 	data, err := json.Marshal(requestBody)
 	if err != nil {
-		log.Printf("[DashScope Video] ❌ 序列化请求体失败: %v", err)
+		log.Printf("[DashScope Video] 序列化请求体失败: error_type=%T", err)
 		return "", fmt.Errorf("序列化请求体失败：%w", err)
 	}
 	log.Printf("[DashScope Video] ✅ 请求体序列化成功，大小: %d bytes", len(data))
@@ -304,7 +304,7 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
-		log.Printf("[DashScope Video] ❌ 创建HTTP请求失败: %v", err)
+		log.Printf("[DashScope Video] 创建HTTP请求失败: error_type=%T", err)
 		return "", err
 	}
 
@@ -322,7 +322,7 @@ func submitDashScopeVideoTask(ctx context.Context, config providerConfig, reques
 	var response dashScopeVideoSubmitResponse
 	if err := doJSON(req, &response); err != nil {
 		elapsed := time.Since(startTime)
-		log.Printf("[DashScope Video] ❌ doJSON 失败 (耗时 %v): %v", elapsed, err)
+		log.Printf("[DashScope Video] doJSON 失败: duration=%v error_type=%T", elapsed, err)
 		return "", err
 	}
 	elapsed := time.Since(startTime)
@@ -380,7 +380,7 @@ func pollDashScopeVideoTask(ctx context.Context, config providerConfig, taskID s
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[DashScope Video] ❌ 轮询被取消（已轮询 %d 轮，耗时 %v）：%v", round, time.Since(pollStart), ctx.Err())
+			log.Printf("[DashScope Video] 轮询被取消: rounds=%d duration=%v error_type=%T", round, time.Since(pollStart), ctx.Err())
 			return nil, ctx.Err()
 
 		case <-timeoutCh:
@@ -394,10 +394,10 @@ func pollDashScopeVideoTask(ctx context.Context, config providerConfig, taskID s
 			log.Printf("[DashScope Video] 轮询第 %d 轮（已耗时 %v）...", round, time.Since(pollStart))
 			result, err := fetchDashScopeVideoTaskStatus(ctx, config, taskID)
 			if err != nil {
-				log.Printf("[DashScope Video] ❌ 第 %d 轮查询失败：%v", round, err)
+				log.Printf("[DashScope Video] 查询失败: round=%d error_type=%T", round, err)
 				return nil, err
 			}
-			log.Printf("[DashScope Video] 第 %d 轮 task_status=%q has_video_url=%v message=%q", round, result.Output.TaskStatus, result.Output.VideoURL != "", result.Output.Message)
+			log.Printf("[DashScope Video] 轮询状态: round=%d task_status=%q has_video_url=%v message_present=%t", round, result.Output.TaskStatus, result.Output.VideoURL != "", strings.TrimSpace(result.Output.Message) != "")
 
 			done, outcomeErr := dashScopeVideoTaskOutcome(config.Model, result)
 			if outcomeErr != nil {

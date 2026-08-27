@@ -30,7 +30,7 @@ func TestProviderRequestErrorDetails(t *testing.T) {
 	}{
 		{name: "cancelled", err: context.Canceled, code: "request_cancelled", text: "任务取消，中断上游请求"},
 		{name: "timeout", err: context.DeadlineExceeded, code: "upstream_timeout", text: "等待上游响应超时"},
-		{name: "network error", err: errors.New("dial tcp: connection refused"), text: "dial tcp: connection refused"},
+		{name: "network error", err: errors.New("dial tcp: connection refused"), text: "上游请求失败"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

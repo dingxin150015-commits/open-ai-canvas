@@ -17,8 +17,23 @@ func TestAppErrorPreservesSafeProjectionAndCause(t *testing.T) {
 	if err.Status != 503 || err.Code != 10001 || !err.Retryable {
 		t.Fatalf("AppError fields = %#v", err)
 	}
+	if err.PublicCode != "service_unavailable" || err.Category != ErrorCategoryInternal {
+		t.Fatalf("AppError metadata = %#v", err)
+	}
 	if !errors.Is(err, cause) {
 		t.Fatal("AppError should unwrap its internal cause")
+	}
+}
+
+func TestModelErrorPreservesPublicCodeCategoryAndAppErrorChain(t *testing.T) {
+	err := ProviderRequestFailed("模型服务暂时不可用")
+	var modelErr *ModelError
+	var appErr *AppError
+	if !errors.As(err, &modelErr) || !errors.As(err, &appErr) {
+		t.Fatalf("model error chain = %#v", err)
+	}
+	if appErr.Status != 502 || appErr.PublicCode != string(ErrCodeProviderRequestFailed) || appErr.Category != ErrorCategoryProvider || !appErr.Retryable {
+		t.Fatalf("model app error = %#v", appErr)
 	}
 }
 

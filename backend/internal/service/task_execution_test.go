@@ -2,10 +2,20 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"infinite-canvas/backend/internal/model"
 )
+
+func TestTaskFailureMessageProjectsOnlyClassifiedErrors(t *testing.T) {
+	if got := taskFailureMessage(ProviderRequestFailed("模型服务暂时不可用")); got != "模型服务暂时不可用" {
+		t.Fatalf("classified failure = %q", got)
+	}
+	if got := taskFailureMessage(errors.New("database password=secret at C:\\private")); got != "任务处理失败，请稍后重试。" {
+		t.Fatalf("unclassified failure leaked: %q", got)
+	}
+}
 
 func TestCanRunProviderTaskRequiresVideoConfig(t *testing.T) {
 	tests := []struct {

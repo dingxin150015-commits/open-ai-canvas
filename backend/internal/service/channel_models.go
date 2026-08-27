@@ -706,7 +706,7 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 				Note:       "该模型需参考素材（图片/视频），仅验证了凭证与端点，未做完整生成测试",
 			}, nil
 		}
-		log.Printf("[TestChannelModel] 测试失败，capability=%s isVideoRefRequired=%v err=%v", capability, capability == "video" && isVideoReferenceRequiredError(err), err)
+		log.Printf("[TestChannelModel] 测试失败: capability=%s is_video_ref_required=%v error_type=%T", capability, capability == "video" && isVideoReferenceRequiredError(err), err)
 		status := http.StatusBadGateway
 		if errors.Is(err, context.DeadlineExceeded) {
 			status = http.StatusGatewayTimeout

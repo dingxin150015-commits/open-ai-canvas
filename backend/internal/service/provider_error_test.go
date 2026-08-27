@@ -10,7 +10,7 @@ func TestProviderFailureDetailsReadsTopLevelModerationError(t *testing.T) {
 	if code != contentModerationErrorCode {
 		t.Fatalf("unexpected code: %q", code)
 	}
-	if message != "prompt rejected" {
+	if message != contentModerationRetryMessage {
 		t.Fatalf("unexpected message: %q", message)
 	}
 }
@@ -19,7 +19,7 @@ func TestProviderFailureDetailsReadsNestedError(t *testing.T) {
 	code, message := providerFailureDetails(map[string]any{
 		"error": map[string]any{"code": "invalid_request", "message": "invalid size"},
 	})
-	if code != "invalid_request" || message != "invalid size" {
+	if code != "invalid_request" || message != "上游返回错误，原始消息已隐藏" {
 		t.Fatalf("unexpected failure details: code=%q message=%q", code, message)
 	}
 }
@@ -29,7 +29,7 @@ func TestProviderFailureDetailsPrefersNestedBusinessCode(t *testing.T) {
 		"code": float64(400),
 		"data": map[string]any{"code": contentModerationErrorCode, "message": "prompt rejected"},
 	})
-	if code != contentModerationErrorCode || message != "prompt rejected" {
+	if code != contentModerationErrorCode || message != contentModerationRetryMessage {
 		t.Fatalf("unexpected wrapped failure details: code=%q message=%q", code, message)
 	}
 }

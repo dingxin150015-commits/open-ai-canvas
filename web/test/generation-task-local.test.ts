@@ -24,6 +24,13 @@ function sourceSection(source: string, startMarker: string, endMarker: string) {
     return compactSource(source.slice(start, end));
 }
 
+test("backend generation errors expose only a validated request diagnostic id", () => {
+    const error = Object.assign(new Error("模型服务暂时不可用"), { requestId: "req_1234567890abcdef" });
+    expect(generationErrorMessage(error)).toBe("模型服务暂时不可用（诊断编号：req_1234567890abcdef）");
+    const forged = Object.assign(new Error("模型服务暂时不可用"), { requestId: "Bearer secret value" });
+    expect(generationErrorMessage(forged)).toBe("模型服务暂时不可用");
+});
+
 test("Dreamina submit failure categories have bounded user-facing messages", () => {
     const cases = [
         ["dreamina_submit_spawn_failed", "无法启动官方即梦 CLI，任务尚未提交。"],
@@ -178,7 +185,7 @@ test("Canvas task surfaces route Dreamina uncertainty through shared display sem
     expect(nodeSource).toContain("isGenerationTaskSubmissionUncertain(errorDisplayTask)");
     expect(taskCenterSource).toContain("if (currentTask && isGenerationTaskSubmissionUncertain(currentTask))");
     expect(taskCenterSource).toContain("不能自动重试；请先核对官方状态，避免重复生成");
-    expect(taskCenterSource).toContain('onRetry={() => void runAction(task.id)}');
+    expect(taskCenterSource).toContain("onRetry={() => void runAction(task.id)}");
     expect(taskCenterSource).toContain("<TaskListRow");
     expect(taskCenterSource).toContain("<TaskGridCard");
     expect(createSource).not.toContain('item.generationStage === "submission_unknown"');

@@ -6,19 +6,29 @@ export type BackendEnvelope<T> = {
     code: number;
     data: T;
     msg: string;
+    errorCode?: string;
+    errorCategory?: string;
+    retryable?: boolean;
+    requestId?: string;
 };
 
 export class ApiError extends Error {
     readonly status?: number;
     readonly code?: number;
+    readonly errorCode?: string;
+    readonly errorCategory?: string;
+    readonly requestId?: string;
     readonly retryable: boolean;
     readonly cause?: unknown;
 
-    constructor(message: string, options: { status?: number; code?: number; retryable?: boolean; cause?: unknown } = {}) {
+    constructor(message: string, options: { status?: number; code?: number; errorCode?: string; errorCategory?: string; requestId?: string; retryable?: boolean; cause?: unknown } = {}) {
         super(message);
         this.name = "ApiError";
         this.status = options.status;
         this.code = options.code;
+        this.errorCode = options.errorCode;
+        this.errorCategory = options.errorCategory;
+        this.requestId = options.requestId;
         this.retryable = options.retryable ?? isRetryableStatus(options.status ?? options.code);
         this.cause = options.cause;
     }
@@ -28,14 +38,17 @@ export class ApiError extends Error {
 export const apiBaseURL = import.meta.env.VITE_CANVAS_BACKEND_URL || "/api";
 export const apiClient = axios.create({ baseURL: apiBaseURL, withCredentials: true });
 
-export async function request<T>(promise: Promise<{ data: BackendEnvelope<T>; status?: number }>) {
+export async function request<T>(promise: Promise<{ data: BackendEnvelope<T>; status?: number; headers?: Record<string, unknown> }>) {
     try {
         const response = await promise;
         if (response.data.code !== 0) {
             throw new ApiError(response.data.msg || "请求失败", {
                 status: response.status,
                 code: response.data.code,
-                retryable: isRetryableStatus(response.status) || isRetryableStatus(response.data.code),
+                errorCode: response.data.errorCode,
+                errorCategory: response.data.errorCategory,
+                requestId: response.data.requestId || responseHeader(response.headers, "x-request-id"),
+                retryable: response.data.retryable ?? (isRetryableStatus(response.status) || isRetryableStatus(response.data.code)),
             });
         }
         return response.data.data;
@@ -46,15 +59,25 @@ export async function request<T>(promise: Promise<{ data: BackendEnvelope<T>; st
         if (axios.isAxiosError<BackendEnvelope<unknown>>(error)) {
             const status = error.response?.status;
             const code = error.response?.data?.code;
+            const envelope = error.response?.data;
             throw new ApiError(error.response?.data?.msg || error.message || "请求失败", {
                 status,
                 code,
-                retryable: isRetryableStatus(status) || isRetryableStatus(code),
+                errorCode: envelope?.errorCode,
+                errorCategory: envelope?.errorCategory,
+                requestId: envelope?.requestId || responseHeader(error.response?.headers as Record<string, unknown> | undefined, "x-request-id"),
+                retryable: envelope?.retryable ?? (isRetryableStatus(status) || isRetryableStatus(code)),
                 cause: error,
             });
         }
         throw error;
     }
+}
+
+function responseHeader(headers: Record<string, unknown> | undefined, name: string) {
+    if (!headers) return undefined;
+    const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function isRetryableStatus(status?: number) {

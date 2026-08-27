@@ -71,7 +71,7 @@
 | Qwen 图片参数/UI 旧问题 | 阶段 12 已完成代码与无费用运行验证 | Qwen Pro 已有专属能力、同步 Provider、Ready 目录和 Edge 管理端验证；真实付费生成仍待单独授权。 |
 | DashScope 图片通用能力夸大 | Qwen 已修复，其余隔离 | Qwen Pro 脱离通用 fallback；其他图片模型保持 Planned，晋升前仍需专属序列化与测试。 |
 | 通用视频 fallback 夸大能力 | 部分解决 | Ready Wan/HappyHorse 已脱离通用 fallback；其他 Planned/手工模型仍需逐模型收敛。 |
-| 任务错误响应和结构化日志 | 部分解决 | `failService` 已安全投影未分类错误；`POST /tasks` 等部分路径仍把 service error 交给 `fail`，全链路日志未完成。 |
+| 任务错误响应和结构化日志 | 已在阶段 13 修复 | 统一错误分类、retryable、requestId、前端诊断编号和 handler/service/worker/provider/resource 安全关联日志；无费用运行验证通过。 |
 | 系统渠道 `/model-catalog/quote` | 未修复 | feature off 分支仍返回 501 TODO。 |
 | 插件备用端口/Vite/Origin | 未修复 | skill 仍误写 Next、使用无效 `CANVAS_URL`，未对接 `FRAMEFIELD_TRUSTED_WEB_ORIGINS`。 |
 | 插件 90 秒超时 | 未修复 | 低于 Canvas Agent 35 分钟生成续接合同。 |

@@ -2,14 +2,31 @@ package service
 
 import "fmt"
 
+const (
+	ErrorCategoryValidation     = "validation"
+	ErrorCategoryAuthentication = "authentication"
+	ErrorCategoryAuthorization  = "authorization"
+	ErrorCategoryNotFound       = "not_found"
+	ErrorCategoryConflict       = "conflict"
+	ErrorCategoryQuota          = "quota"
+	ErrorCategoryCapability     = "capability"
+	ErrorCategoryPricing        = "pricing"
+	ErrorCategoryRouting        = "routing"
+	ErrorCategoryProvider       = "provider"
+	ErrorCategoryTimeout        = "timeout"
+	ErrorCategoryInternal       = "internal"
+)
+
 // AppError 是 service 层对外公开的结构化错误。
 // Message 必须可安全展示给用户，Cause 仅用于保留内部诊断链路，不得直接写入 HTTP 响应。
 type AppError struct {
-	Status    int
-	Code      int
-	Message   string
-	Retryable bool
-	Cause     error
+	Status     int
+	Code       int
+	PublicCode string
+	Category   string
+	Message    string
+	Retryable  bool
+	Cause      error
 }
 
 func (e *AppError) Error() string {
@@ -27,11 +44,39 @@ func (e *AppError) Unwrap() error {
 }
 
 func NewAppError(status int, message string) *AppError {
-	return &AppError{Status: status, Message: message}
+	publicCode, category, retryable := defaultAppErrorMetadata(status)
+	return &AppError{Status: status, Code: status, PublicCode: publicCode, Category: category, Message: message, Retryable: retryable}
 }
 
 func WrapAppError(status int, message string, cause error) *AppError {
-	return &AppError{Status: status, Message: message, Cause: cause}
+	error := NewAppError(status, message)
+	error.Cause = cause
+	return error
+}
+
+func defaultAppErrorMetadata(status int) (string, string, bool) {
+	switch status {
+	case 400:
+		return "bad_request", ErrorCategoryValidation, false
+	case 401:
+		return "authentication_required", ErrorCategoryAuthentication, false
+	case 403:
+		return "access_denied", ErrorCategoryAuthorization, false
+	case 404:
+		return "not_found", ErrorCategoryNotFound, false
+	case 408, 504:
+		return "request_timeout", ErrorCategoryTimeout, true
+	case 409:
+		return "state_conflict", ErrorCategoryConflict, false
+	case 425, 429:
+		return "request_throttled", ErrorCategoryQuota, true
+	case 502:
+		return "upstream_unavailable", ErrorCategoryProvider, true
+	case 503:
+		return "service_unavailable", ErrorCategoryInternal, true
+	default:
+		return "internal_error", ErrorCategoryInternal, status >= 500
+	}
 }
 
 // ModelErrorCode 定义模型相关的错误码
@@ -67,10 +112,43 @@ func (e *ModelError) Error() string {
 	return string(e.ErrorCode)
 }
 
+func (e *ModelError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.AppError
+}
+
 // NewModelError 创建模型错误
 func NewModelError(code ModelErrorCode, message string) *ModelError {
+	status := 400
+	category := ErrorCategoryValidation
+	retryable := false
+	switch code {
+	case ErrCodeModelCapabilityNotSupported:
+		category = ErrorCategoryCapability
+	case ErrCodeModelPriceNotConfigured:
+		category = ErrorCategoryPricing
+	case ErrCodeModelRouteUnavailable:
+		status = 503
+		category = ErrorCategoryRouting
+		retryable = true
+	case ErrCodeProviderRequestFailed:
+		status = 502
+		category = ErrorCategoryProvider
+		retryable = true
+	case ErrCodeModelCatalogMismatch:
+		status = 409
+		category = ErrorCategoryConflict
+	case ErrCodeInvalidModelSelection:
+		category = ErrorCategoryValidation
+	}
+	appError := NewAppError(status, message)
+	appError.PublicCode = string(code)
+	appError.Category = category
+	appError.Retryable = retryable
 	return &ModelError{
-		AppError:  NewAppError(400, message),
+		AppError:  appError,
 		ErrorCode: code,
 		Details:   make(map[string]any),
 	}

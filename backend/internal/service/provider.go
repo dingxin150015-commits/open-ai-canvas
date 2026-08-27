@@ -3516,6 +3516,8 @@ func recordProviderRequest(req *http.Request, startedAt time.Time, statusCode in
 				log.Printf("provider billing uncertainty update failed: task_id=%s billing_order_id=%s error=%v", metadata.TaskID, metadata.BillingOrderID, uncertainErr)
 			}
 		}
+	} else {
+		log.Printf("provider request recorded: task_id=%s provider_request_id=%s request_kind=%s status=%s status_code=%d duration_ms=%d", metadata.TaskID, callLog.ProviderRequestID, requestKind, callLog.Status, statusCode, callLog.DurationMs)
 	}
 }
 
@@ -3537,7 +3539,7 @@ func safeProviderLogError(err error) string {
 	if errors.As(err, &httpErr) {
 		return fmt.Sprintf("上游 HTTP %d", httpErr.StatusCode)
 	}
-	return truncateRunes(err.Error(), 500)
+	return "上游请求失败"
 }
 
 func providerRequestKind(method string, path string) string {

@@ -206,3 +206,12 @@
 - Edge 首轮拉取发现上游从 241 增至 242：总目录 320，新增 1、补齐 69；Ready 筛选 12，Qwen 显示图片/可用/DashScope 图片/停用/未定价，能力为 3 参考图、10MB、6 输出、auto、自定义，所有不支持项关闭。
 - 第二次拉取新增 0/补齐 0。创建 `BKP-20260827-113656-STAGE12-POSTDEPLOY`；数据库 320、Ready 12、Planned 308、Qwen 能力 JSON 558 bytes，invalid 计数全 0。
 - 本阶段未启用或定价 Qwen，未点击测试模型或生成图片，没有供应商调用和费用。
+
+## 2026-08-27：阶段 13 统一错误链路与安全日志
+
+- 确认 `ModelError` 嵌入 `*AppError` 但未实现 `Unwrap`，以及多条任务路由仍把 service error 交给旧 `fail`；修复后能力、价格、路由、Provider 与普通 HTTP 错误都进入统一安全投影。
+- 增加请求编号中间件、响应头和稳定错误元数据；Gin 访问日志、handler、任务、Worker、Provider 与资源物化以关联 ID、状态、耗时和错误类型串联。
+- API 调用与任务日志新增 prompt/text/content/input/output 等敏感正文过滤；Provider 原始 message、签名 URL、内部错误和非结构化任务失败不再进入响应、持久任务日志或进程日志。
+- Backend 隔离 Linux CGO 全量测试通过；Web 458+1、TypeScript 和 11,022 模块生产构建通过，无 Rolldown panic。
+- 创建并验证 `BKP-20260827-125039-STAGE13-PREDEPLOY`；保留阶段 12 镜像标签后逐个更新 Backend/Web，数据卷未删除或替换。
+- 本地无费用验证返回稳定 401/400 元数据，合法 request ID 保留、非法 ID 替换，测试敏感标记未出现在 Backend 日志；没有创建任务、模型调用、OSS 上传或费用。

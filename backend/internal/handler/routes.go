@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,9 +46,10 @@ func RegisterTaskRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		task, err := svc.CreateTask(user.ID, req)
 		if err != nil {
-			fail(c, http.StatusBadRequest, err)
+			failService(c, err)
 			return
 		}
+		log.Printf("task request accepted: request_id=%s task_id=%s", RequestID(c), task.ID)
 		ok(c, task)
 	})
 	r.GET("/tasks", func(c *gin.Context) {
@@ -141,7 +143,7 @@ func RegisterTaskRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		task, err := svc.RetryTask(user.ID, c.Param("id"))
 		if err != nil {
-			fail(c, http.StatusBadRequest, err)
+			failService(c, err)
 			return
 		}
 		ok(c, task)
@@ -167,7 +169,7 @@ func RegisterTaskRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		task, err := svc.CancelTask(c.Request.Context(), user.ID, c.Param("id"))
 		if err != nil {
-			fail(c, http.StatusBadRequest, err)
+			failService(c, err)
 			return
 		}
 		ok(c, task)
@@ -187,7 +189,7 @@ func RegisterTaskRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		task, err := svc.CompleteTextReplayTask(user.ID, c.Param("id"), req.Text)
 		if err != nil {
-			fail(c, http.StatusBadRequest, err)
+			failService(c, err)
 			return
 		}
 		ok(c, task)
@@ -296,9 +298,10 @@ func RegisterSessionRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		detail, err := svc.CreateSession(user.ID, req)
 		if err != nil {
-			fail(c, http.StatusBadRequest, err)
+			failService(c, err)
 			return
 		}
+		log.Printf("session request accepted: request_id=%s session_id=%s", RequestID(c), detail.Session.ID)
 		ok(c, detail)
 	}
 	querySession := func(c *gin.Context) {

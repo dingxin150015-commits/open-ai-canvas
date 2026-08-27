@@ -264,7 +264,7 @@ func stringValue(value any) string {
 }
 
 func (s *Service) log(userID string, taskID string, level string, message string, payload string) error {
-	return s.repo.Create(&model.TaskLog{ID: newID(), UserID: userID, TaskID: taskID, Level: level, Message: message, Payload: truncateTaskLogPayload(payload)})
+	return s.repo.Create(&model.TaskLog{ID: newID(), UserID: userID, TaskID: taskID, Level: level, Message: message, Payload: safeTaskLogPayload(payload)})
 }
 
 func truncateTaskLogPayload(payload string) string {

@@ -20,14 +20,38 @@ describe("backend API request error semantics", () => {
             message: "Request failed with status code 429",
             response: {
                 status: 429,
-                data: { code: 42901, data: null, msg: "请求过于频繁，请稍后重试" },
+                data: {
+                    code: 42901,
+                    data: null,
+                    msg: "请求过于频繁，请稍后重试",
+                    errorCode: "request_throttled",
+                    errorCategory: "quota",
+                    retryable: true,
+                    requestId: "req_12345678",
+                },
+                headers: { "x-request-id": "header-request-id" },
             },
         };
         const thrown = await request(Promise.reject(axiosError)).catch((error) => error);
 
         expect(thrown).toBeInstanceOf(ApiError);
-        expect(thrown).toMatchObject({ status: 429, code: 42901, message: "请求过于频繁，请稍后重试", retryable: true });
+        expect(thrown).toMatchObject({ status: 429, code: 42901, errorCode: "request_throttled", errorCategory: "quota", requestId: "req_12345678", message: "请求过于频繁，请稍后重试", retryable: true });
         expect(thrown.cause).toBe(axiosError);
+    });
+
+    test("uses the response request-id header when an older backend body has no diagnostic id", async () => {
+        const axiosError = {
+            isAxiosError: true,
+            message: "Request failed with status code 500",
+            response: {
+                status: 500,
+                data: { code: 500, data: null, msg: "系统处理失败，请稍后重试" },
+                headers: { "x-request-id": "req_header_12345678" },
+            },
+        };
+        const thrown = await request(Promise.reject(axiosError)).catch((error) => error);
+
+        expect(thrown).toMatchObject({ requestId: "req_header_12345678", retryable: true });
     });
 
     test("converts Axios cancellation to AbortError", async () => {

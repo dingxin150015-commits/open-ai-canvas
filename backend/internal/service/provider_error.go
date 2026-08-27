@@ -29,7 +29,13 @@ func providerFailureDetails(payload map[string]any) (string, string) {
 			message = strings.TrimSpace(stringField(candidate, "message"))
 		}
 	}
-	return code, truncateRunes(message, 500)
+	if isContentModerationFailure(code) || isContentModerationFailure(message) {
+		return firstNonEmpty(code, contentModerationErrorCode), contentModerationRetryMessage
+	}
+	if message != "" {
+		message = "上游返回错误，原始消息已隐藏"
+	}
+	return code, message
 }
 
 func normalizedProviderErrorCode(value any) string {

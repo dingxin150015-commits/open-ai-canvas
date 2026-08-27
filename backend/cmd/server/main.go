@@ -64,9 +64,10 @@ func main() {
 	svc.StartWorker()
 
 	r := gin.New()
+	r.Use(handler.RequestIDMiddleware())
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("%s - [%s] \"%s %s\" %d %s %s\n", param.ClientIP, param.TimeStamp.Format(time.RFC3339), param.Method, redactCanvasSharePath(param.Path), param.StatusCode, param.Latency, param.ErrorMessage)
-	}), gin.Recovery())
+		return fmt.Sprintf("%s - [%s] request_id=%s \"%s %s\" %d %s %s\n", param.ClientIP, param.TimeStamp.Format(time.RFC3339), param.Request.Header.Get("X-Request-ID"), param.Method, redactCanvasSharePath(param.Path), param.StatusCode, param.Latency, param.ErrorMessage)
+	}), gin.CustomRecovery(handler.HandleRecovery))
 	corsMiddleware, err := cors()
 	if err != nil {
 		log.Fatal(err)
@@ -129,7 +130,7 @@ func env(key string, fallback string) string {
 	return value
 }
 
-const corsAllowedHeaders = "Accept, Content-Type, Authorization, X-Requested-With, X-Canvas-Scene, X-Idempotency-Key, X-Canvas-Upstream-URL, X-Canvas-Upstream-Format, X-Canvas-Allow-Local-Channel, X-Canvas-Upstream-Base-URL"
+const corsAllowedHeaders = "Accept, Content-Type, Authorization, X-Requested-With, X-Request-ID, X-Canvas-Scene, X-Idempotency-Key, X-Canvas-Upstream-URL, X-Canvas-Upstream-Format, X-Canvas-Allow-Local-Channel, X-Canvas-Upstream-Base-URL"
 
 const corsAllowedMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 
@@ -146,7 +147,11 @@ func cors() (gin.HandlerFunc, error) {
 	return func(c *gin.Context) {
 		origin := strings.TrimSpace(c.GetHeader("Origin"))
 		if origin != "" && !allowedOriginWithPolicy(c, origin, policy) {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"code": http.StatusForbidden, "data": nil, "msg": "不允许的跨域来源"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code": http.StatusForbidden, "data": nil, "msg": "不允许的跨域来源",
+				"errorCode": "cors_origin_denied", "errorCategory": service.ErrorCategoryAuthorization,
+				"retryable": false, "requestId": handler.RequestID(c),
+			})
 			return
 		}
 		if origin != "" {
@@ -154,6 +159,7 @@ func cors() (gin.HandlerFunc, error) {
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers")
 		}
+		c.Header("Access-Control-Expose-Headers", "X-Request-ID")
 		c.Header("Access-Control-Allow-Headers", corsAllowedHeaders)
 		c.Header("Access-Control-Allow-Methods", corsAllowedMethods)
 		c.Header("Access-Control-Max-Age", "86400")

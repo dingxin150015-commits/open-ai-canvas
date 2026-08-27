@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -79,9 +80,18 @@ func (w *taskWorkerCoordinator) processNextTask() error {
 	return w.processClaimedTask(task)
 }
 
-func (w *taskWorkerCoordinator) processClaimedTask(task *model.Task) error {
+func (w *taskWorkerCoordinator) processClaimedTask(task *model.Task) (resultErr error) {
 	s := w.service
 	terminal := s.terminalCoordinator()
+	startedAt := time.Now()
+	log.Printf("worker task started: task_id=%s", task.ID)
+	defer func() {
+		if resultErr != nil {
+			log.Printf("worker task failed: task_id=%s provider_request_id=%s duration_ms=%d error_type=%T", task.ID, task.ProviderRequestID, time.Since(startedAt).Milliseconds(), resultErr)
+			return
+		}
+		log.Printf("worker task finished: task_id=%s provider_request_id=%s duration_ms=%d", task.ID, task.ProviderRequestID, time.Since(startedAt).Milliseconds())
+	}()
 	_ = s.log(task.UserID, task.ID, "info", "后端任务开始处理", "")
 	policy, err := s.RuntimePolicy()
 	if err != nil {
@@ -187,7 +197,21 @@ func taskFailureMessage(err error) string {
 	if err == nil {
 		return "任务处理失败"
 	}
-	return truncateRunes(err.Error(), 2_000)
+	var modelErr *ModelError
+	if errors.As(err, &modelErr) && modelErr.AppError != nil && strings.TrimSpace(modelErr.Message) != "" {
+		return truncateRunes(modelErr.Message, 2_000)
+	}
+	var appErr *AppError
+	if errors.As(err, &appErr) && strings.TrimSpace(appErr.Message) != "" {
+		return truncateRunes(appErr.Message, 2_000)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "任务执行超时，请稍后重试。"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "任务已取消"
+	}
+	return "任务处理失败，请稍后重试。"
 }
 
 func taskExecutionTimeoutWithPolicy(taskType string, policy RuntimeTaskPolicy) time.Duration {
