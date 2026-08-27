@@ -1,6 +1,6 @@
 {
   "provider": "bailian",
-  "version": "2026-08-25",
+  "version": "2026-08-27",
   "generatedFrom": "local official Bailian documentation mirror plus reviewed live Wan 3.0 Prime enum",
   "models": [
     {
@@ -22,7 +22,7 @@
         "api-reference/video-generation/animate-anyone/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "animate-anyone-template-gen2",
@@ -43,7 +43,7 @@
         "api-reference/video-generation/animate-anyone-template-gen/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "emo-v1",
@@ -64,7 +64,7 @@
         "api-reference/video-generation/emo-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "emoji-v1",
@@ -85,7 +85,7 @@
         "api-reference/video-generation/emoji-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.0-i2v",
@@ -106,7 +106,7 @@
         "api-reference/video-generation/happyhorse-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.0-r2v",
@@ -127,7 +127,7 @@
         "api-reference/video-generation/happyhorse-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.0-t2v",
@@ -148,7 +148,7 @@
         "api-reference/video-generation/happyhorse-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.0-video-edit",
@@ -169,7 +169,7 @@
         "api-reference/video-generation/happyhorse-video-editing/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.1-i2v",
@@ -190,7 +190,7 @@
         "api-reference/video-generation/happyhorse-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.1-r2v",
@@ -212,7 +212,7 @@
         "api-reference/video-generation/happyhorse-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "happyhorse-1.1-t2v",
@@ -233,7 +233,7 @@
         "api-reference/video-generation/happyhorse-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "kling/kling-v3-omni-video-generation",
@@ -257,7 +257,7 @@
         "api-reference/video-generation/kling-video-generation/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "kling/kling-v3-video-generation",
@@ -281,7 +281,7 @@
         "api-reference/video-generation/kling-video-generation/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "liveportrait",
@@ -302,7 +302,7 @@
         "api-reference/video-generation/liveportrait-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-c1-it2v",
@@ -324,7 +324,7 @@
         "api-reference/video-generation/pixverse-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-c1-kf2v",
@@ -345,7 +345,7 @@
         "api-reference/video-generation/pixverse-image-to-video-first-last/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-c1-r2v",
@@ -366,7 +366,7 @@
         "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-c1-t2v",
@@ -387,7 +387,7 @@
         "api-reference/video-generation/pixverse-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-lipsync",
@@ -408,7 +408,7 @@
         "api-reference/video-generation/pixverse-lipsync/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-motioncontrol",
@@ -429,7 +429,7 @@
         "api-reference/video-generation/pixverse-motioncontrol/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-upscale",
@@ -450,7 +450,7 @@
         "api-reference/video-generation/pixverse-upscale/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v5.6-it2v",
@@ -472,7 +472,7 @@
         "api-reference/video-generation/pixverse-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v5.6-kf2v",
@@ -493,7 +493,7 @@
         "api-reference/video-generation/pixverse-image-to-video-first-last/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v5.6-r2v",
@@ -514,7 +514,7 @@
         "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v5.6-t2v",
@@ -535,7 +535,7 @@
         "api-reference/video-generation/pixverse-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v6-it2v",
@@ -557,7 +557,7 @@
         "api-reference/video-generation/pixverse-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v6-kf2v",
@@ -578,7 +578,7 @@
         "api-reference/video-generation/pixverse-image-to-video-first-last/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v6-r2v",
@@ -599,7 +599,7 @@
         "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v6-r2v-omni",
@@ -620,7 +620,7 @@
         "api-reference/video-generation/pixverse-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "pixverse/pixverse-v6-t2v",
@@ -641,7 +641,7 @@
         "api-reference/video-generation/pixverse-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "qwen-image-3.0-pro",
@@ -653,8 +653,8 @@
         "image"
       ],
       "apiPath": "/api/v1/services/aigc/multimodal-generation/generation",
-      "supportStatus": "planned",
-      "supportReason": "Qwen Image 能力合同与 Create UI 回归尚未完成",
+      "supportStatus": "ready",
+      "supportReason": "Qwen Image 3.0 同步文生图与 1-3 图编辑合同、严格序列化和回归测试已完成",
       "supportedOperations": [
         "text_to_image",
         "image_edit"
@@ -664,7 +664,7 @@
         "api-reference/image-generation/qwen-image-editing.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "video-style-transform",
@@ -685,7 +685,7 @@
         "api-reference/video-generation/video-style-transform/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "videoretalk",
@@ -706,7 +706,7 @@
         "api-reference/video-generation/video-retalk/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2-pro_img2video",
@@ -728,7 +728,7 @@
         "api-reference/video-generation/vidu-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2-pro_reference2video",
@@ -749,7 +749,7 @@
         "api-reference/video-generation/vidu-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2-pro_start-end2video",
@@ -770,7 +770,7 @@
         "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2-turbo_img2video",
@@ -792,7 +792,7 @@
         "api-reference/video-generation/vidu-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2-turbo_start-end2video",
@@ -813,7 +813,7 @@
         "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2_reference2video",
@@ -834,7 +834,7 @@
         "api-reference/video-generation/vidu-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq2_text2video",
@@ -855,7 +855,7 @@
         "api-reference/video-generation/vidu-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-ad_reference2video",
@@ -876,7 +876,7 @@
         "api-reference/video-generation/vidu-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-drama_reference2video",
@@ -897,7 +897,7 @@
         "api-reference/video-generation/vidu-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-pro-fast_img2video",
@@ -918,7 +918,7 @@
         "api-reference/video-generation/vidu-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-pro_img2video",
@@ -940,7 +940,7 @@
         "api-reference/video-generation/vidu-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-pro_start-end2video",
@@ -961,7 +961,7 @@
         "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-pro_text2video",
@@ -982,7 +982,7 @@
         "api-reference/video-generation/vidu-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-turbo_img2video",
@@ -1004,7 +1004,7 @@
         "api-reference/video-generation/vidu-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-turbo_start-end2video",
@@ -1025,7 +1025,7 @@
         "api-reference/video-generation/vidu-start-end-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "vidu/viduq3-turbo_text2video",
@@ -1046,7 +1046,7 @@
         "api-reference/video-generation/vidu-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.1-i2v-plus",
@@ -1067,7 +1067,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.1-i2v-turbo",
@@ -1088,7 +1088,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.1-kf2v-plus",
@@ -1109,7 +1109,7 @@
         "api-reference/video-generation/wan-image-to-video-first-last-frames/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.1-t2v-plus",
@@ -1130,7 +1130,7 @@
         "api-reference/video-generation/wan-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.1-t2v-turbo",
@@ -1151,7 +1151,7 @@
         "api-reference/video-generation/wan-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-animate-mix",
@@ -1172,7 +1172,7 @@
         "api-reference/video-generation/wan-video-character-swap/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-animate-move",
@@ -1193,7 +1193,7 @@
         "api-reference/video-generation/wan-image-to-animation/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-i2v-flash",
@@ -1214,7 +1214,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-i2v-plus",
@@ -1235,7 +1235,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-kf2v-flash",
@@ -1256,7 +1256,7 @@
         "api-reference/video-generation/wan-image-to-video-first-last-frames/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-s2v",
@@ -1277,7 +1277,7 @@
         "api-reference/video-generation/wan-s2v/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.2-t2v-plus",
@@ -1298,7 +1298,7 @@
         "api-reference/video-generation/wan-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.5-i2v-preview",
@@ -1319,7 +1319,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.5-t2v-preview",
@@ -1340,7 +1340,7 @@
         "api-reference/video-generation/wan-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.6-i2v",
@@ -1361,7 +1361,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.6-i2v-flash",
@@ -1382,7 +1382,7 @@
         "api-reference/video-generation/wan-image-to-video-first-frame/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.6-r2v",
@@ -1403,7 +1403,7 @@
         "api-reference/video-generation/wan-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.6-r2v-flash",
@@ -1424,7 +1424,7 @@
         "api-reference/video-generation/wan-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.6-t2v",
@@ -1445,7 +1445,7 @@
         "api-reference/video-generation/wan-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-i2v",
@@ -1469,7 +1469,7 @@
         "api-reference/video-generation/wan27-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-i2v-2026-04-25",
@@ -1493,7 +1493,7 @@
         "api-reference/video-generation/wan27-image-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-image-pro",
@@ -1515,7 +1515,7 @@
         "api-reference/image-generation/wan27-image-gen-edit/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-r2v",
@@ -1538,7 +1538,7 @@
         "api-reference/video-generation/wan27-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-r2v-2026-06-12",
@@ -1561,7 +1561,7 @@
         "api-reference/video-generation/wan27-reference-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-t2v",
@@ -1583,7 +1583,7 @@
         "api-reference/video-generation/wan27-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-t2v-2026-04-25",
@@ -1605,7 +1605,7 @@
         "api-reference/video-generation/wan27-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-t2v-2026-06-12",
@@ -1627,7 +1627,7 @@
         "api-reference/video-generation/wan27-text-to-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan2.7-videoedit",
@@ -1648,7 +1648,7 @@
         "api-reference/video-generation/wan27-video-editing/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan3.0-video",
@@ -1673,7 +1673,7 @@
         "api-reference/video-generation/wan30-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wan3.0-video-prime",
@@ -1700,7 +1700,7 @@
         "api-reference/video-generation/wan30-video/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     },
     {
       "id": "wanx2.1-vace-plus",
@@ -1721,7 +1721,7 @@
         "api-reference/video-generation/wan-general-video-editing/create-task.md"
       ],
       "catalogSource": "bailian-official-docs",
-      "catalogVersion": "2026-08-25"
+      "catalogVersion": "2026-08-27"
     }
   ]
 }

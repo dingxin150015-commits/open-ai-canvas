@@ -41,6 +41,8 @@ function parseList(raw) {
 }
 
 const readyVideoIDs = rows.filter((row) => row.support_status === "ready" && row.capability === "video").map((row) => String(row.model_key)).sort();
+const readyImageIDs = rows.filter((row) => row.support_status === "ready" && row.capability === "image").map((row) => String(row.model_key)).sort();
+const qwenImage30 = rows.find((row) => row.model_key === "qwen-image-3.0-pro");
 const officialRows = rows.filter((row) => String(row.catalog_source).includes("bailian"));
 const invalid = {
     readyMissingCapabilityConfig: rows.filter((row) => row.support_status === "ready" && !String(row.capability_config_json || "").trim()).length,
@@ -98,6 +100,18 @@ const result = {
     enabled: rows.filter((row) => Number(row.enabled) === 1).length,
     priced: rows.filter((row) => Number(row.price_configured) === 1).length,
     readyVideoIDs,
+    readyImageIDs,
+    qwenImage30: qwenImage30 ? {
+        supportStatus: qwenImage30.support_status,
+        supportReason: qwenImage30.support_reason,
+        catalogSource: qwenImage30.catalog_source,
+        catalogVersion: qwenImage30.catalog_version,
+        capability: qwenImage30.capability,
+        protocol: qwenImage30.protocol,
+        capabilityConfigBytes: String(qwenImage30.capability_config_json || "").length,
+        enabled: Number(qwenImage30.enabled),
+        priceConfigured: Number(qwenImage30.price_configured),
+    } : null,
     invalid,
     upstreamMismatch,
     digest,

@@ -15,11 +15,11 @@
 
 - [x] 建立唯一 `effectiveChannelModelCapability` 持久边界，由系统渠道 Catalog 与 Admission 共用；精确 SKU 计费和 Ready Provider 使用同一持久模型合同。
 - [x] 明确定义并测试 missing、explicit-empty、wildcard 三态；显式空数组不回填，`*` 只开启自定义输入。
-- [ ] 按 Qwen、Wan、HappyHorse 具体模型建立保守能力矩阵：Wan 2.7、HappyHorse 1.1、Wan 3.0 已完成；Qwen 图片仍 Planned。
+- [x] 按 Qwen、Wan、HappyHorse 具体模型建立保守能力矩阵：Qwen Image 3.0 Pro、Wan 2.7、HappyHorse 1.1、Wan 3.0 已完成；其他图片模型继续 Planned。
 - [ ] 移除执行器不支持或会被静默改写的图片/视频参数：Ready 视频模型已完成；Planned/手工图片与通用 fallback 尚未全量收敛。
 - [ ] 统一 Create、Canvas、Admin 和逻辑模型的尺寸派生纯函数。
 - [x] Create 参数按用户、模型和生成方式持久化；刷新保持画幅/分辨率/时长/声音/水印，明确 Switch 与请求 payload 一致，并完成 Edge 验证。
-- [ ] 在真实 `/create` 设置菜单上验证 Qwen 比例、分辨率、质量和自定义尺寸。
+- [x] 在管理后台和运行目录验证 Qwen Pro 的 auto、比例/像素、自定义尺寸、3 参考图、6 输出及不支持项；普通 Create 真实生成设置仍需模型定价/启用后的单独授权验证。
 - [x] 删除 Qwen 临时 DEBUG、完整提示词/请求体/签名 URL/API Key 片段日志和未使用导入；Provider 只保留结构化安全状态。
 - [x] 为官方发现目录增加 ready/planned/unsupported/deprecated 支持状态，并由 Backend 强制限制非 Ready 状态不可定价、启用、测试、删除或路由。
 - [x] 重构 `FetchAdminChannelModels`，保留完整 CatalogItem 元数据并为现有待配置记录提供安全补齐；阶段 7 已在运行数据库完成拉取并验证真实幂等。
@@ -29,8 +29,8 @@
 ## P1：测试与可观察性
 
 - [x] 复核 Canvas Agent Windows 进程树清理：确认 Codex 受限进程的 `taskkill` 被拒绝导致假阴性；测试夹具显式探测能力，主机真实专项 12/12、全量 287/287 和 TypeScript 构建通过。远程 Linux CI 仍随未来 PR 验证。
-- [ ] 增加 Qwen 38/39 项、同名 SKU 和真实存量配置测试；字段缺失、空数组、`*` 和非法默认值已有局部覆盖。
-- [ ] 增加 Qwen `auto` 省略、`x -> *`、比例映射和 1–6 输出完整序列化测试；当前只有尺寸规范化局部覆盖。
+- [x] 用 Qwen 3.0 专属官方尺寸合同替代旧 38/39 项通用列表，并覆盖存量 Planned→Ready 安全补齐、字段缺失/空数组/`*` 与非法默认值边界。
+- [x] 增加 Qwen `auto` 省略、`x -> *`、比例映射、1–6 输出、1–3 图编辑、参数依赖和拒绝路径完整序列化测试。
 - [x] 为 Ready 视频模型增加 480P/时长/音频/水印、跨媒体数量、输入相关时长和非法组合拒绝测试。
 - [x] 为系统渠道持久能力边界、目录/准入 fail-closed、Ready Provider payload、精确 SKU 账务和真实幂等增加测试。
 - [ ] 为任务失败建立前端、handler、service、worker、provider 全链路结构化日志。

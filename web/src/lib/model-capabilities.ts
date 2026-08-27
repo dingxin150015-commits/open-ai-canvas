@@ -80,19 +80,7 @@ export type VideoCapabilityConfig = {
 };
 
 // 旧版本的“允许自定义”可能只保存了 `*`，前台需要用这组标准值恢复可选项。
-export const STANDARD_IMAGE_SIZE_VALUES = [
-    "1:1",
-    "3:2",
-    "2:3",
-    "4:3",
-    "3:4",
-    "16:9",
-    "21:9",
-    "9:16",
-    "1024x1024",
-    "1536x1024",
-    "1024x1536",
-] as const;
+export const STANDARD_IMAGE_SIZE_VALUES = ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "21:9", "9:16", "1024x1024", "1536x1024", "1024x1536"] as const;
 
 export function normalizeCapabilityString(value: string) {
     const normalized = value.trim();
@@ -240,14 +228,38 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
             values: [
                 "auto",
                 // 比例（推荐，更直观）
-                "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16",
+                "1:1",
+                "3:2",
+                "2:3",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
                 // 像素尺寸（高级用户）- 使用 x 格式与数据库存储一致
-                "1024x1024", "1536x1024", "1024x1536", "2048x2048", "2048x1152",
+                "1024x1024",
+                "1536x1024",
+                "1024x1536",
+                "2048x2048",
+                "2048x1152",
             ],
             default: "1:1",
             allowCustom: false,
         };
         image.quality = { supported: true, values: ["auto", "low", "medium", "high"], default: "auto" };
+    }
+    if (protocol === "dashscope-image" && isQwenImage30Model(model)) {
+        image.references = { promptMaxChars: 32000, maxImages: 3, maxImageBytes: 10 * 1024 * 1024, maskSupported: false };
+        image.size = {
+            parameter: "size",
+            values: ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "1024x1024", "768x1152", "1024x1536", "1152x768", "1536x1024", "720x1280", "1080x1920", "1280x720", "1920x1080"],
+            default: "auto",
+            allowCustom: true,
+        };
+        image.quality = { supported: false, values: [], default: "auto" };
+        image.transparentBackground = { supported: false, default: false };
+        image.responseFormat = { supported: false };
+        image.outputFormat = { supported: false };
+        image.maxOutputs = 6;
     }
     if (protocol !== "grok-image" && model.trim().toLowerCase().startsWith("grok-imagine-image")) {
         image.references.maxImages = 0;
@@ -265,6 +277,14 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         image.maxOutputs = 1;
     }
     return image;
+}
+
+function isQwenImage30Model(model: string) {
+    const value = model
+        .trim()
+        .toLowerCase()
+        .replace(/^models\//, "");
+    return value === "qwen-image-3.0-pro" || value === "qwen-image-3.0";
 }
 
 export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = ""): ModelCapabilityConfig {
@@ -340,7 +360,13 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.operations = ["text_to_video", "image_to_video", "reference_to_video"];
         video.defaultOperation = "text_to_video";
     }
-    if (protocol === "dashscope-video" && model.trim().replace(/^models\//i, "").toLowerCase() === "wan3.0-video") {
+    if (
+        protocol === "dashscope-video" &&
+        model
+            .trim()
+            .replace(/^models\//i, "")
+            .toLowerCase() === "wan3.0-video"
+    ) {
         video.references = {
             promptMaxChars: 20000,
             minImages: 0,
@@ -364,7 +390,10 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.defaultOperation = "text_to_video";
     }
     if (protocol === "dashscope-video") {
-        const modelName = model.trim().replace(/^models\//i, "").toLowerCase();
+        const modelName = model
+            .trim()
+            .replace(/^models\//i, "")
+            .toLowerCase();
         const wan27Kind = wan27VideoKind(modelName);
         if (wan27Kind) applyWan27VideoCapability(video, wan27Kind);
         const happyHorseKind = happyHorse11VideoKind(modelName);
@@ -410,13 +439,37 @@ function applyWan27VideoCapability(video: VideoCapabilityConfig, kind: string) {
         video.operations = ["text_to_video", "audio_to_video"];
         video.defaultOperation = "text_to_video";
     } else if (kind === "i2v") {
-        Object.assign(video.references, { minVisualReferences: 1, maxVisualReferences: 2, maxImages: 2, maxImageBytes: 20 * 1024 * 1024, maxVideos: 1, maxVideoBytes: 100 * 1024 * 1024, maxVideoDurationSeconds: 10, maxAudios: 1, maxAudioBytes: 15 * 1024 * 1024, maxAudioDurationSeconds: 30, audioMustFitOutput: true });
+        Object.assign(video.references, {
+            minVisualReferences: 1,
+            maxVisualReferences: 2,
+            maxImages: 2,
+            maxImageBytes: 20 * 1024 * 1024,
+            maxVideos: 1,
+            maxVideoBytes: 100 * 1024 * 1024,
+            maxVideoDurationSeconds: 10,
+            maxAudios: 1,
+            maxAudioBytes: 15 * 1024 * 1024,
+            maxAudioDurationSeconds: 30,
+            audioMustFitOutput: true,
+        });
         video.ratios = ["adaptive"];
         video.defaultRatio = "adaptive";
         video.operations = ["image_to_video", "extend", "reference_to_video", "audio_to_video"];
         video.defaultOperation = "image_to_video";
     } else {
-        Object.assign(video.references, { minVisualReferences: 1, maxVisualReferences: 5, maxImages: 5, maxImageBytes: 20 * 1024 * 1024, maxVideos: 5, maxVideoBytes: 100 * 1024 * 1024, maxVideoDurationSeconds: 30, maxOutputDurationWithVideoSeconds: 10, maxAudios: 1, maxAudioBytes: 15 * 1024 * 1024, maxAudioDurationSeconds: 10 });
+        Object.assign(video.references, {
+            minVisualReferences: 1,
+            maxVisualReferences: 5,
+            maxImages: 5,
+            maxImageBytes: 20 * 1024 * 1024,
+            maxVideos: 5,
+            maxVideoBytes: 100 * 1024 * 1024,
+            maxVideoDurationSeconds: 30,
+            maxOutputDurationWithVideoSeconds: 10,
+            maxAudios: 1,
+            maxAudioBytes: 15 * 1024 * 1024,
+            maxAudioDurationSeconds: 10,
+        });
         video.operations = ["reference_to_video", "image_to_video", "audio_to_video"];
         video.defaultOperation = "reference_to_video";
     }
@@ -522,11 +575,14 @@ export function imageSizeRequest(profile: ImageCapabilityConfig, value?: string)
 
 export function normalizeVideoValue(profile: VideoCapabilityConfig, value: { seconds?: string; ratio?: string; resolution?: string }) {
     const requestedDuration = Number(value.seconds);
-    const duration = requestedDuration === -1 && profile.duration.smartSupported
-        ? -1
-        : profile.duration.selection === "enum"
-          ? ((profile.duration.values || []).includes(requestedDuration) ? requestedDuration : profile.duration.default)
-          : normalizeRangeDuration(profile, requestedDuration);
+    const duration =
+        requestedDuration === -1 && profile.duration.smartSupported
+            ? -1
+            : profile.duration.selection === "enum"
+              ? (profile.duration.values || []).includes(requestedDuration)
+                  ? requestedDuration
+                  : profile.duration.default
+              : normalizeRangeDuration(profile, requestedDuration);
     const ratio = profile.ratios.includes(value.ratio || "") ? value.ratio! : profile.defaultRatio;
     // 前端状态历史上保存过 `720`，而能力配置和供应商通常使用 `720p`；统一按能力中的原始值返回，避免被误判为不支持。
     const resolution = videoResolutionRequest(profile, value.resolution) || profile.defaultResolution || profile.resolutions[0] || "";

@@ -31,53 +31,42 @@ func runDashScopeImageTask(ctx context.Context, input canvasGenerationInput) (ma
 		return nil, errors.New("DashScope 图片协议不支持蒙版编辑，请移除蒙版后重试")
 	}
 
-	// 构建多模态 content 数组（DashScope 图片生成使用多模态消息格式）
-	content := []map[string]interface{}{}
-
-	// 1. 添加文本内容
-	promptText := strings.TrimSpace(input.Prompt)
-	if systemPrompt := strings.TrimSpace(input.Config.SystemPrompt); systemPrompt != "" {
-		// System prompt 和 user prompt 合并
-		promptText = systemPrompt + "\n\n" + promptText
-	}
-	if promptText != "" {
-		content = append(content, map[string]interface{}{
-			"text": promptText,
-		})
-	}
-
-	// 2. 处理所有参考图（添加到 content 数组）
-	// 注意：参考图数量已在 validateImageTask 中验证，这里直接处理
-	for i, refImg := range input.ReferenceImages {
-		raw, mimeType, err := mediaBytes(refImg)
+	var body map[string]interface{}
+	if isQwenImage30Model(input.Config.Model) {
+		var err error
+		body, err = buildQwenImage30Request(input)
 		if err != nil {
-			return nil, fmt.Errorf("读取第 %d 张参考图失败：%w", i+1, err)
+			return nil, err
 		}
-		// 使用实际的 MIME 类型（而不是硬编码为 image/png）
-		mimeType = normalizedMediaMimeType(mimeType, raw)
-		// 每张参考图作为独立 content 对象（使用 data URL 格式）
-		content = append(content, map[string]interface{}{
-			"image": dataURL(mimeType, raw),
-		})
-	}
-
-	// 3. 构建请求体（多模态消息格式）
-	body := map[string]interface{}{
-		"model": input.Config.Model,
-		"input": map[string]interface{}{
-			"messages": []map[string]interface{}{
-				{
-					"role":    "user",
-					"content": content, // content 必须是对象数组
-				},
+	} else {
+		// 尚未晋升 Ready 的其他 DashScope 图片模型保留原通用路径，
+		// 不能从 Qwen 3.0 的专属字段反推它们也支持同一合同。
+		content := []map[string]interface{}{}
+		promptText := strings.TrimSpace(input.Prompt)
+		if systemPrompt := strings.TrimSpace(input.Config.SystemPrompt); systemPrompt != "" {
+			promptText = systemPrompt + "\n\n" + promptText
+		}
+		if promptText != "" {
+			content = append(content, map[string]interface{}{"text": promptText})
+		}
+		for i, refImg := range input.ReferenceImages {
+			raw, mimeType, err := mediaBytes(refImg)
+			if err != nil {
+				return nil, fmt.Errorf("读取第 %d 张参考图失败：%w", i+1, err)
+			}
+			mimeType = normalizedMediaMimeType(mimeType, raw)
+			content = append(content, map[string]interface{}{"image": dataURL(mimeType, raw)})
+		}
+		body = map[string]interface{}{
+			"model": input.Config.Model,
+			"input": map[string]interface{}{
+				"messages": []map[string]interface{}{{"role": "user", "content": content}},
 			},
-		},
-		"parameters": map[string]interface{}{},
-	}
-
-	// 4. 设置图片尺寸
-	if size := normalizeDashScopeImageSize(input.Config.Size); size != "" {
-		body["parameters"].(map[string]interface{})["size"] = size
+			"parameters": map[string]interface{}{},
+		}
+		if size := normalizeDashScopeImageSize(input.Config.Size); size != "" {
+			body["parameters"].(map[string]interface{})["size"] = size
+		}
 	}
 
 	// 5. 同步调用（不使用异步模式）

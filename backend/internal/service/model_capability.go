@@ -176,6 +176,9 @@ func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapab
 			Default:   "auto",
 		}
 	}
+	if model.ChannelInterfaceType(protocol) == model.ChannelInterfaceDashScopeImage && isQwenImage30Model(modelName) {
+		image = qwenImage30CapabilityConfig()
+	}
 	if model.ChannelInterfaceType(protocol) != model.ChannelInterfaceGrokImage && strings.HasPrefix(strings.ToLower(strings.TrimSpace(modelName)), "grok-imagine-image") {
 		image.References.MaxImages = 0
 		image.References.MaskSupported = false
@@ -902,11 +905,30 @@ func validateImageTask(profile *ImageCapabilityConfig, input canvasGenerationInp
 			return BadAuthRequest(err.Error())
 		}
 	}
+	if isQwenImage30Model(modelName) {
+		if _, err := qwenImage30Size(input.Config.Size); err != nil {
+			return BadAuthRequest(err.Error())
+		}
+	}
 	if profile.Quality.Supported && strings.TrimSpace(input.Config.Quality) != "" && !containsCapabilityString(profile.Quality.Values, input.Config.Quality) {
 		return BadAuthRequest("图片质量不在当前模型支持范围内")
 	}
-	count, err := strconv.Atoi(strings.TrimSpace(input.Config.Count))
-	if err == nil && count > profile.MaxOutputs {
+	quality := strings.ToLower(strings.TrimSpace(input.Config.Quality))
+	if !profile.Quality.Supported && quality != "" && quality != "auto" {
+		return BadAuthRequest("当前图片模型不支持图片质量参数")
+	}
+	if !profile.TransparentBackground.Supported && parseBool(input.Config.TransparentBackground, false) {
+		return BadAuthRequest("当前图片模型不支持透明背景参数")
+	}
+	count := 1
+	if rawCount := strings.TrimSpace(input.Config.Count); rawCount != "" {
+		parsed, err := strconv.Atoi(rawCount)
+		if err != nil || parsed < 1 {
+			return BadAuthRequest("图片生成数量必须是正整数")
+		}
+		count = parsed
+	}
+	if count > profile.MaxOutputs {
 		return BadAuthRequest(fmt.Sprintf("当前图片模型单次最多生成 %d 张", profile.MaxOutputs))
 	}
 	return nil

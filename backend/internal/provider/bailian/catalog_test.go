@@ -21,8 +21,9 @@ func TestOfficialCatalogManifest(t *testing.T) {
 		}
 		wantStatus := provider.ModelSupportPlanned
 		readyModels := map[string]bool{
-			"wan3.0-video": true,
-			"wan2.7-t2v":   true, "wan2.7-t2v-2026-06-12": true, "wan2.7-t2v-2026-04-25": true,
+			"qwen-image-3.0-pro": true,
+			"wan3.0-video":       true,
+			"wan2.7-t2v":         true, "wan2.7-t2v-2026-06-12": true, "wan2.7-t2v-2026-04-25": true,
 			"wan2.7-i2v": true, "wan2.7-i2v-2026-04-25": true,
 			"wan2.7-r2v": true, "wan2.7-r2v-2026-06-12": true,
 			"happyhorse-1.1-t2v": true, "happyhorse-1.1-i2v": true, "happyhorse-1.1-r2v": true,
@@ -46,7 +47,10 @@ func TestOfficialCatalogManifest(t *testing.T) {
 	if len(seen["wan3.0-video"].SupportedOperations) != 5 {
 		t.Fatalf("wan3.0-video operations = %#v", seen["wan3.0-video"].SupportedOperations)
 	}
-	if officialCatalogVersion() != "2026-08-25" {
+	if len(seen["qwen-image-3.0-pro"].SupportedOperations) != 2 || seen["qwen-image-3.0-pro"].Protocol != "dashscope-image" {
+		t.Fatalf("qwen-image-3.0-pro contract = %#v", seen["qwen-image-3.0-pro"])
+	}
+	if officialCatalogVersion() != "2026-08-27" {
 		t.Fatalf("catalog version = %q", officialCatalogVersion())
 	}
 }

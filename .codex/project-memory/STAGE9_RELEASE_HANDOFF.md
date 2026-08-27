@@ -68,8 +68,8 @@
 | Windows CGO SQLite 测试失败 | 已修复 | 独立 Linux CGO test target 和 CI 工具链检查，不改生产驱动。 |
 | 未使用 modernc SQLite 依赖漂移 | 已修复 | go.mod/go.sum 回到 go-sqlite3 生产合同。 |
 | Create 缺少生成声音/水印 | 已修复 | 能力驱动输出控制、摘要、449+1 测试和真实无声/无水印请求。 |
-| Qwen 图片参数/UI 旧问题 | 部分解决，未完成 | 修正真实 Create 组件和 missing/empty/wildcard 语义；Qwen 图片仍 Planned，Provider 参数合同和 Edge 真实验证未完成。 |
-| DashScope 图片通用能力夸大 | 未完成但已隔离 | 图片模型保持 Planned，不可定价/启用；晋升 Ready 前需模型专属序列化与测试。 |
+| Qwen 图片参数/UI 旧问题 | 阶段 12 已完成代码与无费用运行验证 | Qwen Pro 已有专属能力、同步 Provider、Ready 目录和 Edge 管理端验证；真实付费生成仍待单独授权。 |
+| DashScope 图片通用能力夸大 | Qwen 已修复，其余隔离 | Qwen Pro 脱离通用 fallback；其他图片模型保持 Planned，晋升前仍需专属序列化与测试。 |
 | 通用视频 fallback 夸大能力 | 部分解决 | Ready Wan/HappyHorse 已脱离通用 fallback；其他 Planned/手工模型仍需逐模型收敛。 |
 | 任务错误响应和结构化日志 | 部分解决 | `failService` 已安全投影未分类错误；`POST /tasks` 等部分路径仍把 service error 交给 `fail`，全链路日志未完成。 |
 | 系统渠道 `/model-catalog/quote` | 未修复 | feature off 分支仍返回 501 TODO。 |

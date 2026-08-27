@@ -31,13 +31,13 @@
 
 - `/create` 使用 `web/src/pages/create/index.tsx` 中的 `GenerationSettingsMenu`。
 - `ImageSettingsPanel` 主要用于 Canvas 弹层。旧调试把日志加在错误组件上，因此“Create 页面无日志”不能证明缓存或组件未加载。
-- 如果 Create 页面真的拿到合法的 38/39 项 `x` 格式尺寸，当前分辨率算法应能渲染比例和分辨率选项；“只有自定义输入”与当前源码不一致，必须从实际 catalog、有效配置、Create DOM 和构建哈希重新取证。
+- 阶段 12 后，`qwen-image-3.0-pro` 使用独立 Qwen 3.0 能力：默认 `auto`、官方推荐比例/像素、自定义尺寸、最多 3 参考图/6 输出，不宣称质量、透明背景、mask、response/output format。
 
 ## 能力合同
 
 - 系统渠道 Catalog 与任务 Admission 已共用 `effectiveChannelModelCapability` 持久能力边界；缺失、损坏或不完整配置 fail closed。
 - Ready 的 Wan 2.7、HappyHorse 1.1 和 Wan 3.0 使用模型专属能力、Adapter 与 Provider payload 测试，不再依赖夸大的通用视频默认。
-- Qwen/DashScope 图片仍处于 Planned；现有图片 Provider 只序列化已实现参数，尚未完成 Ready 合同与真实 Edge 验证，因此旧 Qwen 问题仍是部分解决。
+- `qwen-image-3.0-pro` 已晋升 Ready，使用模型专属同步 Provider；其他 DashScope 图片仍保持 Planned/通用隔离，不能继承 Qwen 合同。
 - Planned/手工模型的通用能力 fallback 仍需谨慎；只有完成 `provider + protocol + modelKey` 合同与测试后才可晋升 Ready。
 
 ## 其他已确认问题
@@ -74,6 +74,16 @@
 - 生成声音和添加水印使用真实 Ant Design Switch；页面摘要、消息历史和任务请求显式使用当前 Switch 值，不再由旧全局默认静默决定。
 - 阶段 11 验证：专项 13/13、Web 主套件 453/453、跨 Runtime 1/1、TypeScript 和生产构建通过；用户在已登录 Microsoft Edge 确认 16:9、480P、2 秒及无声/无水印刷新后保持，Switch 开关与摘要同步，未提交生成任务。
 - 运行 Web 为 `sha256:b7cec94c5ce9c42a78a00a0129915dbd7f1ef8790cf480554d5bd793b60120f7`，容器 `25816ac62175` healthy、RestartCount=0；Backend 容器和镜像未变。旧 Web 镜像保留为 `open-ai-canvas-web:pre-stage11-20260826-2350`。
+
+## 阶段 12：Qwen Image 3.0 Pro Ready
+
+- 官方依据：`api-reference/image-generation/qwen-text-to-image.md` 与 `qwen-image-editing.md`；采用原生同步 `POST /api/v1/services/aigc/multimodal-generation/generation`。
+- 文生图严格发送一条 user message/一个 text；图片编辑严格发送 1–3 个 image 后跟一个 text。`auto` 省略 `size`，内部 `x`/比例只在 Adapter 转成上游 `宽*高`。
+- Provider 支持并校验 `n=1-6`、负面提示词 500 字符、prompt extend/direct-agent 依赖、thinking、watermark、seed；拒绝 mask、质量、透明背景、超量/超大/非法格式参考图和非法尺寸，不静默钳制或丢参。
+- Catalog 版本 `2026-08-27`，80 项，SHA-256 `28D060E90D47B9DA943D6908330BCB82F352A95D47353FE0F10322A84F2B03B1`；Qwen Pro 从 Planned 晋升 Ready，其他图片模型保持 Planned。
+- 隔离 Backend CGO 全量、Web 456/456、跨 Runtime 1/1、TypeScript 和生产构建通过。Microsoft Edge 首次拉取显示上游 242、官方 80、新增 1、补齐 69；第二次新增 0/补齐 0。
+- 运行数据库为 320 模型：Ready 12、Planned 308；Qwen 能力 JSON 558 bytes，停用、未定价。未执行测试模型或真实图片生成，未产生费用。
+- 当前 Backend `3b7b1e526a42` / `sha256:d0926f28a48cc4c6331860cf8006af040cb974caecc23a874eb180f81868b206`，Web `aac0f955c51d` / `sha256:3bf43cf9c603531f14c70d99cce0d7a4d8a93bc324d0f5c75d8c7a0c1420edfa`，均 healthy、RestartCount=0。
 
 ## 百炼官方文档与全局技能
 

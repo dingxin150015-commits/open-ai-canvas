@@ -453,3 +453,34 @@ ACL 复核：目录关闭继承；仅 `<current-windows-user>`、SYSTEM、Admini
 - 回滚标签：`open-ai-canvas-web:pre-stage11-20260826-2350`。
 - 更新后 Web：容器 `25816ac62175`，镜像 `sha256:b7cec94c5ce9c42a78a00a0129915dbd7f1ef8790cf480554d5bd793b60120f7`，healthy、RestartCount=0、OOMKilled=false。
 - Backend 保持容器 `f97220ae4273` 和镜像 `sha256:0d3b2403dbcf106f8dd61dcb3cd88692e2858c17a591b2aeec8d3aca6a08cdca`，数据卷未操作。
+
+## BKP-20260827-104744-STAGE12-PREDEPLOY
+
+| 字段 | 值 |
+| --- | --- |
+| 状态 | `verified`, `protected` |
+| 私有位置 | `<private-backup-root>\stage12-predeploy-20260827-104744` |
+| 数据库/WAL/SHM | 2,650,112 / 4,152,992 / 32,768 bytes |
+| 数据库 SHA-256 | `A0FB0AD53CC415FFE9001062A8F9D904ECF7035D7A355E9B52BC64A85569ADF0` |
+| WAL SHA-256 | `E1C0702387F4FB1CAC3F21A1DFABD97CBA97686AAA03380D47914D18B6CB5514` |
+| `.settings-key` SHA-256 | `E4B4B107C3060A18D65AD3AAD4E329D063A924A71CCF23EAB15B9ABF8120A6D5` |
+| 完整性 / 外键 / 表 | `ok` / 0 / 60 |
+| 目录基线 | 319：Ready 11、Planned 308；Qwen Planned、停用、未定价、无能力 JSON |
+
+ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Administrators 具有 FullControl。旧镜像保留为 `open-ai-canvas-backend:pre-stage12-20260827-104744` 与 `open-ai-canvas-web:pre-stage12-20260827-104744`。
+
+## BKP-20260827-113656-STAGE12-POSTDEPLOY
+
+| 字段 | 值 |
+| --- | --- |
+| 状态 | `verified`, `protected` |
+| 私有位置 | `<private-backup-root>\stage12-postdeploy-20260827-113656` |
+| 数据库/WAL/SHM | 2,650,112 / 4,152,992 / 32,768 bytes |
+| 数据库 SHA-256 | `A0FB0AD53CC415FFE9001062A8F9D904ECF7035D7A355E9B52BC64A85569ADF0` |
+| WAL SHA-256 | `EF2D26F364B23B4D1A03735B67BA8CD06841CA43803EEDFC34A7DF517B1A8B72` |
+| `.settings-key` SHA-256 | `E4B4B107C3060A18D65AD3AAD4E329D063A924A71CCF23EAB15B9ABF8120A6D5` |
+| 完整性 / 外键 / 表 | `ok` / 0 / 60 |
+| 目录结果 | 320：Ready 12、Planned 308；Qwen Ready、停用、未定价、能力 JSON 558 bytes |
+| 幂等 | 第二次拉取新增 0、补齐 0 |
+
+ACL 仅当前用户、SYSTEM、Administrators。最终 Backend `3b7b1e526a42` / `sha256:d0926f28a48cc4c6331860cf8006af040cb974caecc23a874eb180f81868b206`，Web `aac0f955c51d` / `sha256:3bf43cf9c603531f14c70d99cce0d7a4d8a93bc324d0f5c75d8c7a0c1420edfa`，均 healthy、RestartCount=0。恢复数据库不会撤销外部费用；本阶段没有 Qwen 外部调用或费用。

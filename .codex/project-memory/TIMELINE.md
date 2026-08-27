@@ -195,3 +195,14 @@
 - 专项 13/13、Web 主套件 453/453、跨 Runtime 1/1、TypeScript 和生产构建通过；构建 11,022 个模块，无 Rolldown panic。
 - 旧 Web 镜像标记 `open-ai-canvas-web:pre-stage11-20260826-2350`，只重建 Web；Backend ID/镜像不变，双方 healthy、RestartCount=0，首页和 API health 均为 200。
 - 用户在已登录 Microsoft Edge 确认 16:9、480P、2 秒和无声/无水印刷新后保持，声音/水印 Switch 与摘要同步；未点击发送、没有模型调用或费用。
+
+## 2026-08-27：阶段 12 Qwen Image 3.0 Pro Ready
+
+- 逐行读取 Qwen 同步文生图和图片编辑官方 OpenAPI，锁定单轮 messages、文生图单 text、编辑 1–3 image + 单 text、`auto` 省略、`宽*高`、`n=1-6` 和 24 小时 URL 合同。
+- 新增 Qwen 3.0 专属同步请求构造器和保守能力；覆盖尺寸/比例、参考图格式与大小、prompt extend/thinking、负面提示词、watermark、seed 和严格拒绝，不把合同扩散到其他 DashScope 图片模型。
+- `qwen-image-3.0-pro` 从 Planned 晋升 Ready；Catalog 版本更新为 `2026-08-27`，80 项，重生成哈希两次一致。
+- Backend 隔离 CGO 全量、Web 456+1、TypeScript 和 11,022 模块生产构建通过；首次 Backend 门禁仅暴露一个局部 Go 短声明语法错误，修正后全量通过。
+- 创建 `BKP-20260827-104744-STAGE12-PREDEPLOY`，完整性/外键/OSS 密文和 ACL 通过；给旧 Backend/Web 镜像加阶段 12 回滚标签后保留卷逐个更新服务。
+- Edge 首轮拉取发现上游从 241 增至 242：总目录 320，新增 1、补齐 69；Ready 筛选 12，Qwen 显示图片/可用/DashScope 图片/停用/未定价，能力为 3 参考图、10MB、6 输出、auto、自定义，所有不支持项关闭。
+- 第二次拉取新增 0/补齐 0。创建 `BKP-20260827-113656-STAGE12-POSTDEPLOY`；数据库 320、Ready 12、Planned 308、Qwen 能力 JSON 558 bytes，invalid 计数全 0。
+- 本阶段未启用或定价 Qwen，未点击测试模型或生成图片，没有供应商调用和费用。

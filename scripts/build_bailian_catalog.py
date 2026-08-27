@@ -14,7 +14,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DOCS_ROOT = PROJECT_ROOT / "百炼千问文档" / "百炼千问文档"
 DEFAULT_OUTPUT = PROJECT_ROOT / "backend" / "internal" / "provider" / "bailian" / "catalog.generated.json"
-CATALOG_VERSION = "2026-08-25"
+CATALOG_VERSION = "2026-08-27"
 MODEL_JSON = re.compile(r'"model"\s*:\s*"([A-Za-z0-9._/-]+)"')
 MODEL_ENUM = re.compile(r"^\s{10,}-\s+([A-Za-z0-9._/-]+)\s*$", re.MULTILINE)
 
@@ -167,8 +167,8 @@ def main() -> int:
             "protocol": "dashscope-image",
             "supportedEndpointTypes": ["image"],
             "apiPath": "/api/v1/services/aigc/multimodal-generation/generation",
-            "supportStatus": "planned",
-            "supportReason": "Qwen Image 能力合同与 Create UI 回归尚未完成",
+            "supportStatus": "ready",
+            "supportReason": "Qwen Image 3.0 同步文生图与 1-3 图编辑合同、严格序列化和回归测试已完成",
             "supportedOperations": ["text_to_image", "image_edit"],
             "documentationPaths": [
                 "api-reference/image-generation/qwen-text-to-image.md",

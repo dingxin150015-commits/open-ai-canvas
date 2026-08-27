@@ -133,3 +133,20 @@ func TestReadyDashScopeVideoCatalogItemsCarryModelSpecificCapabilities(t *testin
 		t.Fatalf("planned model received executable capability: %#v", planned)
 	}
 }
+
+func TestReadyQwenImage30CatalogItemCarriesModelSpecificCapability(t *testing.T) {
+	item := channelModelFromCatalog("MODEL-qwen-image", "channel-1", ChannelModelCatalogItem{
+		ID: "qwen-image-3.0-pro", ProviderModelKey: "qwen-image-3.0-pro", ModelType: "image",
+		Protocol: string(model.ChannelInterfaceDashScopeImage), SupportStatus: model.ChannelModelSupportReady,
+	})
+	config, err := DecodeModelCapabilityConfig(item.CapabilityConfigJSON)
+	if err != nil || item.CapabilityVersion != 1 || config == nil || config.Image == nil {
+		t.Fatalf("item=%#v config=%#v error=%v", item, config, err)
+	}
+	if config.Image.References.MaxImages != 3 || config.Image.References.MaskSupported || config.Image.Size.Default != "auto" || !config.Image.Size.AllowCustom || config.Image.Quality.Supported || config.Image.MaxOutputs != 6 {
+		t.Fatalf("Qwen image capability = %#v", config.Image)
+	}
+	if _, err := NormalizeModelCapabilityConfig("image", string(model.ChannelInterfaceDashScopeImage), config); err != nil {
+		t.Fatalf("NormalizeModelCapabilityConfig() error = %v", err)
+	}
+}
