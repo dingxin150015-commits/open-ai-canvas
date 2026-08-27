@@ -53,9 +53,12 @@ export type ModelChannel = {
         cachedTokenPriceMicrocredits?: number;
         capabilityConfig?: ModelCapabilityConfig;
         logicalModelId?: string;
+        channelModelId?: string;
+        channelId?: string;
+        modelKey?: string;
         logicalCapabilitySpec?: CapabilitySpec;
         logicalCapabilityProfiles?: CapabilitySpec[];
-		logicalPriceTiers?: PublicLogicalModelPriceTier[];
+        logicalPriceTiers?: PublicLogicalModelPriceTier[];
         defaultOptions?: Record<string, unknown>;
     }>;
     transport?: "backend-channel" | "local-runtime";
@@ -479,19 +482,19 @@ export function modelOptionsFromChannels(channels: ModelChannel[]) {
 export function hasSystemModelPrice(channel: ModelChannel, model: string) {
     if (channel.scope !== "system") return true;
     const positive = (value: number | undefined) => typeof value === "number" && Number.isFinite(value) && value > 0;
-    return channel.modelCosts?.some((item) => {
-        if (item.model !== model) return false;
-        const tiers = item.logicalPriceTiers || [];
-        if (tiers.length) {
-            return tiers.some((tier) => tier.billingMode === "token"
-                ? [tier.inputTokenPriceMicrocredits, tier.outputTokenPriceMicrocredits, tier.cachedTokenPriceMicrocredits].some(positive)
-                : positive(tier.unitPriceMicrocredits));
-        }
-        if (item.billingMode === "token") {
-            return [item.inputTokenPriceMicrocredits, item.outputTokenPriceMicrocredits, item.cachedTokenPriceMicrocredits].some(positive);
-        }
-        return positive(item.unitPriceMicrocredits);
-    }) === true;
+    return (
+        channel.modelCosts?.some((item) => {
+            if (item.model !== model) return false;
+            const tiers = item.logicalPriceTiers || [];
+            if (tiers.length) {
+                return tiers.some((tier) => (tier.billingMode === "token" ? [tier.inputTokenPriceMicrocredits, tier.outputTokenPriceMicrocredits, tier.cachedTokenPriceMicrocredits].some(positive) : positive(tier.unitPriceMicrocredits)));
+            }
+            if (item.billingMode === "token") {
+                return [item.inputTokenPriceMicrocredits, item.outputTokenPriceMicrocredits, item.cachedTokenPriceMicrocredits].some(positive);
+            }
+            return positive(item.unitPriceMicrocredits);
+        }) === true
+    );
 }
 
 export function normalizeModelOptionValue(value: unknown, channels: ModelChannel[]) {

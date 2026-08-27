@@ -1,5 +1,7 @@
 # 模型目录管理系统重构实施总结
 
+> 历史说明：本文主体记录 2026-08-22 的阶段性设计，不能覆盖当前源码状态。阶段 15 已完成系统渠道统一报价；当时提出的 `LogicalModelPriceSKU` 从未进入 schema/repository/service 主链，现已删除。当前渠道规格价格以 `ChannelModelPriceTier` 为真相，前台统一价格仍使用 `LogicalModel` 的版本化标量字段。
+
 ## 实施完成情况
 
 ### 已完成任务
@@ -28,12 +30,10 @@
 **文件修改：**
 - `internal/service/errors.go`
 
-#### 3. 新增 LogicalModelPriceSKU 模型 ✅
-- 在 `models_logical_model.go` 中添加了 `LogicalModelPriceSKU` 结构体
-- 支持统一定价模式（`pricePolicy = unified`）的独立售价
-- 使用 `SelectorJSON` 存储结构化意图选择器
-- 包含完整的计费模式和价格字段
-- 支持优先级、启用状态和版本控制
+#### 3. 统一价格 SKU 设计（历史方案，已废弃）
+- `LogicalModelPriceSKU` 只曾存在于类型定义中，从未进入数据库表清单或真实读写链路。
+- 当前 `pricePolicy = channel` 使用 `ChannelModelPriceTier` 精确匹配规格；`pricePolicy = unified` 使用 `LogicalModel` 与 active revision 的版本化价格快照。
+- 阶段 15 删除未接入类型，避免维护者误以为存在 `logical_model_price_skus` 表。
 
 **文件修改：**
 - `internal/model/models_logical_model.go`
@@ -120,47 +120,24 @@
 | 目录开关 | ✅ 完成 | `frontendModelsEnabled` 默认 true |
 | 统一模型目录 | ✅ 完成 | `/api/model-catalog` 接口已实现 |
 | 任务入口强制分流 | ✅ 完成 | CreateTask 已增加开关校验 |
-| SKU 分层 | ✅ 完成 | LogicalModelPriceSKU 已定义 |
+| SKU 分层 | ✅ 当前实现 | 渠道规格使用 `ChannelModelPriceTier`；统一价格使用 `LogicalModel` 版本快照 |
 | 价格有效性 | ✅ 完成 | 价格校验逻辑已实现 |
 | 价格展示 | ✅ 完成 | 统一展示字段已添加 |
 | 错误语义 | ✅ 完成 | 明确的错误码已定义 |
 
-### 待完善的功能
+### 当前完成状态
 
-1. **数据库迁移**
-   - 需要创建 `logical_model_price_skus` 表
-   - 需要为现有数据添加默认 SKU
-
-2. **路由注册**
-   - 需要在主路由中注册 `RegisterModelCatalogRoutes`
-
-3. **前端适配**
-   - 前端需要调用新的 `/api/model-catalog` 接口
-   - 移除对旧接口的直接调用
-
-4. **系统渠道报价**
-   - `POST /api/model-catalog/quote` 中系统渠道模式的报价逻辑待实现
-
-5. **SKU 管理后台**
-   - 需要添加前台 SKU 的 CRUD 接口
-   - 需要实现 selector 覆盖校验
-
-6. **测试覆盖**
-   - 单元测试
-   - 集成测试
-   - 边界情况测试
+1. `RegisterModelCatalogRoutes` 已进入主路由。
+2. 前端已使用统一模型目录，并在阶段 15 通过 `/api/model-catalog/quote` 同时支持前台模型和系统渠道模型报价。
+3. 系统渠道报价与任务创建共用能力合同、精确 SKU 选择器、价格倍率和 Token 估算；报价不写账务、不冻结积分。
+4. 目录、任务准入、价格档、系统报价和前端请求均有专项测试；完整门禁以项目级记忆和 `docs/content/docs/progress/pending-test.mdx` 为准。
+5. 不创建 `logical_model_price_skus` 表，也不为已删除的死类型增加兼容迁移。
 
 ## 下一步建议
 
 ### 立即执行
-1. 创建数据库迁移脚本
-2. 在 `cmd/server/main.go` 中注册新的路由
-3. 编写单元测试验证核心逻辑
-
-### 短期计划
-1. 实现系统渠道模型报价逻辑
-2. 添加 SKU 管理后台接口
-3. 前端接入新的统一目录接口
+1. 未来新增计费规格时扩展 `ChannelModelPriceTier` selector，并保持报价、准入、账务和 Provider 使用同一意图。
+2. 通过远程 CI 和发布环境继续验证 SQLite/PostgreSQL、前台模型开关和系统渠道模式。
 
 ### 长期优化
 1. 完善 SKU selector 的匹配算法
@@ -177,10 +154,9 @@
 
 ## 风险提示
 
-1. **磁盘空间**：当前编译环境磁盘空间不足，需要清理
-2. **数据迁移**：旧数据需要迁移到新的 SKU 结构
-3. **前端同步**：前端需要同步更新以使用新接口
-4. **性能影响**：统一目录接口可能需要额外的查询，需要关注性能
+1. **部署配置**：生产必须显式配置 CORS Origin，不能使用 `*`。
+2. **前端同步**：目录模式切换后客户端必须重新获取目录，旧模型 ID 不得跨模式报价。
+3. **性能影响**：统一目录和报价会读取能力及价格档，需要继续关注 PostgreSQL 和大目录下的查询性能。
 
 ## 文件清单
 

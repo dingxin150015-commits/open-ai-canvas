@@ -72,19 +72,19 @@
 | DashScope 图片通用能力夸大 | Qwen 已修复，其余隔离 | Qwen Pro 脱离通用 fallback；其他图片模型保持 Planned，晋升前仍需专属序列化与测试。 |
 | 通用视频 fallback 夸大能力 | 部分解决 | Ready Wan/HappyHorse 已脱离通用 fallback；其他 Planned/手工模型仍需逐模型收敛。 |
 | 任务错误响应和结构化日志 | 已在阶段 13 修复 | 统一错误分类、retryable、requestId、前端诊断编号和 handler/service/worker/provider/resource 安全关联日志；无费用运行验证通过。 |
-| 系统渠道 `/model-catalog/quote` | 未修复 | feature off 分支仍返回 501 TODO。 |
+| 系统渠道 `/model-catalog/quote` | 已在阶段 15 修复 | 共用系统目录、持久能力、精确价格档和账务算法；Web 统一报价已接入。 |
 | 插件备用端口/Vite/Origin | 已在阶段 14 修复 | 统一 Vite 端口参数和精确 `FRAMEFIELD_TRUSTED_WEB_ORIGINS`，不再使用 Next/`CANVAS_URL`。 |
 | 插件 90 秒超时 | 已在阶段 14 修复 | 外部 MCP 超时 2160 秒，覆盖 35 分钟续接和一分钟余量。 |
 | 插件 `agentToken` 查询参数 | 已在阶段 14 修复源码合同 | 最终 URL 只带 `mode`，Web 主动清除旧参数并使用签名握手；安装态新线程仍待验证。 |
 | Compose 插件开关透传 | 已在阶段 14 修复 | root/local/dev/deploy/server 五个 Backend 入口统一透传且默认关闭。 |
-| Server CORS 默认 `*` | 未修复 | `docker-compose.server.yml` 仍默认允许所有 Origin。 |
+| Server CORS 默认 `*` | 已在阶段 15 修复 | Server Compose 对空 CORS 配置 fail closed，必须显式提供 Web Origin。 |
 | 文档站构建 | 未修复，用户已暂缓 | `docs/package.json`、`source.config.ts` 和多篇链接页面仍缺失。 |
 | 远程 GitHub CI | 待验证 | workflow 已补 Backend/Web/Canvas Agent 门禁，但尚未 push/PR 触发。 |
 | Canvas Agent Windows 进程清理测试 | 当前失败，未修复 | 4 个 `dreamina-cli-process` 用例失败且遗留子进程；构建通过。按用户要求本轮只记录，不改生产进程代码。 |
 | SQLite 卷诊断权限 | 已恢复，自动防护未完成 | DB/WAL/SHM 已为服务 UID/GID 100:101、0660；以后诊断容器必须同 UID/GID。 |
 | Create 刷新后画幅回默认值 | 阶段 11 已修复 | 按用户、模型和生成方式保存 IndexedDB 草稿；Edge 确认 16:9、480P、2 秒刷新后保持。 |
 | 音频/水印控件视觉像普通方框 | 阶段 11 已修复 | 已改为明确 Switch；Edge 确认开关和“有声/无声、有水印/无水印”摘要同步。 |
-| `LogicalModelPriceSKU` 死结构 | 未修复 | 类型仍存在但未进入实际 schema/repository/service 主链。 |
+| `LogicalModelPriceSKU` 死结构 | 已在阶段 15 清理 | 类型从未进入 schema/主链，已删除；真实价格合同保持不变。 |
 | `.claude/settings.local.json` 宽泛权限 | 未修复，本地治理项 | `.claude/` 已 Git 忽略；应由用户在 Claude 环境单独收敛。 |
 
 ## 不纳入本次发布的后续项

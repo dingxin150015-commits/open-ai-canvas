@@ -226,3 +226,13 @@
 - 受限全量测试因 `taskkill` ACL 每分钟遗留子进程；精确终止仅本次测试树后在主机权限复验通过，最终测试进程为 0，运行 Backend/Web 未变化。
 - 未执行插件 cachebuster/reinstall/new-thread 验证；`codex plugin list` 在 WindowsApps ACL 下无法启动。未重建容器、操作数据库或调用外部模型。
 - 插件、Compose、测试、文档和工程记忆由本地提交 `8946917` 固化；未 push、未创建 PR、未触发远程 CI。
+
+## 2026-08-27：阶段 15 统一系统报价与部署安全收口
+
+- 将统一目录报价从仅前台逻辑模型扩展到系统渠道模型；系统模式按 channel model ID、持久能力和精确 SKU selector 构造只读账单快照，前端模型选择器改用统一端点。
+- 删除从未进入数据库表清单和读写主链的 `LogicalModelPriceSKU`，校正旧 Backend 阶段总结，明确当前 `ChannelModelPriceTier`/LogicalModel 价格边界。
+- Server Compose 的 CORS 从默认 `*` 改为显式必填；空覆盖配置失败、明确 Origin 配置通过。
+- GORM 官方 `ParameterizedQueries` 对 Raw SQL 错误路径仍可能看到预插值值；最终用包装 logger 整体隐藏 SQL 文本，同时忽略正常 not-found 并保留真实数据库错误诊断。
+- Backend 前三次门禁依次暴露错误构造函数命名、GORM Raw 边界和测试空表夹具遗漏；逐项修正后最终全量通过，没有修改运行数据库。
+- Web 459+1、TypeScript 和生产构建通过；创建 `BKP-20260827-150444-STAGE15-PREDEPLOY`，保留旧镜像后逐个更新 Backend/Web，数据卷未替换。
+- 无费用运行验证：不存在用户登录返回安全 401；报价路由鉴权返回 401；Backend 日志敏感标记、`record not found` 和 SELECT SQL 计数均为 0。未启用/定价模型或产生外部调用。

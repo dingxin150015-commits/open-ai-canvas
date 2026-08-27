@@ -47,7 +47,7 @@
 - `values` 缺失、显式空数组和通配符 `*` 的语义尚未统一。
 - 任务失败响应路径可能不记录日志，因此“后端无日志”不能证明请求未发送。
 - 阶段 14 已修复插件备用端口/Vite/可信 Origin、90 秒 MCP 超时、URL Token 旧协议和 Compose Provider 插件开关透传；插件本地安装/重载仍需在新线程中验证。
-- 文档站缺页和 Server CORS 默认值过宽仍未修复；Canvas Agent CI 门禁已在阶段 4 补入工作流，但远程尚未触发。
+- 文档站缺页仍按用户决定暂缓；Server CORS 默认通配符已在阶段 15 移除。Canvas Agent CI 门禁已在阶段 4 补入工作流，但远程尚未触发。
 - `.claude/settings.local.json` 历史上存在大量宽泛写入和破坏性授权，不应继承为 Codex 执行权限。
 
 ## 当前验证状态
@@ -105,6 +105,17 @@
 - 验证：插件合同专项 4/4、Web 签名握手/旧凭据拒绝专项 17/17、Canvas Agent 主机全量 291/291、TypeScript 构建、五份 Compose config、官方 manifest validator 和 skill validator 全部通过。
 - 受限环境首次全量运行无法执行 `taskkill`，按分钟遗留测试子进程；精确终止该测试树后改用主机权限，全量通过且最终测试进程计数 0。Backend/Web 容器保持原镜像、healthy、RestartCount=0。
 - 本阶段未重建/重启容器、未操作数据库、未调用模型或 OSS。`codex plugin list` 因 WindowsApps ACL 即使主机权限仍无法启动，未执行 cachebuster、插件重装或新线程运行验证；源码合同已完成，安装态验证待后续明确执行。
+
+## 阶段 15：统一系统报价与部署安全收口
+
+- `/api/model-catalog/quote` 现在按 `frontendModels` 开关同时支持前台逻辑模型和系统渠道模型；系统模式按 channel model ID、持久能力合同和精确 `ChannelModelPriceTier` selector 报价，复用任务账务倍率/Token 估算，但不写账务或冻结积分。
+- Web 模型选择器统一调用目录报价端点；前台目录使用 logical model ID，系统目录使用 channel model ID，不再只对前台投影模型请求报价。
+- 生产 Server Compose 不再默认 `CANVAS_CORS_ORIGINS=*`，空值会使配置展开失败，必须显式提供允许的 Web Origin；本地 Compose 行为未改变。
+- 生产 GORM logger 忽略正常 `ErrRecordNotFound`，保留真实数据库错误、文件、耗时和行数，但把所有 SQL 文本替换为固定占位符，防止 Raw SQL 预插值绕过参数过滤。
+- 从未进入 schema/repository/service 的 `LogicalModelPriceSKU` 类型已删除；当前渠道规格价格真相是 `ChannelModelPriceTier`，前台 unified 价格继续使用 `LogicalModel` 与 active revision 快照。
+- 验证：Backend 隔离 Linux CGO 全量通过；Web 459/459、跨 Runtime 1/1、TypeScript 和 11,022 模块生产构建通过；Compose CORS 空值拒绝/显式 Origin 通过；运行登录失败日志中 `record not found`、SELECT SQL 和敏感测试标记均为 0。
+- 当前 Backend `e9261b627b37` / `sha256:f94f555bbdf74bda2c4b36f04ed83c7dae428045a25eab8698ed51bdfad99d9d`，Web `6a66c52b0882` / `sha256:3141706386beba3bbe4dedae77f0c4420d4ea20782266fb33f55a149a13fff83`，均 healthy、RestartCount=0、OOMKilled=false。
+- 当前运行库没有启用且定价的系统模型，因此未为了 UI 运行验证修改管理员配置；系统报价精确成功/拒绝分支由隔离 SQLite Service 测试覆盖，运行路由鉴权返回 401 而非 501。没有模型调用、OSS 上传或费用。
 
 ## 百炼官方文档与全局技能
 

@@ -1,15 +1,81 @@
 package service
 
-import "infinite-canvas/backend/internal/model"
+import (
+	"errors"
+	"strings"
+
+	"infinite-canvas/backend/internal/model"
+
+	"gorm.io/gorm"
+)
 
 // LogicalModelQuote 是创作端当前参数命中的实际供应线路报价。
 // Token 视频在上游返回真实 usage 前只能预估，创建任务仍以账务预留逻辑为准。
 type LogicalModelQuote struct {
+	ModelID            string `json:"modelId,omitempty"`
 	LogicalModelID     string `json:"logicalModelId"`
 	BillingMode        string `json:"billingMode"`
 	Quantity           int64  `json:"quantity"`
 	AmountMicrocredits int64  `json:"amountMicrocredits"`
 	Estimated          bool   `json:"estimated"`
+}
+
+// QuoteSystemChannelModel 使用与系统目录、任务 admission 和账务预留相同的
+// 渠道模型、能力与精确 SKU 价格档合同。报价只构造账单快照，不写入账务或冻结积分。
+func (s *Service) QuoteSystemChannelModel(channelModelID string, intent ModelRequestIntent) (*LogicalModelQuote, error) {
+	channelModelID = strings.TrimSpace(channelModelID)
+	if channelModelID == "" {
+		return nil, InvalidModelSelection("报价请求缺少系统渠道模型")
+	}
+	channelModel, err := s.repo.ChannelModel(channelModelID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, InvalidModelSelection("指定的模型不存在")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady {
+		return nil, InvalidModelSelection("指定的模型不可用")
+	}
+	if _, err := s.repo.SystemChannel(channelModel.ChannelID); errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, InvalidModelSelection("指定的渠道不可用")
+	} else if err != nil {
+		return nil, err
+	}
+	capability := normalizeCapability(intent.Capability)
+	if capability == "" {
+		return nil, ModelCapabilityNotSupported("报价请求缺少模型能力类型")
+	}
+	if channelModel.Capability != capability {
+		return nil, ModelCapabilityNotSupported("指定的模型不支持当前能力类型")
+	}
+	capabilitySpec, err := channelModelCapabilitySpec(*channelModel)
+	if err != nil {
+		return nil, ModelCapabilityNotSupported("指定的模型能力配置无效")
+	}
+	if match := MatchCapability(capabilitySpec, intent); !match.Matched {
+		return nil, ModelCapabilityNotSupported("指定的模型不支持当前请求：" + strings.Join(match.Reasons, "；"))
+	}
+	priceTier := channelModelPriceTierForIntent(*channelModel, intent)
+	if priceTier == nil {
+		return nil, ModelPriceNotConfigured("当前模型尚未配置所选规格的价格")
+	}
+	input := quoteInput(intent, channelModel.ModelKey)
+	quantity := billingQuantity(capability, inputConfigValue(input, "videoSeconds"))
+	if capability != "video" {
+		quantity = 1
+	}
+	order, err := s.newBillingOrderWithPriceTier("", "", "quote", channelModel.ChannelID, channelModel.ModelKey, capability, "model_quote", quantity, estimateTaskBillingTokens(input, capability), priceTier.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &LogicalModelQuote{
+		ModelID:            channelModel.ID,
+		BillingMode:        order.BillingMode,
+		Quantity:           order.Quantity,
+		AmountMicrocredits: order.AmountMicrocredits,
+		Estimated:          order.BillingMode == "token",
+	}, nil
 }
 
 func (s *Service) QuoteLogicalModel(logicalModelID string, intent ModelRequestIntent) (*LogicalModelQuote, error) {

@@ -31,7 +31,7 @@ export type PublicLogicalModel = {
     inputPriceMicrocredits: number;
     outputPriceMicrocredits: number;
     cachedPriceMicrocredits: number;
-	priceTiers: PublicLogicalModelPriceTier[];
+    priceTiers: PublicLogicalModelPriceTier[];
     legacyModelIds: string[];
     capabilitySpec: CapabilitySpec;
     capabilityProfiles: CapabilitySpec[];
@@ -40,14 +40,14 @@ export type PublicLogicalModel = {
 };
 
 export type PublicLogicalModelPriceTier = {
-	selector: Record<string, string>;
-	resolution: string;
-	videoSeconds: number;
-	billingMode: "fixed_request" | "per_second" | "token";
-	unitPriceMicrocredits: number;
-	inputTokenPriceMicrocredits: number;
-	outputTokenPriceMicrocredits: number;
-	cachedTokenPriceMicrocredits: number;
+    selector: Record<string, string>;
+    resolution: string;
+    videoSeconds: number;
+    billingMode: "fixed_request" | "per_second" | "token";
+    unitPriceMicrocredits: number;
+    inputTokenPriceMicrocredits: number;
+    outputTokenPriceMicrocredits: number;
+    cachedTokenPriceMicrocredits: number;
 };
 
 export type AdminLogicalRoute = {
@@ -113,13 +113,16 @@ export type RouteSimulationResult = {
     candidates: Array<{ routeId: string; channelModelId: string; channelModelKey: string; channelModelName: string; priority: number; weight: number; enabled: boolean; matched: boolean; blocked: boolean; inPool: boolean; reasons?: string[] }>;
 };
 
-export type LogicalModelQuote = {
-    logicalModelId: string;
+export type ModelQuote = {
+    modelId?: string;
+    logicalModelId?: string;
     billingMode: PublicLogicalModel["billingMode"];
     quantity: number;
     amountMicrocredits: number;
     estimated: boolean;
 };
+
+export type LogicalModelQuote = ModelQuote & { logicalModelId: string };
 
 export type ModelCatalogSource = "frontend" | "system";
 
@@ -168,6 +171,10 @@ export function getModelCatalog() {
 
 export function getAvailableModelCatalog(intent: ModelRequestIntent) {
     return request<ModelCatalogResponse>(apiClient.post("/model-catalog/available", intent));
+}
+
+export function quoteModelCatalog(modelId: string, intent: ModelRequestIntent, signal?: AbortSignal) {
+    return request<{ quote: ModelQuote }>(apiClient.post("/model-catalog/quote", { modelId, intent }, { signal }));
 }
 
 // 旧接口，保持兼容

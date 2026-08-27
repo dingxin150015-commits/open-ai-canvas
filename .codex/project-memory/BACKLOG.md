@@ -35,7 +35,7 @@
 - [x] 为系统渠道持久能力边界、目录/准入 fail-closed、Ready Provider payload、精确 SKU 账务和真实幂等增加测试。
 - [x] 为任务失败建立前端、handler、service、worker、provider、资源物化全链路结构化日志，并以 request/task/provider/resource ID 关联。
 - [x] 修复错误响应不记录日志或可能暴露内部错误的问题；统一稳定错误分类、retryable、requestId 和前端诊断编号。
-- [ ] 收敛 GORM 默认 `record not found` SQL 调试输出，避免生产日志噪声和未来查询参数暴露风险；不得影响数据库错误诊断。
+- [x] 收敛生产 GORM 日志：忽略正常 `record not found`，保留真实错误元数据并整体隐藏 SQL 文本，覆盖 Raw SQL 预插值边界。
 
 ## P2：插件、部署与 CI
 
@@ -44,7 +44,7 @@
 - [x] 用签名 Local Runtime 握手替代 `agentToken` 查询参数旧协议；Web 继续主动清除旧参数。
 - [x] 修复不同 Compose 对 `ENABLE_PROVIDER_PLUGINS` 的透传差异，五个 Backend 入口默认均为 false。
 - [ ] 在可调用 Codex CLI 的环境重新安装 `yingce@yingce-local`，新建线程验证插件 skill/MCP 加载和 Microsoft Edge 自动打开；当前 WindowsApps ACL 阻止 `codex plugin list`，不得伪报安装态通过。
-- [ ] 收紧 Server CORS 默认值。
+- [x] 收紧 Server CORS：生产 Server Compose 必须显式提供非空 Origin，不再默认 `*`。
 - [x] 在 CI 中增加 Canvas Agent 测试/构建，并为 Web 增加生产构建；远程 Actions 仍需提交/PR 后验证。
 - [x] 消除 Bun test 内嵌 Vite/Rolldown 的退出竞争，增加 panic guard，并用 `.bun-version` 统一本机/CI；远程 Actions 仍需提交/PR 后验证。
 - [ ] 补齐文档站缺页、路径和工具表。

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { ApiError, request } from "../src/services/api/request";
+import { quoteModelCatalog } from "../src/services/api/logical-models";
+import { ApiError, apiClient, request } from "../src/services/api/request";
 
 describe("backend API request error semantics", () => {
     test("unwraps a successful backend envelope", async () => {
@@ -58,5 +59,42 @@ describe("backend API request error semantics", () => {
         const thrown = await request(Promise.reject({ __CANCEL__: true, code: "ERR_CANCELED" })).catch((error) => error);
 
         expect(thrown).toMatchObject({ name: "AbortError", message: "请求已取消" });
+    });
+});
+
+describe("统一模型目录报价", () => {
+    test("向统一端点提交模型 ID 和完整意图", async () => {
+        const originalAdapter = apiClient.defaults.adapter;
+        apiClient.defaults.adapter = async (config) => {
+            expect(config.url).toBe("/model-catalog/quote");
+            expect(config.method).toBe("post");
+            expect(JSON.parse(String(config.data))).toEqual({
+                modelId: "channel-model-1",
+                intent: {
+                    capability: "video",
+                    operation: "text_to_video",
+                    inputs: { image: 0 },
+                    options: { vquality: "480p", videoSeconds: 2 },
+                },
+            });
+            return {
+                data: { code: 0, data: { quote: { modelId: "channel-model-1", billingMode: "per_second", quantity: 2, amountMicrocredits: 2_000_000, estimated: false } }, msg: "ok" },
+                status: 200,
+                statusText: "OK",
+                headers: {},
+                config,
+            };
+        };
+        try {
+            const result = await quoteModelCatalog("channel-model-1", {
+                capability: "video",
+                operation: "text_to_video",
+                inputs: { image: 0 },
+                options: { vquality: "480p", videoSeconds: 2 },
+            });
+            expect(result.quote).toMatchObject({ modelId: "channel-model-1", quantity: 2, amountMicrocredits: 2_000_000 });
+        } finally {
+            apiClient.defaults.adapter = originalAdapter;
+        }
     });
 });

@@ -43,6 +43,12 @@ test("all runtime Backend Compose entrypoints pass the provider plugin switch", 
     }
 });
 
+test("production server Compose requires an explicit non-wildcard CORS origin", () => {
+    const serverCompose = read("docker-compose.server.yml");
+    assert.doesNotMatch(serverCompose, /CANVAS_CORS_ORIGINS:\s+\$\{CANVAS_CORS_ORIGINS:-\*\}/);
+    assert.match(serverCompose, /CANVAS_CORS_ORIGINS:\s+\$\{CANVAS_CORS_ORIGINS:\?/);
+});
+
 test("plugin manifest and referenced files remain complete", () => {
     const manifest = JSON.parse(read("plugins/yingce/.codex-plugin/plugin.json")) as {
         name: string;
