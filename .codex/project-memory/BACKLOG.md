@@ -56,6 +56,8 @@
 - [x] 建立逐模型同步/异步、端点、输入、限制、轮询、输出和临时 URL 的检索与证据合同。
 - [x] 完成技能结构验证、项目/全局副本哈希核对和典型文本、图片、视频、语音、向量检索测试。
 - [ ] 官方文档更新时重新生成索引并审阅差异。
+- [ ] 跟进官方 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332) 的维护者回复；五项架构决策确认前，不提交支持状态 Schema、百炼 Adapter 或版本化 Manifest PR。
+- [ ] Issue #332 获认可后，按“支持状态 → Qwen Image 3.0 Pro → Wan 3.0 → Wan 2.7 → HappyHorse 1.1 → 版本化 Manifest”顺序从官方最新 main 建立独立贡献分支。
 
 ## 执行门禁
 

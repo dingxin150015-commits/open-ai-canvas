@@ -247,3 +247,10 @@
 - Web 镜像内 `index.html` 与容器 HTTP 首页哈希一致；容器 healthy、RestartCount=0、OOMKilled=false，数据卷未替换，安全日志计数正常。
 - 生成 `STAGE16_FINAL_HANDOFF.md`，保留插件安装态、文档站、远程 CI、付费模型和 Planned 模型等明确后续门禁；按用户要求停在远程 push/PR 前。
 - 最终交付报告、恢复点、Edge 人工证据和记忆清理由本地提交 `058f64b` 固化；没有远程写入。
+
+## 2026-08-27：上游百炼能力贡献设计 Issue
+
+- 只读复核官方 `main@5289bef4`、官方 `feature`、用户 Fork 和活跃 Fork；确认官方 feature 落后 main 414 个提交且独有 0，本地 main 不能整体作为 PR head。
+- 官方百炼 discovery 已列出 Qwen Image、Wan 2.7、HappyHorse 等模型，但目录发现与项目可执行状态仍无显式分层；Wan 3.0 尚未进入 discovery。
+- 用户授权后，在 `ddcat-ai/open-ai-canvas` 创建中文 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332)，正文包含支持状态、Ready 条件、数据兼容、Manifest、五项架构决策和六步 PR 拆分。
+- Issue 创建后核对为 open、作者正确、正文关键章节齐全、评论 0、无指派/里程碑。账号无官方仓库标签写权限，`enhancement` 补加被拒绝；未创建分支、PR、push 或 CI。

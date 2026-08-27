@@ -16,6 +16,8 @@
 - 用户在 2026-08-25 提供截图，确认交互式 PowerShell 中 `gh auth status` 已登录 `<authenticated-github-account>`，使用 HTTPS，具备 `gist/read:org/repo/workflow` scope。
 - 2026-08-26 已复核“无法获取拉取请求状态”：默认受限进程不能读取 Windows Keyring，因此 `gh auth status` 会把凭据显示为无效；同一工作区在主机权限下 `gh auth status` 与 `gh api user` 均成功，账号仍为 `<authenticated-github-account>`。这是执行隔离，不是 GitHub 认证再次损坏，禁止为此重写或导出 Token。
 - 官方仓库和用户 Fork 当前均无匹配的开放 PR，`ddcat-ai/open-ai-canvas` 上以 `<authenticated-github-account>:main` 为 head 的历史 PR 查询也为空。因此“无法获取 PR 状态”当前无需项目修复；后续查询必须在主机权限下显式传 `--repo`，无 PR 应显示为“未创建”，不能显示为认证失败。
+- 2026-08-27 已向官方仓库提交中文设计 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332)：百炼模型目录区分“官方已发现”和“项目可执行”。Issue 当前 open、评论 0、无指派/里程碑，等待维护者确认支持状态真相位置、非 Ready 后台行为、人工 Ready、Adapter 位置和 Manifest 维护方式；在确认前不创建数据库或 Adapter PR。
+- 创建时计划使用 `enhancement` 标签，但当前 GitHub 账号没有官方仓库加标签权限；补加操作被 GitHub 明确拒绝，Issue 保持无标签，禁止反复尝试或伪报已加标签。
 
 ## 运行与数据
 
