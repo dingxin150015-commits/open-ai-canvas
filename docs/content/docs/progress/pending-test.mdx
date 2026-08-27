@@ -1,5 +1,7 @@
 # 待测试
 
+> 本文按阶段累积保留历史验证过程。早期章节中的“尚未进入运行环境”“等待阶段 6/7/8”等状态已被后续章节替代；当前权威状态以文末阶段 16 和 `.codex/project-memory/STAGE16_FINAL_HANDOFF.md` 为准。
+
 ## 百炼官方模型发现目录
 
 阶段 1 已实现，尚未进入运行环境：
@@ -111,6 +113,8 @@ Edge 最终视觉验证已完成：视频正常播放，播放器显示 0:02，�
 阶段 14 已修复影策 Codex 插件源码合同：Vite 备用端口与精确可信 Origin、只带 `mode` 的无 Token 深链、2160 秒 MCP 超时，以及五个 Compose 入口的 `ENABLE_PROVIDER_PLUGINS` 透传。插件合同 4/4、Web 本机签名连接 17/17、Canvas Agent 主机全量 291/291、TypeScript、Compose 和官方 plugin/skill validator 均通过。未重建运行容器；安装态仍需在能调用 Codex CLI 的环境重新安装插件并新建线程验证，当前 WindowsApps ACL 阻止 `codex plugin list`，不能把源码验证写成已安装可用。
 
 阶段 15 已完成系统渠道统一报价、Web 统一报价接入、Server CORS 显式必填、生产 GORM SQL 文本隐藏和 `LogicalModelPriceSKU` 死结构清理。Backend 隔离全量、Web 459+1、TypeScript、生产构建、Compose CORS 门禁和无费用运行日志验证通过；运行数据库没有启用且定价的系统模型，因此没有改管理员配置做 UI 报价，精确成功/拒绝分支由隔离 SQLite Service 测试覆盖。阶段中未调用模型、上传 OSS 或产生费用。
+
+阶段 16 已完成最终本地发布候选验证：Backend 全量、Web 459+1、TypeScript/生产构建、Canvas Agent 主机 292/292 与构建、插件/skill、五份 Compose、数据完整性、OSS 加密、日志和 Microsoft Edge 人工只读冒烟均通过。最终恢复点为 `BKP-20260827-160505-STAGE16-FINAL`，运行容器和最终本地镜像标签已登记。远程 push/PR/Actions、插件安装态新线程、文档站、真实 Qwen/Wan/HappyHorse 调用和 Planned 模型继续作为后续项，不能写成已验证。
 
 阶段 9 已完成本地 Git 固化：Backend `64015db`、Web `62cf5d8`、构建测试 `f97adde`，最终文档和工程记忆另行提交。尚未 push、未创建 PR、未触发远程 GitHub Actions；旧问题完成度与剩余门禁以 `.codex/project-memory/STAGE9_RELEASE_HANDOFF.md` 为准。
 

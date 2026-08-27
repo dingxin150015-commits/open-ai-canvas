@@ -45,15 +45,14 @@
 
 ## 其他已确认问题
 
-- `values` 缺失、显式空数组和通配符 `*` 的语义尚未统一。
-- 任务失败响应路径可能不记录日志，因此“后端无日志”不能证明请求未发送。
+- Ready 系统模型的 missing、explicit-empty、wildcard 和错误响应/日志合同已经收口；Planned/手工模型的通用 fallback 仍须在晋升 Ready 前逐模型审计。
 - 阶段 14 已修复插件备用端口/Vite/可信 Origin、90 秒 MCP 超时、URL Token 旧协议和 Compose Provider 插件开关透传；插件本地安装/重载仍需在新线程中验证。
 - 文档站缺页仍按用户决定暂缓；Server CORS 默认通配符已在阶段 15 移除。Canvas Agent CI 门禁已在阶段 4 补入工作流，但远程尚未触发。
 - `.claude/settings.local.json` 历史上存在大量宽泛写入和破坏性授权，不应继承为 Codex 执行权限。
 
 ## 当前验证状态
 
-- Backend 隔离 Linux CGO 全量测试、Web 449/449 + 跨 Runtime 1/1、TypeScript和生产构建均通过。
+- 阶段 16 最终门禁：Backend 隔离 Linux CGO 全量、Web 459/459 + 跨 Runtime 1/1、TypeScript、11,022 模块生产构建、Canvas Agent 主机 292/292 和 TypeScript 构建均通过。
 - 阶段 10 已推翻“Canvas Agent Windows 生产进程清理失败”的旧判断：4 个失败由 Codex 受限测试进程调用 `taskkill` 时被系统拒绝访问造成；同一源码在主机权限下真实 `taskkill /T /F` 专项 12/12、Canvas Agent 全量 287/287 和 TypeScript 构建均通过。
 - 进程测试现会探测精确 Windows 进程树终止能力：受限环境用注入的直属测试子进程终止器继续验证取消、超时、输出上限和 receipt 语义，并把精确树能力明确标记为 skip；正常主机和 CI 仍执行真实生产终止器。
 - 运行数据库已迁移并完成 319 条目录拉取；重复拉取真实幂等。Backend/Web 当前运行最终候选且 healthy，数据卷保持原位。
@@ -95,7 +94,7 @@
 - 当前门禁：Backend 隔离 Linux CGO 全量测试通过；Web 主套件 458/458、跨 Runtime 1/1、TypeScript 与生产构建通过，11,022 个模块且无 Rolldown panic。
 - 无费用运行验证：未认证任务请求返回 401/authentication；畸形登录 JSON 返回安全 400/validation；合法 request ID 端到端保留，非法 ID 被替换，Backend 日志不包含测试敏感标记。
 - 当前 Backend `975ca3fa982b` / `sha256:71deebc35ad6ce81771c798dbcb45bdf68aa8d03c0092d11363993c1b4683910`，Web `5c5a8a6dd877` / `sha256:58a93110a7f7337f874d6863e417999f83b8c6949d573fccc2c3f4f343853e65`，均 healthy、RestartCount=0、OOMKilled=false。
-- 本阶段没有 Schema/目录/价格变化，没有真实模型调用、OSS 上传或费用；远程 GitHub CI 仍未触发。GORM 的既有 `record not found` SQL 调试输出仍需在后续日志治理中单独收敛，不能视为阶段 13 的业务错误响应泄露。
+- 本阶段没有 Schema/目录/价格变化，没有真实模型调用、OSS 上传或费用；远程 GitHub CI 仍未触发。阶段 13 遗留的 GORM 日志边界已由阶段 15 收口。
 
 ## 阶段 14：影策 Codex 插件与部署入口合同
 
@@ -117,6 +116,14 @@
 - 验证：Backend 隔离 Linux CGO 全量通过；Web 459/459、跨 Runtime 1/1、TypeScript 和 11,022 模块生产构建通过；Compose CORS 空值拒绝/显式 Origin 通过；运行登录失败日志中 `record not found`、SELECT SQL 和敏感测试标记均为 0。
 - 当前 Backend `e9261b627b37` / `sha256:f94f555bbdf74bda2c4b36f04ed83c7dae428045a25eab8698ed51bdfad99d9d`，Web `6a66c52b0882` / `sha256:3141706386beba3bbe4dedae77f0c4420d4ea20782266fb33f55a149a13fff83`，均 healthy、RestartCount=0、OOMKilled=false。
 - 当前运行库没有启用且定价的系统模型，因此未为了 UI 运行验证修改管理员配置；系统报价精确成功/拒绝分支由隔离 SQLite Service 测试覆盖，运行路由鉴权返回 401 而非 501。没有模型调用、OSS 上传或费用。
+
+## 阶段 16：最终本地交付
+
+- 最终全量门禁、静态格式/凭据扫描、插件/Compose 校验、运行日志、数据完整性和 Microsoft Edge 人工冒烟均通过；详细证据见 `STAGE16_FINAL_HANDOFF.md`。
+- 最终恢复点为 `BKP-20260827-160505-STAGE16-FINAL`；数据库完整性 `ok`、外键 0、60 张表、OSS 密文可恢复，ACL 仅当前用户、SYSTEM、Administrators。
+- 最终本地镜像标签为 `open-ai-canvas-backend:stage16-final-20260827-160505` 与 `open-ai-canvas-web:stage16-final-20260827-160505`，运行容器 healthy、RestartCount=0、OOMKilled=false。
+- 用户以 Microsoft Edge 截图确认首页、管理后台数据概览和创作页正常；未点击生成或改变配置。Computer Use 因无法确认 URL 两次安全停止，未使用 Chrome。
+- 阶段 16 停在本地发布边界；push、PR、远程 CI、tag 和 Release 均未执行，需单独授权。
 
 ## 百炼官方文档与全局技能
 

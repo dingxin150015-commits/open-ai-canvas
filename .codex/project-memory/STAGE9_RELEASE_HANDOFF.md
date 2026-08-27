@@ -80,7 +80,7 @@
 | Server CORS 默认 `*` | 已在阶段 15 修复 | Server Compose 对空 CORS 配置 fail closed，必须显式提供 Web Origin。 |
 | 文档站构建 | 未修复，用户已暂缓 | `docs/package.json`、`source.config.ts` 和多篇链接页面仍缺失。 |
 | 远程 GitHub CI | 待验证 | workflow 已补 Backend/Web/Canvas Agent 门禁，但尚未 push/PR 触发。 |
-| Canvas Agent Windows 进程清理测试 | 当前失败，未修复 | 4 个 `dreamina-cli-process` 用例失败且遗留子进程；构建通过。按用户要求本轮只记录，不改生产进程代码。 |
+| Canvas Agent Windows 进程清理测试 | 已在阶段 10 修复测试边界 | 主机真实进程树门禁通过；阶段 16 最终全量 292/292、测试进程残留 0。 |
 | SQLite 卷诊断权限 | 已恢复，自动防护未完成 | DB/WAL/SHM 已为服务 UID/GID 100:101、0660；以后诊断容器必须同 UID/GID。 |
 | Create 刷新后画幅回默认值 | 阶段 11 已修复 | 按用户、模型和生成方式保存 IndexedDB 草稿；Edge 确认 16:9、480P、2 秒刷新后保持。 |
 | 音频/水印控件视觉像普通方框 | 阶段 11 已修复 | 已改为明确 Switch；Edge 确认开关和“有声/无声、有水印/无水印”摘要同步。 |
@@ -89,10 +89,10 @@
 
 ## 不纳入本次发布的后续项
 
-- Qwen 图片模型 Ready 化和真实生成。
+- Qwen Image 3.0 Pro 已在阶段 12 Ready；真实付费生成仍待单独授权。
 - Wan 2.7、HappyHorse 真实付费回归。
 - 商业价格矩阵、批量启用模型和运营策略。
-- 插件协议、CORS、文档站和系统 quote 的单独修复。
+- 插件协议、CORS 和系统 quote 已在阶段 14–15 修复；文档站仍按用户决定暂缓。
 - push、创建 PR 和远程 CI；这些是外部写入，需要独立授权。
 
 ## Git 提交

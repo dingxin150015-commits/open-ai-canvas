@@ -520,3 +520,24 @@ ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Ad
 ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Administrators 具有 FullControl。旧镜像保留为 `open-ai-canvas-backend:pre-stage15-20260827-150444` 与 `open-ai-canvas-web:pre-stage15-20260827-150444`。
 
 阶段 15 最终运行 Backend `e9261b627b37` / `sha256:f94f555bbdf74bda2c4b36f04ed83c7dae428045a25eab8698ed51bdfad99d9d`，Web `6a66c52b0882` / `sha256:3141706386beba3bbe4dedae77f0c4420d4ea20782266fb33f55a149a13fff83`，均 healthy、RestartCount=0、OOMKilled=false；数据卷保持 `open-ai-canvas_backend-data`。本阶段无 Schema 或业务数据迁移，无真实模型调用和费用。
+
+## BKP-20260827-160505-STAGE16-FINAL
+
+| 字段 | 值 |
+| --- | --- |
+| 状态 | `verified`, `protected`, `final-local` |
+| 私有位置 | `<private-backup-root>\stage16-final-20260827-160505` |
+| 数据库/WAL/SHM | 2,650,112 / 4,152,992 / 32,768 bytes |
+| 数据库 SHA-256 | `A0FB0AD53CC415FFE9001062A8F9D904ECF7035D7A355E9B52BC64A85569ADF0` |
+| WAL SHA-256 | `1883A33BFCC2281A8CAEF512CF483B7721E7A203D734B4C45D97D4F2ED9BEB32` |
+| SHM SHA-256 | `D004C7A96A7A8C47F296E2B1D9749F952C650011898EA83C19A38020BE082B58` |
+| `.settings-key` SHA-256 | `E4B4B107C3060A18D65AD3AAD4E329D063A924A71CCF23EAB15B9ABF8120A6D5` |
+| 迁移标记 SHA-256 | `0435B398CEC770046D79B55E9C2E6AB06D236A7759FBB44503266E1DFEA0C8F3` |
+| 完整性 / 外键 / 表 | `ok` / 0 / 60 |
+| 业务计数 | 用户 1、会话 1、渠道 1、模型 320、任务 1、资源 1、素材 1 |
+
+ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Administrators 具有 FullControl。最终本地镜像标签为 `open-ai-canvas-backend:stage16-final-20260827-160505` 与 `open-ai-canvas-web:stage16-final-20260827-160505`。
+
+运行 Backend `e9261b627b37` / `sha256:f94f555bbdf74bda2c4b36f04ed83c7dae428045a25eab8698ed51bdfad99d9d`，Web `6a66c52b0882` / `sha256:3141706386beba3bbe4dedae77f0c4420d4ea20782266fb33f55a149a13fff83`，均 healthy、RestartCount=0、OOMKilled=false；数据卷保持 `open-ai-canvas_backend-data`。Web 镜像文件与 HTTP 首页 SHA-256 一致。
+
+这是阶段 16 本地发布候选的权威恢复点。恢复仍需用户即时批准；禁止删除卷，且数据库恢复不能撤销供应商费用或自动删除 OSS 对象。

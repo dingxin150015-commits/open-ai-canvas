@@ -31,6 +31,7 @@
 - 阶段 13 已完成统一错误分类、requestId、前端诊断编号和任务/Provider/资源安全关联日志；本地全量测试、构建、保留卷部署及无费用 401/400 运行验证通过，远程 CI 尚未触发。
 - 阶段 14 已修复影策 Codex 插件的 Vite/Origin、URL Token、长任务超时和 Compose Provider 插件开关合同；源码与主机全量验证通过，插件安装态新线程仍待验证。
 - 阶段 15 已完成系统渠道统一报价、生产 CORS fail-closed、GORM SQL 日志脱敏和未接入价格死结构清理；本地全量、部署与无费用日志验证通过。
+- 阶段 16 已完成最终本地全量门禁、恢复点、镜像标签、Microsoft Edge 人工冒烟和交付报告；当前停在远程 push/PR/CI 授权门禁。
 - 运行容器、GitHub 凭据、数据库内容和远程上游仍必须在每次操作前重新核验，不能沿用旧快照。
 - 数据、外部 API、GitHub 写入、付费生成和全局代理变更均需单独授权。
 
@@ -43,4 +44,5 @@
 - `BACKUP_REGISTRY.md`：数据库、密钥、工作树和部署基线备份的权威登记。
 - `STAGE5_RELEASE_CANDIDATE.md`：阶段 5 候选镜像、验证、迁移顺序、回滚和 NO-GO 清单。
 - `STAGE9_RELEASE_HANDOFF.md`：阶段 9 发布结果、真实验证、历史问题完成度和剩余门禁。
+- `STAGE16_FINAL_HANDOFF.md`：阶段 16 最终本地发布候选、测试、数据、镜像、回滚和远程发布门禁。
 - `MAINTENANCE.md`：记忆更新规则。

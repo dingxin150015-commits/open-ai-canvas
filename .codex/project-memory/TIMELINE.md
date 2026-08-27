@@ -237,3 +237,12 @@
 - Web 459+1、TypeScript 和生产构建通过；创建 `BKP-20260827-150444-STAGE15-PREDEPLOY`，保留旧镜像后逐个更新 Backend/Web，数据卷未替换。
 - 无费用运行验证：不存在用户登录返回安全 401；报价路由鉴权返回 401；Backend 日志敏感标记、`record not found` 和 SELECT SQL 计数均为 0。未启用/定价模型或产生外部调用。
 - 代码、测试、部署文档和工程记忆由本地提交 `f9317fa` 固化；未 push、未创建 PR、未触发远程 CI。
+
+## 2026-08-27：阶段 16 最终本地交付
+
+- 从干净的 `main@2b54c2e` 启动最终审计；gofmt、diff、私有路径和凭据启发式扫描通过。
+- Backend 隔离 Linux CGO 全量、Web 459+1、TypeScript、11,022 模块构建、Canvas Agent Windows 主机 292/292 与构建全部通过；插件/skill、五份 Compose 和 Server CORS 门禁通过。
+- Computer Use 两次因无法可靠确定 Edge URL 而安全停止，没有操作 Chrome；用户随后提供 Microsoft Edge 首页、管理后台、创作页三张截图，补齐人工只读验收。
+- 创建并验证 `BKP-20260827-160505-STAGE16-FINAL`，数据库完整性 `ok`、外键 0、60 表、OSS 密文可恢复；给当前 Backend/Web 镜像增加阶段 16 最终本地标签。
+- Web 镜像内 `index.html` 与容器 HTTP 首页哈希一致；容器 healthy、RestartCount=0、OOMKilled=false，数据卷未替换，安全日志计数正常。
+- 生成 `STAGE16_FINAL_HANDOFF.md`，保留插件安装态、文档站、远程 CI、付费模型和 Planned 模型等明确后续门禁；按用户要求停在远程 push/PR 前。
