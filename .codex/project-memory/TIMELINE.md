@@ -225,3 +225,4 @@
 - 插件合同 4/4、Web 本机签名连接 17/17、Canvas Agent 主机全量 291/291、TypeScript、官方插件/skill 校验全部通过。
 - 受限全量测试因 `taskkill` ACL 每分钟遗留子进程；精确终止仅本次测试树后在主机权限复验通过，最终测试进程为 0，运行 Backend/Web 未变化。
 - 未执行插件 cachebuster/reinstall/new-thread 验证；`codex plugin list` 在 WindowsApps ACL 下无法启动。未重建容器、操作数据库或调用外部模型。
+- 插件、Compose、测试、文档和工程记忆由本地提交 `8946917` 固化；未 push、未创建 PR、未触发远程 CI。
