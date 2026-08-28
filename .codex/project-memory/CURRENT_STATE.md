@@ -12,7 +12,7 @@
 - 阶段 9 发布固化从 `0b202a1` 开始；Backend、Web、构建测试已分别形成 `64015db`、`62cf5d8`、`f97adde` 三个本地提交，文档与工程记忆由阶段 9 最终文档提交承载。
 - 这些提交仅存在于本地 `main`，尚未 push、未创建 PR、未触发远程 GitHub Actions；本地验证结果不能替代远程 CI。
 - 阶段 0 基线记录时工作树包含 9 个已修改文件和 35 个未跟踪文件，主要是 Qwen 能力补全、前端 fallback、调试日志、项目记忆、百炼技能和交接报告。
-- `origin` 指向官方仓库 `ddcat-ai/open-ai-canvas`；`myfork` 指向用户 Fork；`upstream` 当前指向本机临时仓库，而非实时 GitHub。
+- 历史记录（阶段 2 前）：`origin` 曾指向官方仓库，`myfork` 曾指向用户 Fork，`upstream` 曾指向本机临时仓库；该命名已由阶段 2 的 `origin`/`official`/`legacy-upstream-snapshot` 规范替代，不能作为当前事实使用。
 - 用户在 2026-08-25 提供截图，确认交互式 PowerShell 中 `gh auth status` 已登录 `<authenticated-github-account>`，使用 HTTPS，具备 `gist/read:org/repo/workflow` scope。
 - 2026-08-26 已复核“无法获取拉取请求状态”：默认受限进程不能读取 Windows Keyring，因此 `gh auth status` 会把凭据显示为无效；同一工作区在主机权限下 `gh auth status` 与 `gh api user` 均成功，账号仍为 `<authenticated-github-account>`。这是执行隔离，不是 GitHub 认证再次损坏，禁止为此重写或导出 Token。
 - 官方仓库和用户 Fork 当前均无匹配的开放 PR，`ddcat-ai/open-ai-canvas` 上以 `<authenticated-github-account>:main` 为 head 的历史 PR 查询也为空。因此“无法获取 PR 状态”当前无需项目修复；后续查询必须在主机权限下显式传 `--repo`，无 PR 应显示为“未创建”，不能显示为认证失败。
@@ -24,6 +24,7 @@
 - 当前官方固定目标为 `official/main@ab89c05362394623d00c95a4899be03e5243e75a`，共同基点 `70a6640`；本地/官方独有提交为 38/49，显式冲突仍为 29 文件。旧 `913cf4b` 与 48 个官方提交结论已被本轮实时 fetch 替代。
 - 用户 fork `origin/main@11931d0`，本地 main 领先 479 个提交；当前 main 暂跟踪只读 `official/main`，未来统一在用户 fork 维护的 push/跟踪切换仍待单独批准。
 - 阶段 0-2 的计划、恢复点、remote 和实时冲突结果已由当前纯文档提交固化；阶段 3 应从干净的当前 main 创建集成分支，不回退到 `405d25a`，但功能差异分析仍以该阶段 0 起点为准。
+- 用户确认其 fork 是集成分支未来的线上归属，并批准阶段 3 按推荐方案执行：本地先创建 `codex/upstream-20260828-ab89c05`，引入固定官方 SHA 并只核对冲突；本阶段不 push，未验证代码不进入 `origin/main`。
 
 ## 运行与数据
 
