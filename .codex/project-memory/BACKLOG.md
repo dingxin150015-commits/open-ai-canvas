@@ -1,6 +1,6 @@
 # 待办与项目计划
 
-更新时间：2026-08-27
+更新时间：2026-08-28
 
 ## P0：接管与数据安全
 
@@ -56,7 +56,9 @@
 - [x] 建立逐模型同步/异步、端点、输入、限制、轮询、输出和临时 URL 的检索与证据合同。
 - [x] 完成技能结构验证、项目/全局副本哈希核对和典型文本、图片、视频、语音、向量检索测试。
 - [ ] 官方文档更新时重新生成索引并审阅差异。
-- [ ] 跟进官方 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332) 的维护者回复；五项架构决策确认前，不提交支持状态 Schema、百炼 Adapter 或版本化 Manifest PR。
+- [ ] 跟进官方 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332) 的维护者回复；2026-08-28 实时复核仍为 open/评论 0/无标签/无指派，五项架构决策确认前，不提交支持状态 Schema、百炼 Adapter 或版本化 Manifest PR。
+- [ ] Issue 提交后先等待 2–3 个工作日；若仍无维护者回复，再由用户明确授权后发送一次简洁的五项决策确认评论。禁止自动催办、重复评论或把点赞、标签、指派、交叉引用、关闭 Issue、普通贡献者回复和笼统“欢迎 PR”当成完整批准。
+- [ ] 收到回复后核对回复者的 `author_association`；只有 `OWNER`、`MEMBER` 或 `COLLABORATOR` 的明确回答才作为维护者决策。逐项记录为 `confirmed/partial/alternative_requested/rejected/superseded`，部分回答继续保持未决项 NO-GO。
 - [ ] Issue #332 获认可后，按“支持状态 → Qwen Image 3.0 Pro → Wan 3.0 → Wan 2.7 → HappyHorse 1.1 → 版本化 Manifest”顺序从官方最新 main 建立独立贡献分支。
 
 ## 执行门禁

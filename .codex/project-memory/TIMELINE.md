@@ -254,3 +254,10 @@
 - 官方百炼 discovery 已列出 Qwen Image、Wan 2.7、HappyHorse 等模型，但目录发现与项目可执行状态仍无显式分层；Wan 3.0 尚未进入 discovery。
 - 用户授权后，在 `ddcat-ai/open-ai-canvas` 创建中文 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332)，正文包含支持状态、Ready 条件、数据兼容、Manifest、五项架构决策和六步 PR 拆分。
 - Issue 创建后核对为 open、作者正确、正文关键章节齐全、评论 0、无指派/里程碑。账号无官方仓库标签写权限，`enhancement` 补加被拒绝；未创建分支、PR、push 或 CI。
+
+## 2026-08-28：Issue #332 维护者决策状态复核
+
+- 使用 `gh api` 只读检查 Issue 本体、评论和时间线；Issue 仍为 open，评论 0、标签 0、无指派/里程碑，`updated_at=2026-08-27T09:13:58Z` 与创建时间相同，五项架构决策均未获维护者回答。
+- 时间线唯一新增事件是 PR #335 的自动 `cross-referenced`。进一步读取 PR 本体、Issue comments 和 reviews，确认它属于 3D 导演台改进，作者 `echoD886` 的身份为 `CONTRIBUTOR`，无评论/Review，异常重复正文偶然出现 `#332`；该事件与百炼无关。
+- 决策状态保持 `pending`，原 NO-GO 不变：不创建支持状态 Schema、百炼 Adapter 或版本化 Manifest PR，不用标签、指派、点赞、关闭或无关交叉引用替代明确架构答复。
+- 约定后续判定：有效维护者回复需来自 `OWNER/MEMBER/COLLABORATOR`，并逐项回答五个问题或明确接受推荐方案；笼统“欢迎 PR”只算部分认可。提交后等待 2–3 个工作日，后续评论必须重新取得用户授权。

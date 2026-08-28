@@ -45,4 +45,5 @@
 - `STAGE5_RELEASE_CANDIDATE.md`：阶段 5 候选镜像、验证、迁移顺序、回滚和 NO-GO 清单。
 - `STAGE9_RELEASE_HANDOFF.md`：阶段 9 发布结果、真实验证、历史问题完成度和剩余门禁。
 - `STAGE16_FINAL_HANDOFF.md`：阶段 16 最终本地发布候选、测试、数据、镜像、回滚和远程发布门禁。
+- `UPSTREAM_BAILIAN_CONTRIBUTION.md`：上游百炼贡献的背景、Issue #332、五项架构决策、PR 拆分、测试门禁和维护者回复判定规则。
 - `MAINTENANCE.md`：记忆更新规则。
