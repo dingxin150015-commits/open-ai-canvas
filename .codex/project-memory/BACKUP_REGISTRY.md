@@ -541,3 +541,27 @@ ACL 已关闭继承并移除 `CodexSandboxUsers`；仅当前用户、SYSTEM、Ad
 运行 Backend `e9261b627b37` / `sha256:f94f555bbdf74bda2c4b36f04ed83c7dae428045a25eab8698ed51bdfad99d9d`，Web `6a66c52b0882` / `sha256:3141706386beba3bbe4dedae77f0c4420d4ea20782266fb33f55a149a13fff83`，均 healthy、RestartCount=0、OOMKilled=false；数据卷保持 `open-ai-canvas_backend-data`。Web 镜像文件与 HTTP 首页 SHA-256 一致。
 
 这是阶段 16 本地发布候选的权威恢复点。恢复仍需用户即时批准；禁止删除卷，且数据库恢复不能撤销供应商费用或自动删除 OSS 对象。
+
+## BKP-20260828-164620-UPSTREAM-PREMERGE
+
+| 字段 | 值 |
+| --- | --- |
+| 状态 | `verified`, `protected` |
+| 私有位置 | `<private-backup-root>\stage1-upstream-premerge-20260828-164620` |
+| Git 基线 | `main@405d25aec95b307144e5a3e84170bebb948ebe31`；完整 bundle 已验证，另含当前 tracked patch 与 untracked overlay |
+| 数据库/WAL/SHM | 2,678,784 / 4,152,992 / 32,768 bytes |
+| 数据库 SHA-256 | `8A9FEFB38E0478B3947F93E58DFAA8EB5967239D08CD108C099E3EF82950157B` |
+| WAL SHA-256 | `640C18769A0F39CABF4E9E844529F235386E9BFA1DBA2CCE85543885E63CD3E8` |
+| `.settings-key` SHA-256 | `E4B4B107C3060A18D65AD3AAD4E329D063A924A71CCF23EAB15B9ABF8120A6D5` |
+| 迁移标记 SHA-256 | `0435B398CEC770046D79B55E9C2E6AB06D236A7759FBB44503266E1DFEA0C8F3` |
+| 独立恢复副本 SHA-256 | `5C855996FF9F7F10C19139B0AE304CA5D4B660258ACADDED2C11B182D4E4B406` |
+| Git bundle SHA-256 | `D052B30D9C59A46CA55E0F9ADF21EB6E578A365BC66DC10771F3DCCEDF628B31` |
+| 完整性 / 外键 / 表 | 主快照与独立恢复副本均为 `ok` / 0 / 60 |
+| 业务计数 | 用户 1、会话 1、渠道 1、模型 320、任务 3、资源 5、素材 5、画布项目 1 |
+| 目录状态 | `ready=12`, `planned=308`；Provider Key、操作 JSON、文档 JSON 缺失均为 0 |
+
+ACL 仅允许当前用户、SYSTEM、Administrators；逐文件复核无额外主体。Backend 短暂 pause 复制后恢复 `running/healthy`、Paused=false、RestartCount=0、OOMKilled=false；Web 始终 `running/healthy`。数据卷未删除、未替换。
+
+当前镜像增加回滚标签：`open-ai-canvas-backend:pre-upstream-merge-20260828-164620` 与 `open-ai-canvas-web:pre-upstream-merge-20260828-164620`。阶段 16 备份仍保留，不标记删除；本恢复点因包含用户后续新增的任务、资源、素材和画布而成为本次上游合并的当前数据基线。
+
+恢复仍需用户即时批准。普通代码失败优先回滚镜像；只有确认数据迁移本身错误且再次获批时才恢复数据库、匹配 `.settings-key` 和迁移标记。禁止删除卷。

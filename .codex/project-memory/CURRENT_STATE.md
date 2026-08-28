@@ -19,8 +19,17 @@
 - 2026-08-27 已向官方仓库提交中文设计 Issue [#332](https://github.com/ddcat-ai/open-ai-canvas/issues/332)：百炼模型目录区分“官方已发现”和“项目可执行”。2026-08-28 通过 GitHub API 复核仍为 open、评论 0、无标签、无指派/里程碑，正文 `updated_at` 仍是创建时间；维护者尚未确认支持状态真相位置、非 Ready 后台行为、人工 Ready、Adapter 位置和 Manifest 维护方式。在确认前不创建支持状态 Schema、百炼 Adapter 或版本化 Manifest PR。
 - 创建时计划使用 `enhancement` 标签，但当前 GitHub 账号没有官方仓库加标签权限；补加操作被 GitHub 明确拒绝，Issue 保持无标签，禁止反复尝试或伪报已加标签。
 - Issue 时间线出现一条来自 PR [#335](https://github.com/ddcat-ai/open-ai-canvas/pull/335) 的 `cross-referenced`：该 PR 是 3D 导演台改进，作者身份为 `CONTRIBUTOR`，其重复/异常正文偶然包含 `#332`；没有百炼内容、评论或 Review，因此属于无关自动交叉引用，不能视为维护者关注、认可或决策。
+- 2026-08-28 用户批准分阶段执行官方上游增量合并；阶段 0-2 连续执行，阶段 2 后必须汇报并等待阶段 3 批准。计划和永久 NO-GO 见 `UPSTREAM_MERGE_PLAN_20260828.md`。
+- 阶段 2 已完成 remote 规范与实时 fetch：`origin` 现在指向用户 fork，`official` 指向官方仓库，原本机临时 `upstream` 已改名 `legacy-upstream-snapshot`；官方及其他非用户 remote 的 push URL 均为 `DISABLED`，默认 push remote 为 `origin`。本轮未 push。
+- 当前官方固定目标为 `official/main@ab89c05362394623d00c95a4899be03e5243e75a`，共同基点 `70a6640`；本地/官方独有提交为 38/49，显式冲突仍为 29 文件。旧 `913cf4b` 与 48 个官方提交结论已被本轮实时 fetch 替代。
+- 用户 fork `origin/main@11931d0`，本地 main 领先 479 个提交；当前 main 暂跟踪只读 `official/main`，未来统一在用户 fork 维护的 push/跟踪切换仍待单独批准。
+- 阶段 0-2 的计划、恢复点、remote 和实时冲突结果已由当前纯文档提交固化；阶段 3 应从干净的当前 main 创建集成分支，不回退到 `405d25a`，但功能差异分析仍以该阶段 0 起点为准。
 
 ## 运行与数据
+
+- 本次上游合并当前恢复基线为 `BKP-20260828-164620-UPSTREAM-PREMERGE`，状态 `verified/protected`；主快照和独立恢复副本均完整性 `ok`、外键 0、60 表，OSS 密文可解密。
+- 当前业务计数已增长为用户 1、会话 1、渠道 1、模型 320、任务 3、资源 5、素材 5、画布项目 1；这替代阶段 16 的旧业务计数作为本次合并基线。
+- Backend/Web 当前仍为阶段 16 镜像，均 running/healthy、RestartCount=0、OOMKilled=false；新增 `pre-upstream-merge-20260828-164620` 回滚标签，数据卷未删除、未替换。
 
 - 项目全程使用 Microsoft Edge 进行开发联调；用户已确认 Edge 当前完成登录。后续管理后台和 UI 检查必须显式选择 Edge，禁止使用 Chrome 或自动回退其他浏览器。
 - 2026-08-25 阶段 0 已完成一致性数据库备份与恢复验证。敏感快照位置：`<private-backup-root>\stage0-20260825-160625`；ACL 仅允许 `<current-windows-user>`、SYSTEM、Administrators。

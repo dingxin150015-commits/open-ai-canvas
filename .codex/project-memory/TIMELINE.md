@@ -261,3 +261,20 @@
 - 时间线唯一新增事件是 PR #335 的自动 `cross-referenced`。进一步读取 PR 本体、Issue comments 和 reviews，确认它属于 3D 导演台改进，作者 `echoD886` 的身份为 `CONTRIBUTOR`，无评论/Review，异常重复正文偶然出现 `#332`；该事件与百炼无关。
 - 决策状态保持 `pending`，原 NO-GO 不变：不创建支持状态 Schema、百炼 Adapter 或版本化 Manifest PR，不用标签、指派、点赞、关闭或无关交叉引用替代明确架构答复。
 - 约定后续判定：有效维护者回复需来自 `OWNER/MEMBER/COLLABORATOR`，并逐项回答五个问题或明确接受推荐方案；笼统“欢迎 PR”只算部分认可。提交后等待 2–3 个工作日，后续评论必须重新取得用户授权。
+
+## 2026-08-28：官方上游增量合并阶段 0-1
+
+- 用户批准按阶段执行合并；阶段 0-2 可连续，阶段 3 起逐阶段批准。建立 `UPSTREAM_MERGE_PLAN_20260828.md` 和会话级持久备注。
+- 冻结 `main@405d25a`、`VERSION=v1.1.4`、现有 remote 和运行镜像；Backend/Web 均 healthy、RestartCount=0、OOMKilled=false。
+- 创建 `BKP-20260828-164620-UPSTREAM-PREMERGE`：Git bundle、当前工作树 overlay、SQLite/WAL/SHM、`.settings-key`、迁移标记和独立序列化恢复副本均完成哈希与恢复验证。
+- 当前数据已从阶段 16 继续增长到任务 3、资源 5、素材 5、画布项目 1；320 模型仍为 Ready 12、Planned 308。
+- 首次副本校验发现 Docker 复制文件未正确继承 Windows 可读 ACL；仅对新备份目录逐文件授权当前用户、SYSTEM、Administrators，随后双副本验证通过。live 卷未变。
+- 给当前 Backend/Web 镜像增加 `pre-upstream-merge-20260828-164620` 标签；阶段 1 完成，可进入阶段 2。
+
+## 2026-08-28：官方上游增量合并阶段 2
+
+- 将远程规范为用户 fork `origin`、官方 `official`、本机旧快照 `legacy-upstream-snapshot`；官方、旧快照及其他人的 fork 禁止 push，默认 push remote 为用户 `origin`。
+- 只读 fetch 官方 main/feature/tags 和用户 fork。官方 main 从旧分析的 `913cf4b` 前进到 `ab89c05`；用户 fork main 仍为 `11931d0`，未 push。
+- 重新计算共同基点 `70a6640`、本地独有 38、官方独有 49、双方改动 180/504 文件、重叠 54；新 merge-tree 仍为同一 29 个显式冲突文件。
+- 官方 feature 独有 0、落后 main 427；无需合并。官方 `VERSION` 仍是 `v1.2.0-preview.1`，但 main Git 描述为 `v1.2.1-21-gab89c05`，版本文件列入语义冲突。
+- 阶段 0-2 完成；没有 merge/rebase/切换分支/push。阶段 3 等待用户批准。
