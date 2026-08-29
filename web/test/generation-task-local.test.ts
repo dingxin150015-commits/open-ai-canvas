@@ -200,6 +200,7 @@ test("task center deletion accepts only local Dreamina records", async () => {
 
     expect(compactedSource).toMatch(/\{detailTask\.provider === "dreamina-cli" \? \( <Button .*?aria-label="删除本机记录".*?onClick=\{\(\) => deleteLocalTask\(detailTask\)\}> 删除本机记录 <\/Button> \) : null\}/);
     expect(compactedSource).toContain("任务已由官方接受；删除本机记录不会取消官方任务，且本应用将不再同步该记录。已生成素材不受影响。");
+    expect(compactedSource).toContain("官方状态采用最终一致轮询；转入后台后仍会继续等待并同步官方状态。");
     expect(deleteActionSource).toContain("await deleteGenerationTask(task.id);");
 });
 
@@ -1323,6 +1324,15 @@ test("remote image video and audio references keep Backend parity without Dreami
             mode: "video" as const,
             references: { referenceVideos: [{ id: "remote-video-0001", name: "video.mp4", type: "video/mp4", url: "", storageKey: "resource:remote-video-0001" }] },
             result: { mode: "video", video: { dataUrl: "opaque://video", storageKey: "resource:remote-video-output" } },
+            operation: "reference_to_video",
+        },
+        {
+            mode: "video" as const,
+            references: {
+                referenceImages: [{ id: "remote-image-audio-image-0001", name: "reference.png", type: "image/png", dataUrl: "", storageKey: "resource:remote-image-audio-image-0001" }],
+                referenceAudios: [{ id: "remote-image-audio-audio-0001", name: "reference.mp3", type: "audio/mpeg", url: "", storageKey: "resource:remote-image-audio-audio-0001" }],
+            },
+            result: { mode: "video", video: { dataUrl: "opaque://video", storageKey: "resource:remote-image-audio-output" } },
             operation: "reference_to_video",
         },
         {

@@ -36,7 +36,9 @@ type PublicChannelModel struct {
 	ID               string                        `json:"id"`
 	ModelKey         string                        `json:"modelKey"`
 	DisplayName      string                        `json:"displayName"`
+	Icon             string                        `json:"icon"`
 	Capability       string                        `json:"capability"`
+	Protocol         model.ChannelInterfaceType    `json:"protocol"`
 	CapabilityConfig map[string]any                `json:"capabilityConfig,omitempty"`
 	PriceTiers       []PublicChannelModelPriceTier `json:"priceTiers"`
 	PricingMode      string                        `json:"pricingMode"`
@@ -110,7 +112,7 @@ func (s *Service) publicSystemChannelCatalog(intent *ModelRequestIntent) ([]Publ
 
 		publicModels := make([]PublicChannelModel, 0, len(channelModels))
 		for _, cm := range channelModels {
-			if !cm.Enabled {
+			if !cm.Enabled || cm.SupportStatus != model.ChannelModelSupportReady {
 				continue
 			}
 
@@ -144,7 +146,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 	// 转换为公开的价格档
 	publicTiers := make([]PublicChannelModelPriceTier, 0, len(priceTiers))
 	for _, tier := range priceTiers {
-		if !tier.Enabled || !tier.PriceConfigured || !ValidatePriceTierPrice(&tier) {
+		if !tier.Enabled || !tier.PriceConfigured || !ValidatePriceTierPrice(&tier, cm.Capability, cm.Protocol) {
 			continue
 		}
 		publicTiers = append(publicTiers, PublicChannelModelPriceTier{
@@ -163,7 +165,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 	// 计算价格展示
 	pricingMode, displayPrice, priceLabel := computeChannelModelPriceDisplay(cm, publicTiers)
 
-	available := len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm))
+	available := cm.SupportStatus == model.ChannelModelSupportReady && (len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm)))
 
 	// Catalog and task admission consume the same durable capability profile.
 	var capabilityConfig map[string]any
@@ -179,7 +181,9 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 		ID:               cm.ID,
 		ModelKey:         cm.ModelKey,
 		DisplayName:      cm.DisplayName,
+		Icon:             cm.Icon,
 		Capability:       cm.Capability,
+		Protocol:         cm.Protocol,
 		CapabilityConfig: capabilityConfig,
 		PriceTiers:       publicTiers,
 		PricingMode:      pricingMode,
@@ -198,9 +202,7 @@ func computeChannelModelPriceDisplay(cm *model.ChannelModel, priceTiers []Public
 	if len(priceTiers) == 1 {
 		tier := priceTiers[0]
 		price := getChannelTierDisplayPrice(tier)
-		if price > 0 {
-			return "provider", &price, ""
-		}
+		return "provider", &price, ""
 	}
 
 	// 多个价格档，显示"按渠道规格计费"

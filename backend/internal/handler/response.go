@@ -1,15 +1,11 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"sync/atomic"
-	"time"
 
 	"infinite-canvas/backend/internal/service"
 
@@ -17,38 +13,6 @@ import (
 )
 
 const internalErrorMessage = "系统处理失败，请稍后重试"
-const requestIDContextKey = "canvas_request_id"
-
-var requestIDFallbackCounter atomic.Uint64
-
-func RequestIDMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		requestID := normalizeRequestID(c.GetHeader("X-Request-ID"))
-		if requestID == "" {
-			requestID = newRequestID()
-		}
-		c.Set(requestIDContextKey, requestID)
-		c.Request.Header.Set("X-Request-ID", requestID)
-		c.Header("X-Request-ID", requestID)
-		c.Next()
-	}
-}
-
-func RequestID(c *gin.Context) string {
-	if c != nil {
-		if value, exists := c.Get(requestIDContextKey); exists {
-			if requestID := normalizeRequestID(fmt.Sprint(value)); requestID != "" {
-				return requestID
-			}
-		}
-	}
-	requestID := newRequestID()
-	if c != nil {
-		c.Set(requestIDContextKey, requestID)
-		c.Header("X-Request-ID", requestID)
-	}
-	return requestID
-}
 
 func HandleRecovery(c *gin.Context, recovered any) {
 	failInternal(c, http.StatusInternalServerError, fmt.Errorf("recovered panic type %T", recovered))
@@ -219,26 +183,4 @@ func safeClientErrorMessage(status int) string {
 	default:
 		return http.StatusText(status)
 	}
-}
-
-func normalizeRequestID(value string) string {
-	value = strings.TrimSpace(value)
-	if len(value) < 8 || len(value) > 128 {
-		return ""
-	}
-	for _, character := range value {
-		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || strings.ContainsRune("._:-", character) {
-			continue
-		}
-		return ""
-	}
-	return value
-}
-
-func newRequestID() string {
-	buffer := make([]byte, 16)
-	if _, err := rand.Read(buffer); err == nil {
-		return "req_" + hex.EncodeToString(buffer)
-	}
-	return fmt.Sprintf("req_fallback_%x_%x", time.Now().UnixNano(), requestIDFallbackCounter.Add(1))
 }

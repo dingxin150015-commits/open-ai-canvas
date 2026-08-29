@@ -18,6 +18,8 @@ ENV CGO_ENABLED=1
 ENV GOOS=linux
 ENV CANVAS_BACKEND_DATA_DIR=/tmp/open-ai-canvas-tests
 
+COPY plugin-packages/autodl-comfyui.yingce-plugin /src/plugin-packages/autodl-comfyui.yingce-plugin
+
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go test -count=1 ./...

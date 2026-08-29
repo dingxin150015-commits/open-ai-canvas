@@ -1,4 +1,5 @@
 import { defaultImageCapabilityConfig, modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, STANDARD_IMAGE_SIZE_VALUES, videoDurationAllowed, type ImageCapabilityConfig } from "@/lib/model-capabilities";
+import { videoResolutionComparisonKey } from "@/lib/video-generation-options";
 import { modelOptionName, resolveModelChannel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 export type ModelInputSummary = {
@@ -165,12 +166,7 @@ function logicalOptionMatches(name: string, constraint: { values?: unknown[]; mi
 function normalizeLogicalOptionValue(name: string, value: unknown) {
     const normalized = String(value).trim().toLowerCase();
     if (name !== "vquality" && name !== "resolution") return normalized;
-    if (normalized === "low") return "480p";
-    if (["auto", "medium", "high"].includes(normalized)) return "720p";
-    if (normalized === "2k") return "1440p";
-    if (normalized === "4k") return "2160p";
-    const resolution = normalized.replace(/p$/i, "");
-    return resolution ? `${resolution}p` : "";
+    return videoResolutionComparisonKey(normalized);
 }
 
 function logicalOptionError(name: string) {
@@ -256,7 +252,11 @@ export function resolveModelGenerationDefaults(
     const channel = resolveModelChannel(config, model);
     const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(model));
     const isManagedModel = Boolean(cost?.logicalModelId || cost?.logicalCapabilitySpec);
-    const source = (key: keyof ModelGenerationDefaults) => explicit[key] ?? (isManagedModel ? undefined : fallback[key]);
+    // A channel model capability profile is an explicit per-model contract too.
+    // The persisted global values are legacy defaults and must not override a
+    // model's configured duration, ratio, or resolution on a new canvas node.
+    const hasModelCapabilityProfile = Boolean(cost?.capabilityConfig);
+    const source = (key: keyof ModelGenerationDefaults) => explicit[key] ?? (isManagedModel || hasModelCapabilityProfile ? undefined : fallback[key]);
     const profile = modelCapabilityConfigFor(config, model);
 
     if (capability === "image" && profile.image) {
@@ -325,9 +325,9 @@ export function modelGroupReferenceLimits(config: AiConfig, selected: string, ca
 
 export function inferVideoOperation(input: ModelInputSummary) {
     const visualInputCount = input.imageCount + input.characterCount;
-    // 音频参考有独立的协议能力；不能先归类为 reference_to_video，
-    // 否则只声明 audio_to_video 的细分模型永远无法被兼容路由选中。
-    if (input.audioCount > 0) return "audio_to_video";
+    // 纯音频参考使用独立能力；音频与图片、角色或视频组合时属于全模态参考，
+    // 不能把组合请求误路由到只支持 audio_to_video 的细分模型。
+    if (input.audioCount > 0) return visualInputCount > 0 || input.videoCount > 0 ? "reference_to_video" : "audio_to_video";
     if (input.videoCount > 0 || visualInputCount > 2) return "reference_to_video";
     if (visualInputCount > 0) return "image_to_video";
     return "text_to_video";
@@ -342,7 +342,7 @@ function videoOperationLabel(operation: string) {
     if (operation === "text_to_video") return "文生视频";
     if (operation === "image_to_video") return "图生视频";
     if (operation === "audio_to_video") return "音频生视频";
-    if (operation === "reference_to_video") return "参考素材生视频";
+    if (operation === "reference_to_video") return "全模态参考";
     if (operation === "extend") return "视频续写";
     return "当前生成模式";
 }

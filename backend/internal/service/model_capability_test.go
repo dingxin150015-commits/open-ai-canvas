@@ -19,6 +19,7 @@ func TestEffectiveChannelModelCapabilityIsSharedFailClosedBoundary(t *testing.T)
 		ModelKey:              "wan3.0-video",
 		Capability:            "video",
 		Protocol:              model.ChannelInterfaceDashScopeVideo,
+		SupportStatus:         model.ChannelModelSupportReady,
 		CapabilityConfigJSON:  string(encoded),
 		BillingMode:           "fixed_request",
 		UnitPriceMicrocredits: 1,
@@ -51,6 +52,17 @@ func TestEffectiveChannelModelCapabilityIsSharedFailClosedBoundary(t *testing.T)
 				t.Fatalf("invalid public model = %#v", public)
 			}
 		})
+	}
+}
+
+func TestEffectiveAudioCapabilityAllowsDeclaredNoOptions(t *testing.T) {
+	item := &model.ChannelModel{Capability: "audio", Protocol: model.ChannelInterfaceOpenAIAudio}
+	effective, err := effectiveChannelModelCapability(item)
+	if err != nil {
+		t.Fatalf("effectiveChannelModelCapability(audio) error = %v", err)
+	}
+	if effective == nil || effective.Version != 1 || effective.Text != nil || effective.Image != nil || effective.Video != nil {
+		t.Fatalf("effective audio profile = %#v", effective)
 	}
 }
 
@@ -138,6 +150,72 @@ func TestDefaultMiniMaxVideoCapabilitySupportsReferenceGeneration(t *testing.T) 
 	}
 	if !containsCapabilityString(profile.Video.Operations, "reference_to_video") {
 		t.Fatalf("operations = %v, want reference_to_video", profile.Video.Operations)
+	}
+}
+
+func TestAgnesVideo25CapabilityUsesOfficialLimits(t *testing.T) {
+	standard := DefaultModelCapabilityConfigForModel("agnes-video", "agnes-video-2.5").Video
+	if standard.Duration.Min != 4 || standard.Duration.Max != 12 || standard.Duration.Default != 5 {
+		t.Fatalf("Agnes 2.5 duration = %#v", standard.Duration)
+	}
+	if fmt.Sprint(standard.Resolutions) != fmt.Sprint([]string{"720P", "960P", "2K"}) || standard.References.MaxVideos != 3 {
+		t.Fatalf("Agnes 2.5 capability = %#v", standard)
+	}
+	flash := DefaultModelCapabilityConfigForModel("agnes-video", "agnes-video-2.5-flash").Video
+	if fmt.Sprint(flash.Resolutions) != fmt.Sprint([]string{"720P"}) || flash.References.MaxImages != 5 || flash.References.MaxVideos != 0 {
+		t.Fatalf("Agnes 2.5 Flash capability = %#v", flash)
+	}
+}
+
+func TestNormalizeAgnesVideo25CapabilityRepairsLegacyStoredLimits(t *testing.T) {
+	legacy := DefaultModelCapabilityConfigForModel("newapi", "legacy-video")
+	normalized, err := NormalizeModelCapabilityConfigForModel("video", "agnes-video", "agnes-video-2.5", legacy)
+	if err != nil {
+		t.Fatalf("NormalizeModelCapabilityConfigForModel() error = %v", err)
+	}
+	if normalized.Video.Duration.Min != 4 || normalized.Video.Duration.Max != 12 || normalized.Video.Duration.Default != 5 {
+		t.Fatalf("normalized duration = %#v", normalized.Video.Duration)
+	}
+	if fmt.Sprint(normalized.Video.Resolutions) != fmt.Sprint([]string{"720P", "960P", "2K"}) {
+		t.Fatalf("normalized resolutions = %v", normalized.Video.Resolutions)
+	}
+	input := canvasGenerationInput{Config: providerConfig{InterfaceType: "agnes-video", Model: "agnes-video-2.5", VideoSeconds: "15", Size: "16:9", VQuality: "720P"}}
+	if err := validateVideoTask(normalized.Video, input); err == nil {
+		t.Fatalf("validateVideoTask(15 seconds) error = %v", err)
+	}
+}
+
+func TestDefaultVolcengineArkVideoCapabilitySupportsFullModalReference(t *testing.T) {
+	profile := DefaultModelCapabilityConfigForModel("volcengine-ark-video", "doubao-seedance-2-0-260128")
+	if profile == nil || profile.Video == nil {
+		t.Fatal("Volcengine Ark video profile = nil")
+	}
+	for _, operation := range []string{"reference_to_video", "audio_to_video"} {
+		if !containsCapabilityString(profile.Video.Operations, operation) {
+			t.Fatalf("operations = %v, want %s", profile.Video.Operations, operation)
+		}
+	}
+	if profile.Video.References.MaxImages != 9 || profile.Video.References.MaxVideos != 3 || profile.Video.References.MaxAudios != 3 {
+		t.Fatalf("reference limits = %#v", profile.Video.References)
+	}
+}
+
+func TestValidateVolcengineArkFullModalReferenceRejectsTextAndAudioOnly(t *testing.T) {
+	profile := DefaultModelCapabilityConfigForModel("volcengine-ark-video", "doubao-seedance-2-0-260128").Video
+	input := canvasGenerationInput{
+		Prompt:          "follow the soundtrack",
+		Config:          providerConfig{InterfaceType: "volcengine-ark-video", VideoSeconds: "6", Size: "16:9", VQuality: "720p"},
+		ReferenceAudios: []providerMedia{{URL: "https://example.com/music.mp3"}},
+		Metadata:        map[string]interface{}{"videoEditOperation": "audio_to_video"},
+	}
+	err := validateVideoTask(profile, input)
+	if err == nil || !strings.Contains(err.Error(), "文本+音频") {
+		t.Fatalf("validateVideoTask() error = %v", err)
+	}
+
+	input.ReferenceImages = []providerMedia{{URL: "https://example.com/subject.png"}}
+	if err := validateVideoTask(profile, input); err != nil {
+		t.Fatalf("validateVideoTask(full modal) error = %v", err)
 	}
 }
 

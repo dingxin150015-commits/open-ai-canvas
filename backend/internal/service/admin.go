@@ -120,6 +120,7 @@ type PublicModelChannel struct {
 type PublicChannelModelPrice struct {
 	Model                        string                     `json:"model"`
 	DisplayName                  string                     `json:"displayName"`
+	Icon                         string                     `json:"icon"`
 	Capability                   string                     `json:"capability"`
 	Protocol                     model.ChannelInterfaceType `json:"protocol"`
 	BillingMode                  string                     `json:"billingMode"`
@@ -823,15 +824,6 @@ func mergeChannelRequest(req ChannelRequest, channel model.ModelChannel) Channel
 	return req
 }
 
-func validChannelInterfaceType(value model.ChannelInterfaceType) bool {
-	switch value {
-	case model.ChannelInterfaceChatCompletion, model.ChannelInterfaceOpenAIResponse, model.ChannelInterfaceOpenAIImage, model.ChannelInterfaceGrokImage, model.ChannelInterfaceVolcengineArkImage, model.ChannelInterfaceVolcengineJiMengImage, model.ChannelInterfaceDashScopeImage, model.ChannelInterfaceDashScopeVideo, model.ChannelInterfaceGeminiImage, model.ChannelInterfaceOpenAIAudio, model.ChannelInterfaceAsyncAudio, model.ChannelInterfaceNewAPIVideo, model.ChannelInterfaceNewAPIChannel1, model.ChannelInterfaceNewAPIChannel2, model.ChannelInterfaceXAIVideo, model.ChannelInterfaceVolcengineArkVideo, model.ChannelInterfaceVolcengineJiMengVideo, model.ChannelInterfaceGeminiVeo, model.ChannelInterfaceNovitaVideo, model.ChannelInterfaceMiniMaxVideo:
-		return true
-	default:
-		return false
-	}
-}
-
 func publicChannel(channel model.ModelChannel, admin bool, channelModels []model.ChannelModel) PublicModelChannel {
 	models := make([]string, 0, len(channelModels))
 	modelCosts := make([]PublicChannelModelPrice, 0, len(channelModels))
@@ -839,15 +831,23 @@ func publicChannel(channel model.ModelChannel, admin bool, channelModels []model
 		if !item.Enabled {
 			continue
 		}
+		if !admin {
+			if item.SupportStatus != model.ChannelModelSupportReady || !HasValidPrice(&item) {
+				continue
+			}
+			if _, err := effectiveChannelModelCapability(&item); err != nil {
+				continue
+			}
+		}
 		models = append(models, item.ModelKey)
 		if item.Enabled && item.PriceConfigured {
 			capabilityConfig, decodeErr := DecodeModelCapabilityConfig(item.CapabilityConfigJSON)
 			if decodeErr == nil && capabilityConfig != nil {
-				if normalized, normalizeErr := NormalizeModelCapabilityConfig(item.Capability, string(item.Protocol), capabilityConfig); normalizeErr == nil {
+				if normalized, normalizeErr := NormalizeModelCapabilityConfigForModel(item.Capability, string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey), capabilityConfig); normalizeErr == nil {
 					capabilityConfig = normalized
 				}
 			}
-			modelCosts = append(modelCosts, PublicChannelModelPrice{Model: item.ModelKey, DisplayName: item.DisplayName, Capability: item.Capability, Protocol: item.Protocol, BillingMode: item.BillingMode, UnitPriceMicrocredits: item.UnitPriceMicrocredits, InputTokenPriceMicrocredits: item.InputTokenPriceMicrocredits, OutputTokenPriceMicrocredits: item.OutputTokenPriceMicrocredits, CachedTokenPriceMicrocredits: item.CachedTokenPriceMicrocredits, CapabilityConfig: capabilityConfig})
+			modelCosts = append(modelCosts, PublicChannelModelPrice{Model: item.ModelKey, DisplayName: item.DisplayName, Icon: item.Icon, Capability: item.Capability, Protocol: item.Protocol, BillingMode: item.BillingMode, UnitPriceMicrocredits: item.UnitPriceMicrocredits, InputTokenPriceMicrocredits: item.InputTokenPriceMicrocredits, OutputTokenPriceMicrocredits: item.OutputTokenPriceMicrocredits, CachedTokenPriceMicrocredits: item.CachedTokenPriceMicrocredits, CapabilityConfig: capabilityConfig})
 		}
 	}
 	if len(models) == 0 {

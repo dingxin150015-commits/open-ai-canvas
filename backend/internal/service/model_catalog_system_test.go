@@ -62,6 +62,21 @@ func TestPublicSystemChannelCatalogExcludesDisabledAndMarksUnpricedUnavailable(t
 			Enabled:              true,
 			PriceConfigured:      false,
 		},
+		{
+			ID:                    "planned-priced",
+			ChannelID:             channel.ID,
+			ModelKey:              "planned-video",
+			ProviderModelKey:      "planned-video",
+			DisplayName:           "Planned Video",
+			Capability:            "video",
+			Protocol:              model.ChannelInterfaceDashScopeVideo,
+			SupportStatus:         model.ChannelModelSupportPlanned,
+			CapabilityConfigJSON:  string(profile),
+			Enabled:               true,
+			PriceConfigured:       true,
+			BillingMode:           "fixed_request",
+			UnitPriceMicrocredits: 0,
+		},
 	}
 	if err := database.Create(&models).Error; err != nil {
 		t.Fatal(err)
@@ -77,7 +92,7 @@ func TestPublicSystemChannelCatalogExcludesDisabledAndMarksUnpricedUnavailable(t
 	}
 	got := catalog[0].Models[0]
 	if got.ModelKey != "unpriced-video" {
-		t.Fatalf("model = %q, disabled wan3.0-video must be omitted", got.ModelKey)
+		t.Fatalf("model = %q, disabled and non-ready models must be omitted", got.ModelKey)
 	}
 	if got.Available {
 		t.Fatal("enabled but unpriced model must remain unavailable to the creation UI")

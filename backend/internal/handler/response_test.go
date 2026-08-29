@@ -57,27 +57,32 @@ func TestFailHidesUnclassifiedClientError(t *testing.T) {
 	}
 }
 
-func TestRequestIDMiddlewareUsesOnlyValidIdentifiers(t *testing.T) {
+func TestRequestCorrelationMiddlewareGeneratesRequestIDAndAcceptsSafeTraceID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(RequestIDMiddleware())
-	router.GET("/test", func(c *gin.Context) { ok(c, gin.H{"requestId": RequestID(c)}) })
+	router.Use(RequestCorrelationMiddleware())
+	router.GET("/test", func(c *gin.Context) { ok(c, gin.H{"requestId": RequestID(c), "traceId": TraceID(c)}) })
 
 	valid := httptest.NewRecorder()
 	validRequest := httptest.NewRequest(http.MethodGet, "/test", nil)
 	validRequest.Header.Set("X-Request-ID", "client-request-123")
+	validRequest.Header.Set("X-Canvas-Trace-ID", "client-trace-123")
 	router.ServeHTTP(valid, validRequest)
-	if valid.Header().Get("X-Request-ID") != "client-request-123" || !strings.Contains(valid.Body.String(), "client-request-123") {
-		t.Fatalf("valid request id was not preserved: headers=%v body=%s", valid.Header(), valid.Body.String())
+	generated := valid.Header().Get("X-Request-ID")
+	if !strings.HasPrefix(generated, "req_") || strings.Contains(valid.Body.String(), "client-request-123") || !strings.Contains(valid.Body.String(), generated) {
+		t.Fatalf("request id was not regenerated safely: headers=%v body=%s", valid.Header(), valid.Body.String())
+	}
+	if valid.Header().Get("X-Canvas-Trace-ID") != "client-trace-123" || !strings.Contains(valid.Body.String(), "client-trace-123") {
+		t.Fatalf("safe trace id was not preserved: headers=%v body=%s", valid.Header(), valid.Body.String())
 	}
 
 	invalid := httptest.NewRecorder()
 	invalidRequest := httptest.NewRequest(http.MethodGet, "/test", nil)
 	invalidRequest.Header.Set("X-Request-ID", "Bearer secret value")
+	invalidRequest.Header.Set("X-Canvas-Trace-ID", "Bearer trace secret")
 	router.ServeHTTP(invalid, invalidRequest)
-	generated := invalid.Header().Get("X-Request-ID")
-	if !strings.HasPrefix(generated, "req_") || strings.Contains(invalid.Body.String(), "Bearer") {
-		t.Fatalf("invalid request id was accepted: headers=%v body=%s", invalid.Header(), invalid.Body.String())
+	if !strings.HasPrefix(invalid.Header().Get("X-Request-ID"), "req_") || !strings.HasPrefix(invalid.Header().Get("X-Canvas-Trace-ID"), "trace_") || strings.Contains(invalid.Body.String(), "Bearer") {
+		t.Fatalf("unsafe correlation id was accepted: headers=%v body=%s", invalid.Header(), invalid.Body.String())
 	}
 }
 

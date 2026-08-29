@@ -36,6 +36,7 @@ func TestAuthorizeCustomRelayAllowsModelsAndAgentEndpoints(t *testing.T) {
 		{method: http.MethodGet, target: "https://api.example.com/v1/models", apiFormat: "openai"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/responses", apiFormat: "openai", contentType: "application/json"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/chat/completions", apiFormat: "openai", contentType: "application/json; charset=utf-8"},
+		{method: http.MethodPost, target: "https://api.anthropic.com/v1/messages", apiFormat: "claude", contentType: "application/json"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/audio/speech", apiFormat: "openai", contentType: "application/json"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/images/edits", apiFormat: "openai", contentType: "multipart/form-data; boundary=test"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/images/edits", apiFormat: "openai", contentType: "application/json"},
@@ -66,6 +67,28 @@ func TestAuthorizeCustomRelayAllowsModelsAndAgentEndpoints(t *testing.T) {
 	}
 }
 
+func TestAuthorizeCustomRelayAllowsOnlyOfficialAgnesPollQuery(t *testing.T) {
+	target, err := url.Parse("https://apihub.agnes-ai.com/agnesapi?video_id=video-1&model_name=agnes-video-2.5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := authorizeCustomRelay(http.MethodGet, target, "openai", ""); err != nil {
+		t.Fatalf("authorizeCustomRelay() Agnes poll error = %v", err)
+	}
+	for _, raw := range []string{
+		"https://apihub.agnes-ai.com/agnesapi?video_id=video-1",
+		"https://apihub.agnes-ai.com/agnesapi?video_id=video-1&model_name=agnes-video-2.5&extra=1",
+	} {
+		invalid, parseErr := url.Parse(raw)
+		if parseErr != nil {
+			t.Fatal(parseErr)
+		}
+		if err := authorizeCustomRelay(http.MethodGet, invalid, "openai", ""); err == nil {
+			t.Fatalf("authorizeCustomRelay(%q) should fail", raw)
+		}
+	}
+}
+
 func TestAuthorizeCustomRelayRejectsArbitraryRequestsAndCredentialQueries(t *testing.T) {
 	tests := []struct {
 		method      string
@@ -77,6 +100,8 @@ func TestAuthorizeCustomRelayRejectsArbitraryRequestsAndCredentialQueries(t *tes
 		{method: http.MethodGet, target: "https://api.example.com/account", apiFormat: "openai"},
 		{method: http.MethodGet, target: "https://api.example.com/v1/models?api_key=secret", apiFormat: "openai"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/responses", apiFormat: "openai", contentType: "text/plain"},
+		{method: http.MethodPost, target: "https://api.anthropic.com/v1/messages", apiFormat: "claude", contentType: "text/plain"},
+		{method: http.MethodGet, target: "https://api.anthropic.com/v1/messages", apiFormat: "claude"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/account", apiFormat: "openai", contentType: "multipart/form-data; boundary=test"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/../account/chat/completions", apiFormat: "openai", contentType: "application/json"},
 		{method: http.MethodPost, target: "https://api.example.com/v1/models/gemini:streamGenerateContent?alt=sse&token=secret", apiFormat: "gemini", contentType: "application/json"},
@@ -142,6 +167,23 @@ func TestAuthorizeSystemProxyMiniMaxVideoCreateAndPoll(t *testing.T) {
 	}
 	if err := authorizeSystemProxy(channel, model.ChannelInterfaceMiniMaxVideo, http.MethodPost, "/v2/video_generation", "application/json", []byte(`{"model":"unapproved"}`)); err == nil {
 		t.Fatal("unapproved MiniMax model should be rejected")
+	}
+}
+
+func TestAuthorizeSystemProxyAgnesVideoCreateAndPoll(t *testing.T) {
+	channel := &model.ModelChannel{APIFormat: "openai", ModelsJSON: `["agnes-video-2.5"]`}
+	createBody := []byte(`{"model":"agnes-video-2.5","prompt":"test","mode":"text","seconds":"5","size":"720P"}`)
+	if err := authorizeSystemProxy(channel, model.ChannelInterfaceAgnesVideo, http.MethodPost, "/videos", "application/json", createBody); err != nil {
+		t.Fatalf("Agnes create authorization error = %v", err)
+	}
+	if err := authorizeSystemProxy(channel, model.ChannelInterfaceAgnesVideo, http.MethodGet, "/agnesapi", "", nil); err != nil {
+		t.Fatalf("Agnes poll authorization error = %v", err)
+	}
+	if err := authorizeSystemProxy(channel, model.ChannelInterfaceAgnesVideo, http.MethodPost, "/videos", "multipart/form-data; boundary=test", createBody); err == nil {
+		t.Fatal("expected Agnes multipart create to be rejected")
+	}
+	if err := authorizeSystemProxy(channel, model.ChannelInterfaceAgnesVideo, http.MethodGet, "/videos/task-1", "", nil); err == nil {
+		t.Fatal("expected unsupported Agnes poll path to be rejected")
 	}
 }
 

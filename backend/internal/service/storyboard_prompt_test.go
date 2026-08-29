@@ -1,8 +1,11 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 )
 
 func TestStoryboardCinematicQualityContractIncludesRequestedCountAndDuration(t *testing.T) {
@@ -21,6 +24,29 @@ func TestStoryboardCinematicQualityContractIncludesCameraLanguageGuide(t *testin
 		if !strings.Contains(contract, term) {
 			t.Fatalf("camera language guide is missing %q: %s", term, contract)
 		}
+	}
+	if !strings.Contains(contract, "1 到 12 个镜头") || !strings.Contains(contract, "所需的最少镜头数") {
+		t.Fatalf("automatic shot count contract is not bounded: %s", contract)
+	}
+}
+
+func TestStoryboardOutputTokenLimitTracksRequestedShotCount(t *testing.T) {
+	if got := storyboardOutputTokenLimit(1); got != 2800 {
+		t.Fatalf("one-shot token limit = %d, want 2800", got)
+	}
+	if got := storyboardOutputTokenLimit(10); got != 10000 {
+		t.Fatalf("ten-shot token limit = %d, want 10000", got)
+	}
+	if got := storyboardOutputTokenLimit(0); got != 12000 {
+		t.Fatalf("automatic token limit = %d, want 12000", got)
+	}
+}
+
+func TestStoryboardRepairContextRejectsInsufficientBudget(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), storyboardFinalizeReserve+storyboardMinimumRepairTime-time.Second)
+	defer cancel()
+	if _, _, err := storyboardRepairContext(ctx); err == nil {
+		t.Fatal("expected insufficient repair budget to fail")
 	}
 }
 
@@ -82,7 +108,7 @@ func TestValidateStoryboardPlanTreatsComplexityAsAdvisory(t *testing.T) {
 	}}}
 	characters := []storyboardCharacterCard{{AssetID: "a"}, {AssetID: "b"}, {AssetID: "c"}}
 
-	if err := validateStoryboardPlan(plan, 0, 0, characters); err != nil {
+	if err := validateStoryboardPlan(plan, 0, 0, characters, nil); err != nil {
 		t.Fatalf("complexity should be advisory for an otherwise valid plan: %v", err)
 	}
 }
@@ -112,13 +138,51 @@ func TestNormalizeAutomaticStoryboardDurationsPreservesLongDialogue(t *testing.T
 	}
 }
 
-func TestMatchStoryboardAssetsForShotPrioritizesCurrentCharacterCards(t *testing.T) {
+func TestResolveStoryboardAssetsUsesStableCanvasNodeIDs(t *testing.T) {
 	assets := []storyboardAsset{
 		{ID: "environment", Title: "天宫", Tags: []string{"场景:天宫"}},
 		{ID: "character-node", Title: "青莲剑仙", CharacterAssetID: "character-1", CharacterVersionID: "version-3"},
 	}
-	matched := matchStoryboardAssetsForShot(assets, agentStoryboardShot{CharacterIDs: []string{"character-1"}, AssetTags: []string{"场景:天宫"}})
-	if len(matched) != 2 || matched[0].ID != "character-node" {
-		t.Fatalf("expected current character card before optional tagged assets: %#v", matched)
+	resolved := resolveStoryboardAssets(assets, []storyboardAssetRef{{NodeID: "character-node", Role: "character", Priority: 100}, {NodeID: "environment", Role: "environment", Priority: 80}})
+	if len(resolved) != 2 || resolved[0].ID != "character-node" || resolved[1].ID != "environment" {
+		t.Fatalf("expected stable asset order from model references: %#v", resolved)
+	}
+}
+
+func TestValidateStoryboardAssetRefsRejectsInventedNodeID(t *testing.T) {
+	plan := agentStoryboardPlan{Shots: []agentStoryboardShot{{AssetRefs: []storyboardAssetRef{{NodeID: "invented", Role: "prop", Priority: 50}}}}}
+	err := validateStoryboardAssetRefs(plan, []storyboardAsset{{ID: "real", Title: "真实道具"}})
+	if err == nil || !strings.Contains(err.Error(), "不在当前画布资产目录") {
+		t.Fatalf("expected invented node id to fail, got %v", err)
+	}
+}
+
+func TestExtractStoryboardAssetsIncludesMediaAndExcludesShotOutputs(t *testing.T) {
+	snapshot := map[string]any{"nodes": []interface{}{
+		map[string]interface{}{"id": "image", "type": "image", "title": "角色参考", "metadata": map[string]interface{}{"content": "resource:image", "assetCategory": "character"}},
+		map[string]interface{}{"id": "video", "type": "video", "title": "动作参考", "metadata": map[string]interface{}{"content": "resource:video"}},
+		map[string]interface{}{"id": "audio", "type": "audio", "title": "环境声", "metadata": map[string]interface{}{"content": "resource:audio"}},
+		map[string]interface{}{"id": "output", "type": "video", "title": "旧镜头", "metadata": map[string]interface{}{"content": "resource:output", "workflowKind": "shot"}},
+	}}
+	assets := extractStoryboardAssets(snapshot)
+	if len(assets) != 3 || assets[0].ID != "image" || assets[1].ID != "video" || assets[2].ID != "audio" {
+		t.Fatalf("unexpected assets: %#v", assets)
+	}
+}
+
+func TestNormalizeStoryboardAssetsBoundsAndDeduplicatesInput(t *testing.T) {
+	assets := normalizeStoryboardAssets([]storyboardAsset{
+		{ID: " asset-1 ", Title: " 场景图 ", Type: "IMAGE", Tags: []string{"雨夜", "雨夜", strings.Repeat("长", 80)}, Prompt: strings.Repeat("镜", 700)},
+		{ID: "asset-1", Title: "重复", Type: "image"},
+		{ID: "text-1", Title: "文本", Type: "text"},
+	})
+	if len(assets) != 1 {
+		t.Fatalf("expected one normalized asset, got %#v", assets)
+	}
+	if assets[0].ID != "asset-1" || assets[0].Type != "image" || len(assets[0].Tags) != 2 {
+		t.Fatalf("unexpected normalized asset: %#v", assets[0])
+	}
+	if utf8.RuneCountInString(assets[0].Prompt) != 600 || utf8.RuneCountInString(assets[0].Tags[1]) != 64 {
+		t.Fatalf("expected bounded prompt and tag lengths: %#v", assets[0])
 	}
 }

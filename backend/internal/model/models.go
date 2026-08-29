@@ -14,6 +14,7 @@ type ChannelInterfaceType string
 type ChannelModelSupportStatus string
 type ApiCallStatus string
 type ResourceStatus string
+type ResourceDeletionStatus string
 type BillingStatus string
 type CreditLedgerType string
 type RedeemCodeStatus string
@@ -70,6 +71,7 @@ const (
 
 	ChannelInterfaceChatCompletion        ChannelInterfaceType = "chat-completion"
 	ChannelInterfaceOpenAIResponse        ChannelInterfaceType = "openai-response"
+	ChannelInterfaceClaudeAPI             ChannelInterfaceType = "claude-api"
 	ChannelInterfaceOpenAIImage           ChannelInterfaceType = "openai-image"
 	ChannelInterfaceGrokImage             ChannelInterfaceType = "grok-image"
 	ChannelInterfaceVolcengineArkImage    ChannelInterfaceType = "volcengine-ark-image"
@@ -88,6 +90,13 @@ const (
 	ChannelInterfaceDashScopeImage        ChannelInterfaceType = "dashscope-image"
 	ChannelInterfaceDashScopeVideo        ChannelInterfaceType = "dashscope-video"
 	ChannelInterfaceMiniMaxVideo          ChannelInterfaceType = "minimax-video"
+	ChannelInterfaceAgnesVideo            ChannelInterfaceType = "agnes-video"
+	ChannelInterfaceRunningHubImage       ChannelInterfaceType = "runninghub-workflow-image"
+	ChannelInterfaceRunningHubVideo       ChannelInterfaceType = "runninghub-workflow-video"
+	ChannelInterfaceRunningHubAudio       ChannelInterfaceType = "runninghub-workflow-audio"
+	ChannelInterfaceComfyBridgeImage      ChannelInterfaceType = "comfyui-bridge-image"
+	ChannelInterfaceComfyBridgeVideo      ChannelInterfaceType = "comfyui-bridge-video"
+	ChannelInterfaceComfyBridgeAudio      ChannelInterfaceType = "comfyui-bridge-audio"
 
 	ApiCallStatusSucceeded ApiCallStatus = "succeeded"
 	ApiCallStatusFailed    ApiCallStatus = "failed"
@@ -96,6 +105,9 @@ const (
 	ResourceStatusReady   ResourceStatus = "ready"
 	ResourceStatusFailed  ResourceStatus = "failed"
 	ResourceStatusDeleted ResourceStatus = "deleted"
+
+	ResourceDeletionStatusPending    ResourceDeletionStatus = "pending"
+	ResourceDeletionStatusProcessing ResourceDeletionStatus = "processing"
 
 	BillingStatusReserved  BillingStatus = "reserved"
 	BillingStatusRunning   BillingStatus = "running"

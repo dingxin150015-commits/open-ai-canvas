@@ -60,15 +60,19 @@ func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID s
 	if !hasOwnedReference {
 		return nil
 	}
-	if taskID := taskExecutionID(ctx); taskID != "" {
-		_ = s.repo.UpdateTaskProgress(taskID, "同步方舟可信素材", 36)
-	}
 	settingRecord, setting, err := s.readArkPrivateAssetSetting()
 	if err != nil {
 		return err
 	}
-	if !setting.Enabled || setting.AccessKeyID == "" || setting.AccessKeySecret == "" {
-		return errors.New("方舟可信素材库尚未配置，请由管理员在方舟素材库设置中填写启用的 IAM AK/SK")
+	automaticSyncEnabled, err := arkPrivateAssetAutomaticSyncEnabled(setting)
+	if err != nil {
+		return err
+	}
+	if !automaticSyncEnabled {
+		return nil
+	}
+	if taskID := taskExecutionID(ctx); taskID != "" {
+		_ = s.repo.UpdateTaskProgress(taskID, "同步方舟可信素材", 36)
 	}
 	for index := range input.ReferenceImages {
 		reference := &input.ReferenceImages[index]
@@ -79,7 +83,7 @@ func (s *Service) prepareArkPrivateAssetReferences(ctx context.Context, userID s
 		if resourceID == "" {
 			continue
 		}
-		resource, err := s.repo.ResourceForUser(userID, resourceID)
+		resource, err := s.Resource(userID, resourceID)
 		if err != nil {
 			return fmt.Errorf("读取方舟参考素材失败：%w", err)
 		}
@@ -106,6 +110,18 @@ func isArkPrivateAssetVideoConfig(config providerConfig) bool {
 	return config.InterfaceType == string(model.ChannelInterfaceVolcengineArkVideo) || isArkPlanVideoConfig(config)
 }
 
+func arkPrivateAssetAutomaticSyncEnabled(setting arkPrivateAssetSettingValue) (bool, error) {
+	// 可信素材同步是可选增强能力。管理员未启用时保持原始参考 URL，
+	// 继续执行常规火山方舟视频请求。
+	if !setting.Enabled {
+		return false, nil
+	}
+	if setting.AccessKeyID == "" || setting.AccessKeySecret == "" {
+		return false, errors.New("方舟可信素材库尚未配置，请由管理员在方舟素材库设置中填写启用的 IAM AK/SK")
+	}
+	return true, nil
+}
+
 func arkPrivateAssetResourceID(reference providerMedia) string {
 	if !strings.HasPrefix(reference.StorageKey, "resource:") {
 		return ""
@@ -126,7 +142,7 @@ func (s *Service) SyncResourceToArkPrivateAsset(ctx context.Context, actor *mode
 	if resourceID == "" {
 		return nil, BadAuthRequest("请选择要同步的图片素材")
 	}
-	resource, err := s.repo.ResourceForUser(actor.ID, resourceID)
+	resource, err := s.Resource(actor.ID, resourceID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, NotFound("图片素材不存在或无权访问")
 	}

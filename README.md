@@ -47,6 +47,15 @@
 | <img src="assets/user-QAyong.jpg" alt="QAyong" width="80"> | QAyong<br><sub>ID：QAyong<br>B站：QAyong</sub> | [2110491559@qq.com](mailto:2110491559@qq.com) | AI 短剧合规，资产确权 |
 | <img src="assets/user-K37ix.jpg" alt="_K37ix." width="80"> | _K37ix. | [2773843782@qq.com](mailto:2773843782@qq.com) | Making things that think |
 
+## 交流与反馈
+
+Issue 反馈、技术讨论和产品升级建议都可以在 QQ 群中沟通。群内还会不定期组织 AI 学习与培训交流会。
+
+<p align="center">
+  <img src="assets/qq.jpg" alt="影策 QQ 交流群" width="280">
+  <img src="assets/wx.jpg" alt="影策 微信交流群" width="280">
+</p>
+
 ## 当前能力
 
 - **自由画布**：项目、节点、连线、框选、缩放、小地图、撤销重做、导入导出和公开只读分享。
@@ -106,6 +115,14 @@ cd ../web
 bun install
 bun run dev
 ```
+
+Windows PowerShell 用户也可以在仓库根目录执行一键启动脚本：
+
+```powershell
+.\scripts\start-local.ps1
+```
+
+脚本会使用 `.local/project-workbench-debug` 作为后端开发数据目录，并分别打开前后端窗口。缺少 `web/node_modules` 时会自动执行 `bun install --frozen-lockfile`。详细说明见 [`本地开发`](docs/content/docs/backend/local-development.mdx)。
 
 打开 <http://localhost:3000>，注册第一个管理员账号，再在设置中配置模型渠道。前端的 Vite 配置会把 `/api` 代理到本机 `8080`。
 

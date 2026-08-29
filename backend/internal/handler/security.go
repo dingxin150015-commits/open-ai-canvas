@@ -36,7 +36,7 @@ var (
 	systemMiniMaxTaskPath      = regexp.MustCompile(`^/v2/query/video_generation/[^/]+$`)
 	openAIPostEndpoints        = map[string]bool{
 		"/responses": true, "/chat/completions": true, "/images/generations": true, "/images/edits": true,
-		"/audio/speech": true,
+		"/audio/speech": true, "/messages": true,
 	}
 )
 
@@ -61,10 +61,16 @@ func authorizeCustomRelay(method string, target *url.URL, apiFormat string, cont
 	}
 
 	apiFormat = strings.ToLower(strings.TrimSpace(apiFormat))
-	if apiFormat != "openai" && apiFormat != "gemini" {
+	if apiFormat != "openai" && apiFormat != "gemini" && apiFormat != "claude" {
 		return errors.New("自定义渠道调用格式无效")
 	}
 	if method == http.MethodGet {
+		if apiFormat == "openai" && requestPath == "/agnesapi" {
+			if len(query) == 2 && len(query["video_id"]) == 1 && len(query["model_name"]) == 1 && strings.TrimSpace(query.Get("video_id")) != "" && strings.TrimSpace(query.Get("model_name")) != "" {
+				return nil
+			}
+			return errors.New("Agnes 视频查询必须提供 video_id 和 model_name")
+		}
 		if customNovitaTaskResultPath.MatchString(requestPath) {
 			if len(query) == 1 && len(query["task_id"]) == 1 && strings.TrimSpace(query.Get("task_id")) != "" {
 				return nil
@@ -74,7 +80,7 @@ func authorizeCustomRelay(method string, target *url.URL, apiFormat string, cont
 		allowed := requestPath == "/models" || strings.HasSuffix(requestPath, "/models")
 		if apiFormat == "openai" {
 			allowed = allowed || customVideoTaskPath.MatchString(requestPath) || customXAIVideoTaskPath.MatchString(requestPath) || customVideoContentPath.MatchString(requestPath) || customArkVideoTaskPath.MatchString(requestPath) || customMiniMaxTaskPath.MatchString(requestPath)
-		} else {
+		} else if apiFormat == "gemini" {
 			allowed = allowed || customGeminiOperationPath.MatchString(requestPath)
 		}
 		if len(query) != 0 || !allowed {
@@ -94,6 +100,12 @@ func authorizeCustomRelay(method string, target *url.URL, apiFormat string, cont
 		jsonAllowed := mediaType == "application/json" && (strings.HasSuffix(requestPath, "/responses") || strings.HasSuffix(requestPath, "/chat/completions") || strings.HasSuffix(requestPath, "/images/generations") || strings.HasSuffix(requestPath, "/images/edits") || strings.HasSuffix(requestPath, "/audio/speech") || strings.HasSuffix(requestPath, "/video/generations") || strings.HasSuffix(requestPath, "/videos/generations") || strings.HasSuffix(requestPath, "/videos") || strings.HasSuffix(requestPath, "/contents/generations/tasks") || strings.HasSuffix(requestPath, "/video/create") || strings.HasSuffix(requestPath, "/v2/video_generation"))
 		if len(query) != 0 || (!multipartAllowed && !jsonAllowed) {
 			return errors.New("自定义渠道不允许访问该上游接口")
+		}
+		return nil
+	}
+	if apiFormat == "claude" {
+		if mediaType != "application/json" || !strings.HasSuffix(requestPath, "/messages") {
+			return errors.New("Claude 自定义渠道只允许 application/json 的 /messages 请求")
 		}
 		return nil
 	}
@@ -162,6 +174,23 @@ func authorizeSystemProxy(channel *model.ModelChannel, protocol model.ChannelInt
 	if method == http.MethodGet && requestPath == "/models" {
 		return nil
 	}
+	if protocol == model.ChannelInterfaceAgnesVideo {
+		if method == http.MethodGet && requestPath == "/agnesapi" {
+			return nil
+		}
+		if method != http.MethodPost || requestPath != "/videos" {
+			return errors.New("系统渠道不允许访问该上游接口")
+		}
+		mediaType, _, err := mime.ParseMediaType(contentType)
+		if err != nil || mediaType != "application/json" {
+			return errors.New("Agnes 视频生成请求必须使用 application/json")
+		}
+		modelName := proxyRequestModel(contentType, body)
+		if modelName == "" || !channelAllowsModel(channel, modelName) {
+			return errors.New("当前系统渠道未授权该模型")
+		}
+		return nil
+	}
 	if protocol == model.ChannelInterfaceMiniMaxVideo {
 		if method == http.MethodGet && systemMiniMaxTaskPath.MatchString(requestPath) {
 			return nil
@@ -209,6 +238,8 @@ func interfaceAllowsProxyPath(interfaceType model.ChannelInterfaceType, requestP
 		return requestPath == "/chat/completions"
 	case model.ChannelInterfaceOpenAIResponse:
 		return requestPath == "/responses"
+	case model.ChannelInterfaceClaudeAPI:
+		return requestPath == "/messages"
 	case model.ChannelInterfaceOpenAIImage, model.ChannelInterfaceGrokImage:
 		return requestPath == "/images/generations" || requestPath == "/images/edits"
 	case model.ChannelInterfaceVolcengineArkImage:

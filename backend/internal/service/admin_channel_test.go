@@ -84,6 +84,27 @@ func TestPublicChannelOnlyReturnsSystemHeadersToAdmin(t *testing.T) {
 	}
 }
 
+func TestPublicChannelHidesNonExecutableSystemModelsFromUsers(t *testing.T) {
+	profile, err := json.Marshal(DefaultModelCapabilityConfigForModel(string(model.ChannelInterfaceChatCompletion), "text-model"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	channel := model.ModelChannel{ID: "system-1", Scope: model.ChannelScopeSystem, Enabled: true}
+	items := []model.ChannelModel{
+		{ID: "ready-free", ModelKey: "ready-free", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, SupportStatus: model.ChannelModelSupportReady, CapabilityConfigJSON: string(profile), Enabled: true, PriceConfigured: true, BillingMode: "fixed_request"},
+		{ID: "planned-priced", ModelKey: "planned-priced", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, SupportStatus: model.ChannelModelSupportPlanned, CapabilityConfigJSON: string(profile), Enabled: true, PriceConfigured: true, BillingMode: "fixed_request"},
+		{ID: "ready-unpriced", ModelKey: "ready-unpriced", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, SupportStatus: model.ChannelModelSupportReady, CapabilityConfigJSON: string(profile), Enabled: true, PriceConfigured: false, BillingMode: "fixed_request"},
+	}
+	userView := publicChannel(channel, false, items)
+	if len(userView.Models) != 1 || userView.Models[0] != "ready-free" {
+		t.Fatalf("user models = %v, want only explicit free ready model", userView.Models)
+	}
+	adminView := publicChannel(channel, true, items)
+	if len(adminView.Models) != 3 {
+		t.Fatalf("admin models = %v, want all enabled models", adminView.Models)
+	}
+}
+
 func TestChannelFromRequestRejectsInvalidConcurrencyLimit(t *testing.T) {
 	for _, limit := range []int{0, 1000} {
 		_, err := channelFromRequest(ChannelRequest{Name: "Bad", BaseURL: "https://example.com/v1", ConcurrencyLimit: &limit}, model.ModelChannel{})
@@ -244,7 +265,7 @@ func newChannelModelTestService(t *testing.T) (*Service, *gorm.DB) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.ModelChannel{}, &model.ChannelModel{}, &model.IDSequence{}); err != nil {
+	if err := db.AutoMigrate(&model.ModelChannel{}, &model.ChannelModel{}, &model.ChannelModelPriceTier{}, &model.IDSequence{}); err != nil {
 		t.Fatal(err)
 	}
 	return &Service{repo: repository.New(db)}, db

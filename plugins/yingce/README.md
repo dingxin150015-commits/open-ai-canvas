@@ -98,3 +98,28 @@ npx -y @ddcat666/open-ai-canvas-agent
 ```
 
 手动排查时访问 `http://127.0.0.1:17371/runtime/info`，确认返回 `framefield-local-runtime` 且当前网页 Origin 已获信任；`/config` 只返回非敏感状态，不提供 token。随后打开 `<画布网页地址>/canvas?mode=new`。旧的 `agentUrl`、`agentToken` 查询参数会被网页主动移除并拒绝，不能再用于连接。
+
+## 技能库
+
+插件的 `skills/` 是可按需加载的 Codex 技能库，不需要把整套规则复制到每次对话里。安装插件后，建议新建一个 Codex 线程；Codex 会根据请求自动发现并加载对应技能：
+
+- `canvas-context`：先读语义化画布上下文、选区、连接和资源就绪状态。
+- `canvas-editing`：写入前校验真实节点 id，批量操作后复核结果。
+- `asset-aware-generation`：复用已有角色、场景、道具、风格和媒体资源创建生成流程。
+
+安装/更新流程：
+
+```bash
+cd /path/to/open-ai-canvas
+codex plugin marketplace add "$(pwd)"
+codex plugin add yingce@yingce-local
+# 更新插件后开启一个新的 Codex 对话
+```
+
+验证技能和 MCP 是否已加载，可以在新对话中直接说：
+
+```text
+读取当前画布上下文，列出可用媒体资源，并说明哪些资源可以作为生图参考。
+```
+
+如果回答没有调用 `canvas_get_context` / `canvas_get_resources`，先确认当前对话是安装插件后新建的，并检查 `codex mcp list` 中的 `yingce`。

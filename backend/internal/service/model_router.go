@@ -569,7 +569,7 @@ func (s *Service) loadRouteCatalog() (*routeCatalogSnapshot, error) {
 		cached := cachedLogicalModel{Model: item, Revision: *graph.Revision, ProductSpec: productSpec, Defaults: map[string]any{}}
 		for _, route := range graph.Routes {
 			channelModel, ok := channelModelByID[route.ChannelModelID]
-			if !ok || !channelModel.Enabled || !enabledSystemChannels[channelModel.ChannelID] {
+			if !ok || !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady || !enabledSystemChannels[channelModel.ChannelID] {
 				continue
 			}
 			if item.PricePolicy == "unified" && item.BillingMode == "token" && !supportsTokenBilling(item.Capability, channelModel.Protocol) {
@@ -657,7 +657,7 @@ func (s *Service) eligibleLogicalRoutes(routes []cachedLogicalRoute, intent Mode
 
 func channelModelHasActivePriceTier(channelModel model.ChannelModel) bool {
 	for _, tier := range channelModel.PriceTiers {
-		if tier.Enabled && tier.PriceConfigured {
+		if tier.Enabled && tier.PriceConfigured && ValidatePriceTierPrice(&tier, channelModel.Capability, channelModel.Protocol) {
 			return true
 		}
 	}
@@ -672,7 +672,7 @@ func channelModelPriceTierForIntent(channelModel model.ChannelModel, intent Mode
 	var best *model.ChannelModelPriceTier
 	for index := range channelModel.PriceTiers {
 		tier := &channelModel.PriceTiers[index]
-		if !tier.Enabled || !tier.PriceConfigured {
+		if !tier.Enabled || !tier.PriceConfigured || !ValidatePriceTierPrice(tier, channelModel.Capability, channelModel.Protocol) {
 			continue
 		}
 		matched, score := matchSKUSelector(skuSelectorForTier(*tier), selector)
@@ -693,6 +693,14 @@ func skuSelectorForIntent(intent ModelRequestIntent) map[string]string {
 	}
 	switch normalizeCapability(intent.Capability) {
 	case "video":
+		// 价格档按实际参考素材归类。供应商执行仍可使用 reference_to_video、extend
+		// 等细分操作；计价时视频参考优先归为视频生视频，其余图片参考无论数量
+		// 都归为图生视频。
+		if intent.Inputs["video"] > 0 {
+			selector["operation"] = "video_to_video"
+		} else if intent.Inputs["image"] > 0 {
+			selector["operation"] = "image_to_video"
+		}
 		if count := intent.Inputs["image"]; count > 0 {
 			selector["imageCount"] = strconv.Itoa(count)
 		}
@@ -941,7 +949,7 @@ func (s *Service) routedModelForTaskSelection(task *model.Task) (*RoutedModel, e
 	if err != nil {
 		return nil, err
 	}
-	if !channelModel.Enabled {
+	if !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady {
 		return nil, errors.New("任务使用的模型服务配置已失效")
 	}
 	if _, err := s.repo.SystemChannel(channelModel.ChannelID); err != nil {
@@ -970,7 +978,7 @@ func (s *Service) routedModelForTaskSelection(task *model.Task) (*RoutedModel, e
 	if err != nil || s.logicalRouteBlocked(cachedLogicalRoute{Route: *route, CapabilitySpec: capabilitySpec, ChannelModel: *channelModel}) {
 		return nil, errors.New("当前模型服务暂不可用")
 	}
-	if logicalModel.PricePolicy == "channel" && !channelModel.PriceConfigured {
+	if logicalModel.PricePolicy == "channel" && !HasValidPrice(channelModel) {
 		return nil, errors.New("任务使用的模型服务价格配置已失效")
 	}
 	if logicalModel.PricePolicy == "unified" && logicalModel.BillingMode == "token" && !supportsTokenBilling(logicalModel.Capability, channelModel.Protocol) {
@@ -1036,7 +1044,7 @@ func (s *Service) switchTaskToNextRoute(task *model.Task, attempts []model.Route
 	}
 	channelModelByID := make(map[string]model.ChannelModel, len(channelModels))
 	for _, channelModel := range channelModels {
-		if channelModel.Enabled && enabledSystemChannels[channelModel.ChannelID] && (logicalModel.PricePolicy != "channel" || channelModelHasActivePriceTier(channelModel)) {
+		if channelModel.Enabled && channelModel.SupportStatus == model.ChannelModelSupportReady && enabledSystemChannels[channelModel.ChannelID] && (logicalModel.PricePolicy != "channel" || channelModelHasActivePriceTier(channelModel)) {
 			channelModelByID[channelModel.ID] = channelModel
 		}
 	}
@@ -1217,7 +1225,7 @@ func (s *Service) resolveArchivedTaskRoute(task *model.Task, intent ModelRequest
 		return nil, BadAuthRequest("历史任务原模型供应线路已失效，无法重试")
 	}
 	channelModel, err := s.repo.ChannelModel(task.ChannelModelID)
-	if err != nil || !channelModel.Enabled {
+	if err != nil || !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady {
 		return nil, BadAuthRequest("历史任务原模型服务已失效，无法重试")
 	}
 	if _, err := s.repo.SystemChannel(channelModel.ChannelID); err != nil {
@@ -1239,10 +1247,14 @@ func (s *Service) resolveArchivedTaskRoute(task *model.Task, intent ModelRequest
 	if err != nil || s.logicalRouteBlocked(cachedLogicalRoute{Route: *route, CapabilitySpec: capabilitySpec, ChannelModel: *channelModel}) {
 		return nil, BadAuthRequest("历史任务原模型供应线路暂不可用，无法重试")
 	}
-	if logicalModel.PricePolicy == "channel" && !channelModel.PriceConfigured {
-		return nil, BadAuthRequest("历史任务原模型价格配置已失效，无法重试")
+	var priceTier *model.ChannelModelPriceTier
+	if logicalModel.PricePolicy == "channel" {
+		priceTier = channelModelPriceTierForIntent(*channelModel, intent)
+		if priceTier == nil {
+			return nil, BadAuthRequest("历史任务原模型价格配置已失效，无法重试")
+		}
 	}
-	return &RoutedModel{LogicalModel: *logicalModel, Revision: *revision, Route: *route, ChannelModel: *channelModel, Defaults: defaults}, nil
+	return &RoutedModel{LogicalModel: *logicalModel, Revision: *revision, Route: *route, ChannelModel: *channelModel, PriceTier: priceTier, Defaults: defaults}, nil
 }
 
 func (s *Service) finishTaskRouteAttempt(attempt *model.RouteAttempt, task *model.Task, taskErr error) {

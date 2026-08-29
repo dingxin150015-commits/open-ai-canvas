@@ -41,7 +41,8 @@
 #### 4. 完善价格有效性校验逻辑 ✅
 - 创建了 `price_validation.go` 文件
 - 实现了 `ValidateChannelModelPrice` 函数，根据 `billingMode` 校验价格字段
-- 实现了 `ComputePriceConfigured` 函数，价格标志由实际价格派生
+- `PriceConfigured` 是管理员/Provider 明确设置的持久合同，不再由价格数值推导；`ComputePriceConfigured` 已删除
+- 零价格只有在 `PriceConfigured=true` 且对应计费合同有效时才表示显式免费；默认零值保持 fail-closed
 - 实现了 `HasValidPrice` 函数，检查渠道模型是否有有效价格
 - 支持三种计费模式：`fixed_request`、`per_second`、`token`
 

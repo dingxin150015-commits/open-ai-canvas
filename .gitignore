@@ -24,6 +24,9 @@ coverage/
 dist/
 *.log
 *.tsbuildinfo
+/web/public/OpenAICanvas-ComfyBridge.exe
+/web/public/OpenAICanvas-ComfyBridge-linux-amd64
+/web/public/OpenAICanvas-ComfyBridge-linux-arm64
 *.db
 *.db-*
 *.sqlite
@@ -79,3 +82,4 @@ test-video.json
 
 # NPM lock（由团队决定是否提交）
 web/package-lock.json
+.superdesign

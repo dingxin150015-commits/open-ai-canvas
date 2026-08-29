@@ -25,6 +25,8 @@ type Service struct {
 	emailCodeMu                sync.Mutex
 	redeemBatchMu              sync.Mutex
 	storageMu                  sync.Mutex
+	storageTestMu              sync.Mutex
+	activeStorageTests         map[string]bool
 	characterTaskMu            sync.Mutex
 	activeCancels              map[string]context.CancelFunc
 	pendingStorage             map[string]int64
@@ -37,6 +39,8 @@ type Service struct {
 	sessionCreationCoordinator *sessionCreationCoordinator
 	sessionUploadCoordinator   *sessionUploadCoordinator
 	runtimeErr                 error
+	pluginRuntime              *pluginRuntime
+	pluginRuntimeErr           error
 	workerID                   string
 	routeCatalogMu             sync.RWMutex
 	routeCatalogRefreshMu      sync.Mutex
@@ -62,6 +66,8 @@ type CreateSessionRequest struct {
 	Characters     []storyboardCharacterCard `json:"characters"`
 	Config         providerConfig            `json:"config"`
 	LogicalModelID string                    `json:"logicalModelId"`
+	TraceID        string                    `json:"-"`
+	RequestID      string                    `json:"-"`
 }
 
 type CreateTaskRequest struct {
@@ -74,6 +80,8 @@ type CreateTaskRequest struct {
 	Model          string         `json:"model"`
 	LogicalModelID string         `json:"logicalModelId"`
 	Input          map[string]any `json:"input"`
+	TraceID        string         `json:"-"`
+	RequestID      string         `json:"-"`
 }
 
 type SessionDetail struct {
@@ -95,7 +103,8 @@ func New(repo *repository.Repository, dataDir string) *Service {
 
 func NewWithRuntimeCapabilities(repo *repository.Repository, dataDir string, capabilities RuntimeCapabilities) *Service {
 	coordinator, err := newRuntimeCoordinator(repo.Dialect())
-	service := &Service{repo: repo, dataDir: dataDir, runtimeCapabilities: capabilities, activeCancels: make(map[string]context.CancelFunc), coordinator: coordinator, runtimeErr: err, workerID: newID(), routeCatalogTTL: 30 * time.Second, routeCatalogMaxStale: 5 * time.Minute, routeHealthBlocked: make(map[string]time.Time)}
+	pluginRuntime, pluginRuntimeErr := newPluginRuntime(dataDir)
+	service := &Service{repo: repo, dataDir: dataDir, runtimeCapabilities: capabilities, activeStorageTests: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc), coordinator: coordinator, runtimeErr: err, pluginRuntime: pluginRuntime, pluginRuntimeErr: pluginRuntimeErr, workerID: newID(), routeCatalogTTL: 30 * time.Second, routeCatalogMaxStale: 5 * time.Minute, routeHealthBlocked: make(map[string]time.Time)}
 	service.taskBillingCoordinator = newTaskBillingCoordinator(service.repo)
 	service.taskTerminalCoordinator = newTaskTerminalCoordinator(service)
 	service.taskRouteExecutor = newTaskRouteExecutor(service)
@@ -116,6 +125,7 @@ func (s *Service) taskBilling() *taskBillingCoordinator {
 
 func (s *Service) StartWorker() {
 	s.taskWorker().start()
+	s.startResourceDeletionWorker()
 }
 
 func (s *Service) CreateSession(userID string, req CreateSessionRequest) (*SessionDetail, error) {
@@ -264,7 +274,15 @@ func stringValue(value any) string {
 }
 
 func (s *Service) log(userID string, taskID string, level string, message string, payload string) error {
-	return s.repo.Create(&model.TaskLog{ID: newID(), UserID: userID, TaskID: taskID, Level: level, Message: message, Payload: safeTaskLogPayload(payload)})
+	traceID := ""
+	requestID := ""
+	if taskID != "" {
+		if task, err := s.repo.Task(taskID); err == nil {
+			traceID = task.TraceID
+			requestID = task.RequestID
+		}
+	}
+	return s.repo.Create(&model.TaskLog{ID: newID(), UserID: userID, TaskID: taskID, TraceID: traceID, RequestID: requestID, Level: level, Message: message, Payload: safeTaskLogPayload(payload)})
 }
 
 func truncateTaskLogPayload(payload string) string {

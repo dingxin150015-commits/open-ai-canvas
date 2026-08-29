@@ -368,9 +368,9 @@ func (s *Service) buildAdminLogicalModel(item model.LogicalModel, graph *reposit
 			return nil, specErr
 		}
 		_, channelOK = systemChannelByID[channelModel.ChannelID]
-		structurallyAvailable := route.Enabled && route.Weight > 0 && channelModel.Enabled && channelOK
+		structurallyAvailable := route.Enabled && route.Weight > 0 && channelModel.Enabled && channelModel.SupportStatus == model.ChannelModelSupportReady && channelOK
 		billingAvailable := item.PricePolicy != "unified" || item.BillingMode != "token" || supportsTokenBilling(item.Capability, channelModel.Protocol)
-		available := structurallyAvailable && billingAvailable && (item.PricePolicy != "channel" || channelModel.PriceConfigured)
+		available := structurallyAvailable && billingAvailable && (item.PricePolicy != "channel" || HasValidPrice(&channelModel))
 		admin.Routes = append(admin.Routes, AdminLogicalRoute{ID: route.ID, ChannelModelID: channelModel.ID, ChannelID: channelModel.ChannelID, ChannelModelKey: channelModel.ModelKey, ChannelModelName: channelModel.DisplayName, Enabled: route.Enabled, Priority: route.Priority, Weight: route.Weight, Available: available, structurallyAvailable: structurallyAvailable, CapabilitySpec: capabilitySpec})
 	}
 	routeSpecs := make([]CapabilitySpec, 0, len(admin.Routes))
@@ -696,9 +696,6 @@ func (s *Service) logicalModelBundle(actor *model.User, id string, req LogicalMo
 		if !supportsLogicalModelTokenBilling(capability, enabledRouteProtocols) {
 			return nil, nil, nil, false, BadAuthRequest("Token 计费仅支持文本前台模型，或全部启用供应线路均为火山方舟视频协议的视频前台模型")
 		}
-		if capability == "video" && req.OutputPriceMicrocredits <= 0 {
-			return nil, nil, nil, false, BadAuthRequest("火山方舟视频 Token 计费需要配置每百万视频 Token 价格")
-		}
 	}
 	// 停用必须始终可执行，便于管理员立即阻止失效线路继续对外服务；重新启用时再强校验结构能力和计费可用性。
 	if req.Enabled {
@@ -767,6 +764,12 @@ func channelModelCapabilitySpec(channelModel model.ChannelModel) (CapabilitySpec
 	if err != nil {
 		return CapabilitySpec{}, BadAuthRequest("渠道模型能力配置无效，请先修复渠道模型")
 	}
+	if config != nil {
+		config, err = NormalizeModelCapabilityConfigForModel(normalizeCapability(channelModel.Capability), string(channelModel.Protocol), firstNonEmpty(channelModel.ProviderModelKey, channelModel.ModelKey), config)
+		if err != nil {
+			return CapabilitySpec{}, err
+		}
+	}
 	spec, err := CapabilitySpecFromModelCapabilityConfig(config, normalizeCapability(channelModel.Capability))
 	if err != nil {
 		return CapabilitySpec{}, err
@@ -826,6 +829,12 @@ func channelModelDefaultOptions(channelModel model.ChannelModel, spec Capability
 	config, err := DecodeModelCapabilityConfig(channelModel.CapabilityConfigJSON)
 	if err != nil {
 		return nil, BadAuthRequest("渠道模型能力配置无效，请先修复渠道模型")
+	}
+	if config != nil {
+		config, err = NormalizeModelCapabilityConfigForModel(normalizeCapability(channelModel.Capability), string(channelModel.Protocol), firstNonEmpty(channelModel.ProviderModelKey, channelModel.ModelKey), config)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defaults := make(map[string]any)
 	if config != nil {

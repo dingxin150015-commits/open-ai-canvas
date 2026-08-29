@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"infinite-canvas/backend/internal/model"
 )
@@ -27,7 +28,7 @@ func (s *Service) processStoryboardRowsTask(ctx context.Context, task model.Task
 	if err != nil {
 		return nil, nil, err
 	}
-	plan, assets, err := s.generateStoryboardPlan(ctx, task, input, input.ShotDuration, input.ShotCount)
+	plan, _, err := s.generateStoryboardPlan(ctx, task, input, input.ShotDuration, input.ShotCount)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,11 +45,6 @@ func (s *Service) processStoryboardRowsTask(ctx context.Context, task model.Task
 		if promptErr != nil {
 			return nil, nil, promptErr
 		}
-		matchedAssets := matchStoryboardAssets(assets, shot.AssetTags)
-		referenceNodeIDs := make([]string, 0, len(matchedAssets))
-		for _, asset := range matchedAssets {
-			referenceNodeIDs = append(referenceNodeIDs, asset.ID)
-		}
 		rows = append(rows, map[string]any{
 			"shotNumber": index + 1, "durationSeconds": shot.Duration, "plotDescription": shot.Description,
 			"dialogue": shot.Dialogue, "characters": storyboardRowCharacters(shot, input.Characters), "shotSize": shot.ShotSize, "emotion": shot.Emotion,
@@ -58,18 +54,24 @@ func (s *Service) processStoryboardRowsTask(ctx context.Context, task model.Task
 			"camera": shot.Camera, "motion": shot.Motion, "timeBeats": shot.TimeBeats, "negativePrompt": shot.Negative,
 			"narrativeIntent": shot.Intent, "viewerPOV": shot.ViewerPOV, "performanceBlocking": shot.Performance,
 			"mustHave": shot.MustHave, "optionalDetails": shot.Optional, "continuityOut": shot.ContinuityOut,
-			"referenceNodeIds": referenceNodeIDs, "assetTags": shot.AssetTags,
+			"assetBindings": shot.AssetRefs,
 		})
 	}
 	return map[string]interface{}{"title": plan.Title, "rows": rows}, nil, nil
 }
 
-const maxStoryboardRepairAttempts = 2
+const (
+	maxStoryboardRepairAttempts = 1
+	storyboardRepairMaxDuration = 4 * time.Minute
+	storyboardFinalizeReserve   = 30 * time.Second
+	storyboardMinimumRepairTime = 90 * time.Second
+)
 
 func (s *Service) repairStoryboardPlan(ctx context.Context, task model.Task, input agentStoryboardInput, config providerConfig, originalText string, validationErr error, shotDuration int, shotCount int) (agentStoryboardPlan, error) {
 	currentText := originalText
 	currentErr := validationErr
 	for attempt := 1; attempt <= maxStoryboardRepairAttempts; attempt++ {
+		_ = s.log(task.UserID, task.ID, "warn", "分镜结构校验失败", fmt.Sprintf("第 %d 次修复前：%s", attempt, currentErr.Error()))
 		if err := s.repo.UpdateTaskProgress(task.ID, "修复分镜结构", 55+attempt*10); err != nil {
 			return agentStoryboardPlan{}, fmt.Errorf("更新分镜修复进度失败，上游修复请求未发出：%w", err)
 		}
@@ -77,7 +79,12 @@ func (s *Service) repairStoryboardPlan(ctx context.Context, task model.Task, inp
 		if promptErr != nil {
 			return agentStoryboardPlan{}, promptErr
 		}
-		repaired, repairErr := runTextTask(withProviderRequestKind(ctx, "repair"), canvasGenerationInput{Mode: "text", Prompt: repairPrompt, Config: config, StreamText: true})
+		repairCtx, cancel, budgetErr := storyboardRepairContext(ctx)
+		if budgetErr != nil {
+			return agentStoryboardPlan{}, budgetErr
+		}
+		repaired, repairErr := runTextTask(withProviderRequestKind(repairCtx, "repair"), canvasGenerationInput{Mode: "text", Prompt: repairPrompt, Config: config, StreamText: true, MaxOutputTokens: storyboardOutputTokenLimit(shotCount)})
+		cancel()
 		if repairErr != nil {
 			return agentStoryboardPlan{}, fmt.Errorf("分镜结构修复失败：%w", repairErr)
 		}
@@ -85,7 +92,7 @@ func (s *Service) repairStoryboardPlan(ctx context.Context, task model.Task, inp
 		plan, parseErr := parseAgentStoryboardPlan(repairedText)
 		if parseErr == nil {
 			normalizeAutomaticStoryboardDurations(&plan, shotDuration)
-			parseErr = validateStoryboardPlan(plan, shotDuration, shotCount, input.Characters)
+			parseErr = validateStoryboardPlan(plan, shotDuration, shotCount, input.Characters, input.CanvasAssets)
 		}
 		if parseErr == nil {
 			return plan, nil
@@ -112,16 +119,18 @@ func parseStoryboardTaskInput(task model.Task, label string) (agentStoryboardInp
 }
 
 func (s *Service) generateStoryboardPlan(ctx context.Context, task model.Task, input agentStoryboardInput, shotDuration int, shotCount int) (agentStoryboardPlan, []storyboardAsset, error) {
+	ctx = withProtocolRegistry(ctx, s.protocolRegistry())
 	if !providerConfigReady(input.Config) {
 		return agentStoryboardPlan{}, nil, errors.New("请先配置可用的文本模型")
 	}
 	if err := validateStoryboardContext(input.ProjectStyle, input.Characters); err != nil {
 		return agentStoryboardPlan{}, nil, err
 	}
-	assets := input.CanvasAssets
+	assets := normalizeStoryboardAssets(input.CanvasAssets)
 	if len(assets) == 0 {
-		assets = extractStoryboardAssets(input.CanvasSnapshot)
+		assets = normalizeStoryboardAssets(extractStoryboardAssets(input.CanvasSnapshot))
 	}
+	input.CanvasAssets = assets
 	config, err := s.resolveProviderConfig(input.Config)
 	if err != nil {
 		return agentStoryboardPlan{}, nil, err
@@ -131,7 +140,7 @@ func (s *Service) generateStoryboardPlan(ctx context.Context, task model.Task, i
 	if err != nil {
 		return agentStoryboardPlan{}, nil, err
 	}
-	result, err := runTextTask(ctx, canvasGenerationInput{Mode: "text", Prompt: plannerPrompt, Config: config, StreamText: true})
+	result, err := runTextTask(ctx, canvasGenerationInput{Mode: "text", Prompt: plannerPrompt, Config: config, StreamText: true, MaxOutputTokens: storyboardOutputTokenLimit(shotCount)})
 	if err != nil {
 		return agentStoryboardPlan{}, nil, err
 	}
@@ -139,7 +148,7 @@ func (s *Service) generateStoryboardPlan(ctx context.Context, task model.Task, i
 	plan, err := parseAgentStoryboardPlan(text)
 	if err == nil {
 		normalizeAutomaticStoryboardDurations(&plan, shotDuration)
-		err = validateStoryboardPlan(plan, shotDuration, shotCount, input.Characters)
+		err = validateStoryboardPlan(plan, shotDuration, shotCount, input.Characters, assets)
 	}
 	if err != nil {
 		plan, err = s.repairStoryboardPlan(ctx, task, input, config, text, err, shotDuration, shotCount)
@@ -151,6 +160,21 @@ func (s *Service) generateStoryboardPlan(ctx context.Context, task model.Task, i
 		_ = s.log(task.UserID, task.ID, "warn", "分镜复杂度建议", complexityErr.Error())
 	}
 	return plan, assets, nil
+}
+
+func storyboardRepairContext(ctx context.Context) (context.Context, context.CancelFunc, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		repairCtx, cancel := context.WithTimeout(ctx, storyboardRepairMaxDuration)
+		return repairCtx, cancel, nil
+	}
+	remaining := time.Until(deadline)
+	if remaining <= storyboardFinalizeReserve+storyboardMinimumRepairTime {
+		return nil, nil, fmt.Errorf("分镜结构校验失败，但任务剩余时间不足以安全修复：剩余 %s", remaining.Round(time.Second))
+	}
+	repairDuration := min(storyboardRepairMaxDuration, remaining-storyboardFinalizeReserve)
+	repairCtx, cancel := context.WithTimeout(ctx, repairDuration)
+	return repairCtx, cancel, nil
 }
 
 func (s *Service) buildAgentStoryboardResult(task model.Task, plan agentStoryboardPlan, assets []storyboardAsset, projectStyle storyboardProjectStyle) (map[string]interface{}, []map[string]interface{}, error) {
@@ -177,7 +201,7 @@ func (s *Service) buildAgentStoryboardResult(task model.Task, plan agentStoryboa
 			return nil, nil, err
 		}
 		shotID := fmt.Sprintf("%s-shot-%d", prefix, index+1)
-		matchedAssets := matchStoryboardAssetsForShot(assets, shot)
+		matchedAssets := resolveStoryboardAssets(assets, shot.AssetRefs)
 		assetIDs := make([]string, 0, len(matchedAssets))
 		for _, asset := range matchedAssets {
 			assetIDs = append(assetIDs, asset.ID)
@@ -192,7 +216,7 @@ func (s *Service) buildAgentStoryboardResult(task model.Task, plan agentStoryboa
 				"prompt":                videoPrompt,
 				"composerContent":       shotComposerContent(videoPrompt, matchedAssets),
 				"videoEditOperation":    "text_to_video",
-				"assetTags":             shot.AssetTags,
+				"assetBindings":         shot.AssetRefs,
 				"referenceAssetNodeIds": assetIDs,
 				"status":                "idle",
 			}),
@@ -202,7 +226,7 @@ func (s *Service) buildAgentStoryboardResult(task model.Task, plan agentStoryboa
 		for _, asset := range matchedAssets {
 			ops = append(ops, connectOp(asset.ID, shotID))
 		}
-		resultShots = append(resultShots, map[string]any{"title": shot.Title, "description": shot.Description, "assetTags": shot.AssetTags, "referenceAssetNodeIds": assetIDs})
+		resultShots = append(resultShots, map[string]any{"title": shot.Title, "description": shot.Description, "assetBindings": shot.AssetRefs, "referenceAssetNodeIds": assetIDs})
 	}
 	ops = append(ops, map[string]any{"type": "select_nodes", "ids": shotIDs(prefix, len(plan.Shots))})
 	result := map[string]any{

@@ -2,8 +2,10 @@
 
 ## 状态
 
-- 当前阶段：阶段 3 已获用户批准，正在执行记忆一致性修正与本地集成分支引入。
-- 阶段 3 完成后必须汇报并停止；阶段 4 未获批准前不解决业务冲突。
+- 当前阶段：阶段 9 已完成；用户已批准进入阶段 10，按“两步可审计合并”创建本地 merge commit。仓库在执行前仍处于未提交合并状态。
+- 阶段 4-8 已解决全部 29 个文本冲突，当前 `git diff --name-only --diff-filter=U` 为空。
+- 本次批准仅包括先固化固定快照 `ab89c05`，再重新只读确认官方 `main` 后同步已审计的轻量提交 `115e228`；若官方已出现新的未审计代码增量，则停止并重新分析。
+- push 仍需后续单独远程写入批准。
 - 本计划不授权 push、PR、CI、tag、Release、付费调用、数据库恢复或卷删除。
 
 ## 固定起点
@@ -57,6 +59,46 @@
 
 - 阶段 3 已获批准：从干净本地 main 创建 `codex/upstream-20260828-ab89c05`，以 `--no-commit --no-ff` 引入固定官方 `ab89c05`，只核对真实冲突，不解决业务冲突、不 push。
 - 阶段 4 及之后每个阶段独立汇报、独立批准。
+
+### 阶段 7 已确认结果
+
+- 分支仍为 `codex/upstream-20260828-ab89c05`，`HEAD=03604df`，`MERGE_HEAD=ab89c05`；无 merge commit、无 push。
+- Web 冲突已全部解决，动态协议以 Backend Registry 为事实源；显式免费价格、系统渠道统一报价、Create 参考轨道/输出开关/按用户模型操作持久化、本地素材缺失 fail-closed 和 Logo 的 Vite/Bun 双运行时边界均保留。
+- `bun run typecheck` 通过；拆分定向测试共 41 项通过（核心 22、渠道目录 14、任务中心 2、用户同步 3），0 项失败。
+- 大测试文件合并运行曾长时间无输出；拆分到相关用例后通过。`bun install --frozen-lockfile --offline` 因长时间无进展被终止，未联网、未改锁文件；当前依赖仍足以通过类型检查和上述测试，完整安装/全量测试留在后续总门禁复核。
+- Backend/Web 运行容器保持原镜像、healthy、RestartCount=0；未重建、未部署、未操作数据卷。
+
+### 阶段 8 已确认结果
+
+- CI 工作流取并集：保留 Backend CGO、Web format/typecheck/test/build、Canvas Agent test/build，并接入官方 Director P0 Chrome E2E；本地未运行 Chrome，也未触发远程 Actions。
+- `.gitignore` 保留本地缓存、敏感材料和临时报告边界，并接纳官方 `.superdesign` 忽略项。
+- `CHANGELOG.md` 合并双方 `Unreleased`，移除未经本地发布的 `v1.2.0-preview.1` 分段；根 `VERSION` 恢复并保持 `v1.1.4`。
+- 数据库文档合并支持状态、显式免费价格、插件状态、ComfyUI Bridge 和 S3/删除 Outbox；待测文档合并本地阶段历史与官方 33 类新增功能，形成 39 个无重复二级章节。
+- 插件 README 保留签名 Local Runtime 与 URL Token 拒绝合同，同时接纳 `canvas-context`、`canvas-editing`、`asset-aware-generation` 技能说明。删除了官方旧的 URL Token 手动排查方案。
+- CI YAML 解析和必需 job/step 检查通过；Prettier、冲突标记、cached diff check 通过。插件/技能合同首次因 Windows 路径分隔符断言失败，改用 `path.basename` 后 8/8 通过。
+- Backend/Web 运行容器保持原 `open-ai-canvas-*:local` 镜像、healthy、RestartCount=0；未重建、未部署、未操作数据卷。
+- 当前没有未解决文本冲突，但仍没有 merge commit。下一阶段建议先执行完整 Backend/Web/Canvas Agent/文档与插件门禁，再由用户单独批准是否提交和推送到其 fork 集成分支。
+
+### 阶段 9 已确认结果
+
+- Backend 隔离 Linux CGO 全量首次暴露 5 个合并后门禁缺口：测试镜像未复制 AutoDL 插件制品；两个日志测试仍期待原始上游/预检错误；三个 SKU 测试夹具缺少完整显式价格合同。修复测试镜像输入、保留脱敏断言，并补齐 `PriceConfigured + BillingMode` 后，第三次全量通过。
+- Web 依赖按 `bun.lock` 恢复且锁文件未漂移。主套件首次 1061/1062，仅节点注册表测试错误地禁止插件额外节点；改为验证所有内置节点恰好有定义且全表 type 唯一后，专项 19/19、全量 1062/1062 和跨 Runtime 1/1 通过。
+- Web TypeScript 通过。生产构建首次因沙箱拒绝 Go 缓存失败；主机权限完成 Windows、Linux AMD64、Linux ARM64 三个 Comfy Bridge 制品后，使用预构建校验完成 13,482 模块 Vite 生产构建，构建耗时 8 分 36 秒。大 chunk 和插件耗时提示为警告，不是失败。
+- Canvas Agent 依赖按锁文件恢复且锁文件未漂移；主机权限全量 327/327 通过，包含 Windows 真实进程树终止、Dreamina 调度/恢复/围栏、Local Runtime、插件与技能合同；`tsc -p tsconfig.json` 通过。Windows 无符号链接权限的拒绝子项仍由 Linux CI 保留。
+- CI/Changelog/MDX/插件 README/相邻测试 Prettier 通过；gofmt、冲突标记、工作树与暂存区 diff check 通过。五份独立 Compose 与 deploy+build 叠加配置共六组只读解析通过。
+- `docs/` 仍没有独立 `package.json`，因此本阶段只有 MDX 格式和结构验证，不能宣称文档站构建通过。
+- Backend/Web 运行容器保持 `open-ai-canvas-*:local`、healthy、RestartCount=0、OOMKilled=false；测试镜像和构建产物没有部署，数据卷未操作。
+- 当前 `HEAD=03604df`、`MERGE_HEAD=ab89c05`、`VERSION=v1.1.4`、未解决冲突 0；尚未创建 merge commit、push、PR 或触发远程 CI。用户现已单独批准创建本地 merge commit；推送到 `origin/codex/upstream-20260828-ab89c05` 仍需再单独批准。
+
+### 阶段 10：两步可审计合并（已批准，执行中）
+
+1. 修正并暂存项目记忆、`BACKLOG.md` 和历史价格说明，根 `VERSION` 保持 `v1.1.4`。
+2. 为已经完成全量验证的固定官方快照 `ab89c05` 创建本地 merge commit。
+3. 使用只读远程查询重新确认官方 `main`；仅当它仍为已审计的 `115e228` 时，fetch 并创建第二个小型 merge commit。
+4. 第二步预期只包含 `README.md` 与两张赞助商图片；逐文件检查后再提交。
+5. 最后记录两个 merge commit 的精确 SHA、父提交、官方包含关系和剩余门禁；本阶段结束后停下汇报。
+
+永久边界不变：不 push、不创建 PR、不触发远程 CI、不部署、不操作数据库/卷、不调用 Provider。
 
 ## 永久 NO-GO
 

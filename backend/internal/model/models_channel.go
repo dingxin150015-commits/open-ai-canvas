@@ -32,6 +32,7 @@ type ChannelModel struct {
 	ModelKey                     string                    `json:"modelKey" gorm:"size:120;uniqueIndex:idx_channel_model_key_active,priority:2,where:deleted_at IS NULL"`
 	ProviderModelKey             string                    `json:"providerModelKey" gorm:"size:120"`
 	DisplayName                  string                    `json:"displayName" gorm:"size:160"`
+	Icon                         string                    `json:"icon" gorm:"size:80"`
 	Capability                   string                    `json:"capability" gorm:"size:32;index"`
 	Protocol                     ChannelInterfaceType      `json:"protocol" gorm:"size:32;index"`
 	SupportStatus                ChannelModelSupportStatus `json:"supportStatus" gorm:"size:24;index;not null;default:ready"`
@@ -91,6 +92,8 @@ type ChannelModelPriceTier struct {
 type ApiCallLog struct {
 	ID                  string        `json:"id" gorm:"primaryKey;size:36"`
 	UserID              string        `json:"userId" gorm:"index;size:36;index:idx_api_logs_user_created,priority:1"`
+	TraceID             string        `json:"traceId,omitempty" gorm:"index;size:96"`
+	RequestID           string        `json:"requestId,omitempty" gorm:"index;size:96"`
 	UserDisplayName     string        `json:"userDisplayName,omitempty" gorm:"-"`
 	UserAccount         string        `json:"userAccount,omitempty" gorm:"-"`
 	ChannelID           string        `json:"channelId" gorm:"index;size:36;index:idx_api_logs_channel_created,priority:1"`
