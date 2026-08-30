@@ -325,7 +325,7 @@ export function buildVideoGenerationMetadata(
     const referenceImageIds = new Set((context?.referenceImages || []).map((image) => image.id));
     // 工作流视频把已连接媒体交给字段映射处理，不再把历史首尾帧选择当成硬约束。
     // 这样旧节点切换到 RunningHub/ComfyUI 后，不会因为残留的首尾帧 ID 阻断生成。
-    const workflowVideo = node?.type === CanvasNodeType.Config && ((config?.taskWorkflowProvider === "runninghub" || config?.taskWorkflowProvider === "comfyui") || isCanvasWorkflowProvider(metadata));
+    const workflowVideo = node?.type === CanvasNodeType.Config && (config?.taskWorkflowProvider === "runninghub" || config?.taskWorkflowProvider === "comfyui" || isCanvasWorkflowProvider(metadata));
     const startFrame = workflowVideo ? undefined : requireConnectedVideoFrame(metadata?.videoStartFrameNodeId, "首帧", referenceImageIds);
     const endFrame = workflowVideo ? undefined : requireConnectedVideoFrame(metadata?.videoEndFrameNodeId, "尾帧", referenceImageIds);
     return {
@@ -401,9 +401,7 @@ export function generationWorkflowMetadata(config: AiConfig): Pick<CanvasNodeMet
 
 export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode, requirements?: ModelRequirements): AiConfig {
     // 只有独立 Config 节点读取工作流元数据；普通图片/视频/音频节点始终按基础模型生成。
-    const workflowProvider = mode !== "text" && node?.type === CanvasNodeType.Config
-        ? resolveCanvasWorkflowProvider(node.metadata) === "comfyui" ? "comfyui" : "runninghub"
-        : "model";
+    const workflowProvider = mode !== "text" && node?.type === CanvasNodeType.Config ? (resolveCanvasWorkflowProvider(node.metadata) === "comfyui" ? "comfyui" : "runninghub") : "model";
     const defaultModel = mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : mode === "audio" ? config.audioModel : config.textModel;
     const fallbackModel = mode === "image" ? defaultConfig.imageModel : mode === "video" ? defaultConfig.videoModel : mode === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
     const storedModel = resolveCanvasGenerationModel(config, node?.metadata?.model, mode);
@@ -411,18 +409,22 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
     // 先合并节点上的实时选择，再做兼容性匹配。否则路由只看到全局默认值，节点改过的时长、分辨率或布尔能力无法参与分流。
     const workflowParameters = node?.metadata?.workflowParameters || {};
     const runningHubWorkflowId = node?.metadata?.runningHubWorkflowId?.trim() || config.runningHub.workflowId.trim();
-    const selectedRunningHubWorkflow = workflowProvider === "runninghub"
-        ? config.runningHub.workflows.find((item) => item.workflowId.trim() === runningHubWorkflowId && (!node?.metadata?.runningHubWorkflowKind || (item.kind === "app" ? "app" : "workflow") === node.metadata.runningHubWorkflowKind))
-        : undefined;
+    const selectedRunningHubWorkflow =
+        workflowProvider === "runninghub"
+            ? config.runningHub.workflows.find((item) => item.workflowId.trim() === runningHubWorkflowId && (!node?.metadata?.runningHubWorkflowKind || (item.kind === "app" ? "app" : "workflow") === node.metadata.runningHubWorkflowKind))
+            : undefined;
     const comfyBridgeWorkflowId = node?.metadata?.comfyBridgeWorkflowId?.trim() || config.comfyBridge.workflowId.trim();
-    const selectedComfyBridgeWorkflow = workflowProvider === "comfyui"
-        ? config.comfyBridge.workflows.find((item) => item.workflowId.trim() === comfyBridgeWorkflowId)
-        : undefined;
-    const selectedWorkflowFields = workflowProvider === "runninghub"
-        ? selectedRunningHubWorkflow?.fields?.length ? selectedRunningHubWorkflow.fields : workflowVideoFieldsFromJson(selectedRunningHubWorkflow?.workflowJson)
-        : workflowProvider === "comfyui"
-            ? selectedComfyBridgeWorkflow?.fields?.length ? selectedComfyBridgeWorkflow.fields : workflowVideoFieldsFromJson(selectedComfyBridgeWorkflow?.workflowJson)
-            : [];
+    const selectedComfyBridgeWorkflow = workflowProvider === "comfyui" ? config.comfyBridge.workflows.find((item) => item.workflowId.trim() === comfyBridgeWorkflowId) : undefined;
+    const selectedWorkflowFields =
+        workflowProvider === "runninghub"
+            ? selectedRunningHubWorkflow?.fields?.length
+                ? selectedRunningHubWorkflow.fields
+                : workflowVideoFieldsFromJson(selectedRunningHubWorkflow?.workflowJson)
+            : workflowProvider === "comfyui"
+              ? selectedComfyBridgeWorkflow?.fields?.length
+                  ? selectedComfyBridgeWorkflow.fields
+                  : workflowVideoFieldsFromJson(selectedComfyBridgeWorkflow?.workflowJson)
+              : [];
     const workflowOutputSize = workflowProvider === "model" ? "" : workflowOutputSizeValue(selectedWorkflowFields, workflowParameters);
     const workflowParameterValue = (source: string) => {
         const value = workflowParameters[`source:${source}`];
@@ -431,12 +433,16 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
     const requestedConfig: AiConfig = {
         ...config,
         quality: node?.metadata?.quality ?? workflowParameterValue("quality") ?? config.quality ?? defaultConfig.quality,
-        size: workflowProvider === "model"
-            ? node?.metadata?.size ?? config.size ?? defaultConfig.size
-            : workflowOutputSize || node?.metadata?.size || config.size || defaultConfig.size,
+        size: workflowProvider === "model" ? (node?.metadata?.size ?? config.size ?? defaultConfig.size) : workflowOutputSize || node?.metadata?.size || config.size || defaultConfig.size,
         transparentBackground: node?.metadata?.transparentBackground ?? config.transparentBackground ?? defaultConfig.transparentBackground,
-        videoSeconds: workflowProvider === "model" ? normalizeVideoDuration(node?.metadata?.seconds ?? workflowParameterValue("videoSeconds") ?? config.videoSeconds ?? defaultConfig.videoSeconds) : String(node?.metadata?.seconds ?? workflowParameterValue("videoSeconds") ?? config.videoSeconds ?? defaultConfig.videoSeconds),
-        vquality: workflowProvider === "model" ? normalizeVideoResolution(node?.metadata?.vquality ?? workflowParameterValue("vquality") ?? config.vquality ?? defaultConfig.vquality) : String(node?.metadata?.vquality ?? workflowParameterValue("vquality") ?? config.vquality ?? defaultConfig.vquality),
+        videoSeconds:
+            workflowProvider === "model"
+                ? normalizeVideoDuration(node?.metadata?.seconds ?? workflowParameterValue("videoSeconds") ?? config.videoSeconds ?? defaultConfig.videoSeconds)
+                : String(node?.metadata?.seconds ?? workflowParameterValue("videoSeconds") ?? config.videoSeconds ?? defaultConfig.videoSeconds),
+        vquality:
+            workflowProvider === "model"
+                ? normalizeVideoResolution(node?.metadata?.vquality ?? workflowParameterValue("vquality") ?? config.vquality ?? defaultConfig.vquality)
+                : String(node?.metadata?.vquality ?? workflowParameterValue("vquality") ?? config.vquality ?? defaultConfig.vquality),
         videoGenerateAudio: node?.metadata?.generateAudio ?? config.videoGenerateAudio ?? defaultConfig.videoGenerateAudio,
         videoWatermark: node?.metadata?.watermark ?? config.videoWatermark ?? defaultConfig.videoWatermark,
         videoArkPrivateAssetUpload: node?.metadata?.arkPrivateAssetUpload ?? config.videoArkPrivateAssetUpload ?? defaultConfig.videoArkPrivateAssetUpload,
@@ -450,47 +456,71 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
     // 无 requirements 的调用（重试、媒体工具等）也按当前能力与尺寸路由到组内最低价兼容模型，
     // 避免旧 metadata.model 不支持当前尺寸导致生成时被 normalize 回退。
     const liveOptions = modelRequestOptions(requestedConfig, mode);
-    const baseRequirements = requirements?.capability
-        ? { ...requirements, options: { ...liveOptions, ...(requirements.options || {}) } }
-        : { capability: mode, options: liveOptions };
-    const model = workflowProvider === "model"
-        ? resolveCompatibleModel(config, preferredModel, imageSize ? { ...baseRequirements, imageSize } : baseRequirements) || preferredModel
-        : preferredModel;
-    const generationDefaults: Partial<ModelGenerationDefaults> = workflowProvider === "model"
-        ? resolveModelGenerationDefaults(
-              config,
-              model,
-              mode === "image" ? "image" : mode === "video" ? "video" : undefined,
-              mode === "image"
-                  ? {
-                        size: node?.metadata?.size,
-                        quality: node?.metadata?.quality,
-                        transparentBackground: node?.metadata?.transparentBackground,
-                        count: requestedConfig.count,
-                    }
-                  : {
-                        size: node?.metadata?.size,
-                        videoSeconds: node?.metadata?.seconds,
-                        vquality: node?.metadata?.vquality,
-                        videoGenerateAudio: node?.metadata?.generateAudio,
-                        videoWatermark: node?.metadata?.watermark,
-                    },
-              {
-                  size: requestedConfig.size,
-                  quality: requestedConfig.quality,
-                  transparentBackground: requestedConfig.transparentBackground,
-                  count: requestedConfig.count,
-                  videoSeconds: requestedConfig.videoSeconds,
-                  vquality: requestedConfig.vquality,
-                  videoGenerateAudio: requestedConfig.videoGenerateAudio,
-                  videoWatermark: requestedConfig.videoWatermark,
-              },
-          )
-        : {};
+    const baseRequirements = requirements?.capability ? { ...requirements, options: { ...liveOptions, ...(requirements.options || {}) } } : { capability: mode, options: liveOptions };
+    const model = workflowProvider === "model" ? resolveCompatibleModel(config, preferredModel, imageSize ? { ...baseRequirements, imageSize } : baseRequirements) || preferredModel : preferredModel;
+    const generationDefaults: Partial<ModelGenerationDefaults> =
+        workflowProvider === "model"
+            ? resolveModelGenerationDefaults(
+                  config,
+                  model,
+                  mode === "image" ? "image" : mode === "video" ? "video" : undefined,
+                  mode === "image"
+                      ? {
+                            size: node?.metadata?.size,
+                            quality: node?.metadata?.quality,
+                            transparentBackground: node?.metadata?.transparentBackground,
+                            count: requestedConfig.count,
+                        }
+                      : {
+                            size: node?.metadata?.size,
+                            videoSeconds: node?.metadata?.seconds,
+                            vquality: node?.metadata?.vquality,
+                            videoGenerateAudio: node?.metadata?.generateAudio,
+                            videoWatermark: node?.metadata?.watermark,
+                        },
+                  {
+                      size: requestedConfig.size,
+                      quality: requestedConfig.quality,
+                      transparentBackground: requestedConfig.transparentBackground,
+                      count: requestedConfig.count,
+                      videoSeconds: requestedConfig.videoSeconds,
+                      vquality: requestedConfig.vquality,
+                      videoGenerateAudio: requestedConfig.videoGenerateAudio,
+                      videoWatermark: requestedConfig.videoWatermark,
+                  },
+              )
+            : {};
     const modeCapability = mode === "video" || mode === "audio" ? mode : "image";
     const runningHubCapability = normalizeRunningHubCapability(selectedRunningHubWorkflow?.capability, normalizeRunningHubCapability(config.runningHub.capability));
-    const runningHub = { ...config.runningHub, enabled: workflowProvider === "runninghub" && config.runningHub.enabled, selectedKind: selectedRunningHubWorkflow?.kind === "app" ? "app" as const : "workflow" as const, workflowId: runningHubWorkflowId, capability: runningHubCapability, workflows: workflowProvider === "runninghub" ? config.runningHub.workflows.map((item) => item.workflowId.trim() === runningHubWorkflowId && (!node?.metadata?.runningHubWorkflowKind || (item.kind === "app" ? "app" : "workflow") === node.metadata.runningHubWorkflowKind) ? { ...item, fields: applyWorkflowParameterValues(item.fields?.length ? item.fields : workflowVideoFieldsFromJson(item.workflowJson) as WorkflowFieldMapping[], workflowParameters) } : item) : config.runningHub.workflows };
-    const comfyBridge = { ...config.comfyBridge, enabled: workflowProvider === "comfyui" && config.comfyBridge.enabled, workflowId: comfyBridgeWorkflowId, capability: selectedComfyBridgeWorkflow?.capability || modeCapability, workflows: workflowProvider === "comfyui" ? config.comfyBridge.workflows.map((item) => item.workflowId.trim() === comfyBridgeWorkflowId ? { ...item, fields: applyWorkflowParameterValues(item.fields?.length ? item.fields : workflowVideoFieldsFromJson(item.workflowJson) as WorkflowFieldMapping[], workflowParameters) } : item) : config.comfyBridge.workflows };
+    const runningHub = {
+        ...config.runningHub,
+        enabled: workflowProvider === "runninghub" && config.runningHub.enabled,
+        selectedKind: selectedRunningHubWorkflow?.kind === "app" ? ("app" as const) : ("workflow" as const),
+        workflowId: runningHubWorkflowId,
+        capability: runningHubCapability,
+        workflows:
+            workflowProvider === "runninghub"
+                ? config.runningHub.workflows.map((item) =>
+                      item.workflowId.trim() === runningHubWorkflowId && (!node?.metadata?.runningHubWorkflowKind || (item.kind === "app" ? "app" : "workflow") === node.metadata.runningHubWorkflowKind)
+                          ? { ...item, fields: applyWorkflowParameterValues(item.fields?.length ? item.fields : (workflowVideoFieldsFromJson(item.workflowJson) as WorkflowFieldMapping[]), workflowParameters) }
+                          : item,
+                  )
+                : config.runningHub.workflows,
+    };
+    const comfyBridge = {
+        ...config.comfyBridge,
+        enabled: workflowProvider === "comfyui" && config.comfyBridge.enabled,
+        workflowId: comfyBridgeWorkflowId,
+        capability: selectedComfyBridgeWorkflow?.capability || modeCapability,
+        workflows:
+            workflowProvider === "comfyui"
+                ? config.comfyBridge.workflows.map((item) =>
+                      item.workflowId.trim() === comfyBridgeWorkflowId
+                          ? { ...item, fields: applyWorkflowParameterValues(item.fields?.length ? item.fields : (workflowVideoFieldsFromJson(item.workflowJson) as WorkflowFieldMapping[]), workflowParameters) }
+                          : item,
+                  )
+                : config.comfyBridge.workflows,
+    };
     return {
         ...requestedConfig,
         taskWorkflowProvider: workflowProvider,
@@ -498,10 +528,10 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         comfyBridge,
         model,
         quality: generationDefaults.quality || requestedConfig.quality,
-        size: generationDefaults.size || requestedConfig.size,
+        size: generationDefaults.size ?? requestedConfig.size,
         transparentBackground: generationDefaults.transparentBackground || (requestedConfig.transparentBackground === "true" ? "true" : "false"),
         videoSeconds: generationDefaults.videoSeconds || requestedConfig.videoSeconds,
-        vquality: generationDefaults.vquality || requestedConfig.vquality,
+        vquality: generationDefaults.vquality ?? requestedConfig.vquality,
         videoGenerateAudio: generationDefaults.videoGenerateAudio || requestedConfig.videoGenerateAudio,
         videoWatermark: generationDefaults.videoWatermark || requestedConfig.videoWatermark,
         videoArkPrivateAssetUpload: requestedConfig.videoArkPrivateAssetUpload,

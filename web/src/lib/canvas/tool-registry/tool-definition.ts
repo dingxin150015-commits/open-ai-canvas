@@ -9,17 +9,7 @@ import type { CanvasNodeData, CanvasNodeMetadata, CanvasNodeTypeId, CanvasToolMo
 export type ToolbarId = "main" | "selection" | "node-hover" | "add-node-menu";
 
 /** 工具分类——用于分组渲染、危险隔离与 separator 自动插入 */
-export type ToolCategory =
-    | "navigation"
-    | "history"
-    | "create"
-    | "appearance"
-    | "selection"
-    | "layout"
-    | "arrange"
-    | "danger"
-    | "node-state"
-    | "resource";
+export type ToolCategory = "navigation" | "history" | "create" | "appearance" | "selection" | "layout" | "arrange" | "danger" | "node-state" | "resource";
 
 /** 所有工具栏回调的聚合类型。工具定义通过 ctx.handlers.onXxx 访问 */
 export type ToolbarHandlers = {
@@ -89,9 +79,9 @@ export type ToolbarHandlers = {
     onNodeSuperResolve: (node: CanvasNodeData) => void;
     onNodeAngle: (node: CanvasNodeData) => void;
     onNodeViewImage: (node: CanvasNodeData) => void;
-    onNodeExtractVideoLastFrame: (node: CanvasNodeData) => void;
+    onNodeExtractVideoFrames: (node: CanvasNodeData) => void;
     onNodeExtractAudioFromVideo: (node: CanvasNodeData) => void;
-    onNodeTrimVideoRegenerate: (node: CanvasNodeData) => void;
+    onNodeTrimVideoSegments: (node: CanvasNodeData) => void;
     onNodeSubtitles: (node: CanvasNodeData) => void;
     onNodeTimeline: (node: CanvasNodeData) => void;
     onNodeReversePrompt: (node: CanvasNodeData) => void;
@@ -114,8 +104,8 @@ export type ToolContext = {
     node?: CanvasNodeData;
     /** 便捷访问 node.metadata（node 为空时为 undefined） */
     nodeMetadata?: CanvasNodeMetadata;
-    /** 视频尾帧提取中（节点悬停工具栏用） */
-    extractingVideoFrame: boolean;
+    /** 视频画面提取中（节点悬停工具栏用） */
+    extractingVideoFrames: boolean;
     /** 视频音频提取/片段截取进行中（节点悬停工具栏用） */
     extractingAudio: boolean;
     trimmingVideo: boolean;
@@ -134,7 +124,8 @@ export type AddNodeMenuContext = {
     isProjectLinked: boolean;
     /** 内置应用插件的启用状态；未声明时视为未提供 gating 信息。 */
     enabledPluginIds?: ReadonlySet<string>;
-    handlers: Pick<ToolbarHandlers,
+    handlers: Pick<
+        ToolbarHandlers,
         | "onAddText"
         | "onAddImage"
         | "onAddVideo"

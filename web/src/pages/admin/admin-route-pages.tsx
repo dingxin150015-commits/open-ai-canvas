@@ -9,6 +9,7 @@ const CreditOperationsPanel = lazy(() => import("./components/credit-operations-
 const AccessSettingsPanel = lazy(() => import("./components/access-settings-panel"));
 const EmailSettingsPanel = lazy(() => import("./components/email-settings-panel"));
 const FeatureAvailabilityPanel = lazy(() => import("./components/feature-availability-panel"));
+const StorageResourcesPanel = lazy(() => import("./components/storage-resources-panel"));
 
 function PageFallback({ label }: { label: string }) {
     return <div className="py-16 text-center text-sm text-foreground/50">正在读取{label}...</div>;
@@ -16,26 +17,74 @@ function PageFallback({ label }: { label: string }) {
 
 export function AnalyticsPage() {
     const { references } = useAdminContext();
-    return <AdminPageFrame title="数据概览" description="活跃、调用与成本趋势"><Suspense fallback={<PageFallback label="统计数据" />}><AnalyticsPanel users={references.users} channels={references.channels} /></Suspense></AdminPageFrame>;
+    return (
+        <AdminPageFrame title="数据概览" description="活跃、调用与成本趋势">
+            <Suspense fallback={<PageFallback label="统计数据" />}>
+                <AnalyticsPanel users={references.users} channels={references.channels} />
+            </Suspense>
+        </AdminPageFrame>
+    );
 }
 
 export function AnnouncementsPage() {
-    return <AdminPageFrame title="系统公告" description="发布、关闭与历史公告"><Suspense fallback={<PageFallback label="系统公告" />}><AdminAnnouncementsPanel /></Suspense></AdminPageFrame>;
+    return (
+        <AdminPageFrame title="系统公告" description="发布、关闭与历史公告">
+            <Suspense fallback={<PageFallback label="系统公告" />}>
+                <AdminAnnouncementsPanel />
+            </Suspense>
+        </AdminPageFrame>
+    );
 }
 
 export function CreditOperationsPage() {
     const { references } = useAdminContext();
-    return <AdminPageFrame title="积分运营" description="人工调账与异常计费"><Suspense fallback={<PageFallback label="积分运营数据" />}><CreditOperationsPanel users={references.users} /></Suspense></AdminPageFrame>;
+    return (
+        <AdminPageFrame title="积分运营" description="人工调账与异常计费">
+            <Suspense fallback={<PageFallback label="积分运营数据" />}>
+                <CreditOperationsPanel users={references.users} />
+            </Suspense>
+        </AdminPageFrame>
+    );
 }
 
 export function AccessSettingsPage() {
-    return <AdminPageFrame title="登录与注册" description="注册策略与 Linux.do" scroll><Suspense fallback={<PageFallback label="登录与注册配置" />}><AccessSettingsPanel /></Suspense></AdminPageFrame>;
+    return (
+        <AdminPageFrame title="登录与注册" description="注册策略与 Linux.do" scroll>
+            <Suspense fallback={<PageFallback label="登录与注册配置" />}>
+                <AccessSettingsPanel />
+            </Suspense>
+        </AdminPageFrame>
+    );
 }
 
 export function EmailSettingsPage() {
-    return <AdminPageFrame title="邮件服务" description="注册验证码 SMTP" scroll><div className="pt-4"><Suspense fallback={<PageFallback label="邮件配置" />}><EmailSettingsPanel /></Suspense></div></AdminPageFrame>;
+    return (
+        <AdminPageFrame title="邮件服务" description="注册验证码 SMTP" scroll>
+            <div className="pt-4">
+                <Suspense fallback={<PageFallback label="邮件配置" />}>
+                    <EmailSettingsPanel />
+                </Suspense>
+            </div>
+        </AdminPageFrame>
+    );
 }
 
 export function FeatureAvailabilityPage() {
-    return <AdminPageFrame title="功能开放" description="控制用户工作台入口、渠道、插件与计费模式" scroll><Suspense fallback={<PageFallback label="功能开放配置" />}><FeatureAvailabilityPanel /></Suspense></AdminPageFrame>;
+    return (
+        <AdminPageFrame title="功能开放" description="控制用户工作台入口、渠道、插件与计费模式" scroll>
+            <Suspense fallback={<PageFallback label="功能开放配置" />}>
+                <FeatureAvailabilityPanel />
+            </Suspense>
+        </AdminPageFrame>
+    );
+}
+
+export function StorageResourcesPage() {
+    return (
+        <AdminPageFrame title="存储资源" description="只读查看资源记录、容量分布与文件预览" scroll>
+            <Suspense fallback={<PageFallback label="存储资源" />}>
+                <StorageResourcesPanel />
+            </Suspense>
+        </AdminPageFrame>
+    );
 }

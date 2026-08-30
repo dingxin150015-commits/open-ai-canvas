@@ -8,17 +8,9 @@ import { mergeFetchedChannelModelCosts } from "@/lib/channel-model-catalog";
 import { desktopLocalChannelFormState, desktopLocalChannelPayloadValue, DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL } from "@/lib/desktop-local-channel";
 import { fetchChannelModels } from "@/services/api/image";
 import { fetchPluginProviderCatalog } from "@/services/api/plugin-catalog";
-import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
+import { pluginWorkflowCapabilityConfig } from "@/lib/model-capabilities";
 import type { ModelProtocolDefinition } from "@/lib/model-protocols";
-import {
-    createModelChannel,
-    defaultBaseUrlForApiFormat,
-    filterModelsByCapability,
-    modelOptionsFromChannels,
-    useConfigStore,
-    type AiConfig,
-    type ModelChannel,
-} from "@/stores/use-config-store";
+import { createModelChannel, defaultBaseUrlForApiFormat, filterModelsByCapability, modelOptionsFromChannels, useConfigStore, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { ChannelModelSettings } from "./channel-video-pricing";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -43,7 +35,9 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
     const comfyBridgeReady = Boolean(config.comfyBridge.enabled && config.comfyBridge.bridgeId.trim() && config.comfyBridge.workflowId.trim());
 
     useEffect(() => {
-        void fetchPluginProviderCatalog("user.custom-channel").then(setProviderCatalog).catch(() => setProviderCatalog([]));
+        void fetchPluginProviderCatalog("user.custom-channel")
+            .then(setProviderCatalog)
+            .catch(() => setProviderCatalog([]));
     }, []);
 
     const updateChannels = (channels: ModelChannel[], baseConfig = config) => {
@@ -51,16 +45,18 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
     };
 
     const updateChannel = (id: string, patch: Partial<ModelChannel>) => {
-        updateChannels(config.channels.map((channel) => {
-            if (channel.id !== id) return channel;
-            const models = patch.models ? uniqueModels(patch.models) : channel.models;
-            return {
-                ...channel,
-                ...patch,
-                models,
-                modelCosts: patch.modelCosts !== undefined ? patch.modelCosts : (patch.models ? channel.modelCosts?.filter((item) => models.includes(item.model)) : channel.modelCosts),
-            };
-        }));
+        updateChannels(
+            config.channels.map((channel) => {
+                if (channel.id !== id) return channel;
+                const models = patch.models ? uniqueModels(patch.models) : channel.models;
+                return {
+                    ...channel,
+                    ...patch,
+                    models,
+                    modelCosts: patch.modelCosts !== undefined ? patch.modelCosts : patch.models ? channel.modelCosts?.filter((item) => models.includes(item.model)) : channel.modelCosts,
+                };
+            }),
+        );
     };
 
     const updateChannelConnection = (channel: ModelChannel, connection: UserChannelConnection) => {
@@ -84,7 +80,7 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                   protocol: provider.value,
                   billingMode: "fixed_request" as const,
                   unitPriceMicrocredits: 0,
-                  capabilityConfig: workflow.capability === "image" || workflow.capability === "video" ? defaultModelCapabilityConfig(provider.value, workflow.id) : undefined,
+                  capabilityConfig: pluginWorkflowCapabilityConfig(provider.value, workflow),
                   defaultOptions: workflow.defaults,
               }))
             : channel.modelCosts;
@@ -219,41 +215,52 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
             <div className="settings-pane-header">
                 <div className="min-w-0">
                     <h2>个人渠道</h2>
-                    <p>管理个人模型服务和工作流渠道。普通渠道只保存连接类型；模型能力在“模型与能力”中配置。<Button type="link" size="small" className="h-auto p-0 text-xs font-semibold" onClick={onOpenModels}>打开模型选择</Button></p>
+                    <p>
+                        管理个人模型服务和工作流渠道。普通渠道只保存连接类型；模型能力在“模型与能力”中配置。
+                        <Button type="link" size="small" className="h-auto p-0 text-xs font-semibold" onClick={onOpenModels}>
+                            打开模型选择
+                        </Button>
+                    </p>
                 </div>
                 <div className="flex w-full gap-2 sm:w-auto sm:shrink-0">
-                    <Button className="h-10 flex-1 sm:h-8 sm:flex-none" icon={<RefreshCw className="size-4" />} loading={loadingChannelIds.includes("all")} disabled={loadingChannelIds.some((id) => id !== "all")} onClick={() => void refreshAllModels()}>拉取全部</Button>
-                    <Button className="h-10 flex-1 sm:h-8 sm:flex-none" type="primary" icon={<Plus className="size-4" />} onClick={addChannel}>新增渠道</Button>
+                    <Button className="h-10 flex-1 sm:h-8 sm:flex-none" icon={<RefreshCw className="size-4" />} loading={loadingChannelIds.includes("all")} disabled={loadingChannelIds.some((id) => id !== "all")} onClick={() => void refreshAllModels()}>
+                        拉取全部
+                    </Button>
+                    <Button className="h-10 flex-1 sm:h-8 sm:flex-none" type="primary" icon={<Plus className="size-4" />} onClick={addChannel}>
+                        新增渠道
+                    </Button>
                 </div>
             </div>
-            {onOpenRunningHub || onOpenComfyUI ? <section className="settings-section mb-3">
-                <div className="mb-3">
-                    <h3 className="text-sm font-semibold">个人工作流渠道</h3>
-                    <p className="mt-1 text-xs text-foreground/55">RunningHub 和 ComfyUI 使用各自的工作流参数与执行通道，配置入口统一放在个人渠道中。</p>
-                </div>
-                <div className="grid gap-2 lg:grid-cols-2">
-                    {onOpenRunningHub ? (
-                        <WorkflowChannelEntry
-                            icon={<Workflow className="size-4" />}
-                            title="RunningHub"
-                            description="云端工作流和 RunningHub App"
-                            status={runningHubReady ? `${config.runningHub.workflows.length} 个工作流已配置` : config.runningHub.enabled ? "待完成连接和工作流配置" : "未启用"}
-                            ready={runningHubReady}
-                            onOpen={onOpenRunningHub}
-                        />
-                    ) : null}
-                    {onOpenComfyUI ? (
-                        <WorkflowChannelEntry
-                            icon={<MonitorUp className="size-4" />}
-                            title="ComfyUI"
-                            description="通过 Bridge 连接本机或远程 ComfyUI"
-                            status={comfyBridgeReady ? `${config.comfyBridge.workflows.length} 个工作流已配置` : config.comfyBridge.enabled ? "待选择 Bridge 和工作流" : "未启用"}
-                            ready={comfyBridgeReady}
-                            onOpen={onOpenComfyUI}
-                        />
-                    ) : null}
-                </div>
-            </section> : null}
+            {onOpenRunningHub || onOpenComfyUI ? (
+                <section className="settings-section mb-3">
+                    <div className="mb-3">
+                        <h3 className="text-sm font-semibold">个人工作流渠道</h3>
+                        <p className="mt-1 text-xs text-foreground/55">RunningHub 和 ComfyUI 使用各自的工作流参数与执行通道，配置入口统一放在个人渠道中。</p>
+                    </div>
+                    <div className="grid gap-2 lg:grid-cols-2">
+                        {onOpenRunningHub ? (
+                            <WorkflowChannelEntry
+                                icon={<Workflow className="size-4" />}
+                                title="RunningHub"
+                                description="云端工作流和 RunningHub App"
+                                status={runningHubReady ? `${config.runningHub.workflows.length} 个工作流已配置` : config.runningHub.enabled ? "待完成连接和工作流配置" : "未启用"}
+                                ready={runningHubReady}
+                                onOpen={onOpenRunningHub}
+                            />
+                        ) : null}
+                        {onOpenComfyUI ? (
+                            <WorkflowChannelEntry
+                                icon={<MonitorUp className="size-4" />}
+                                title="ComfyUI"
+                                description="通过 Bridge 连接本机或远程 ComfyUI"
+                                status={comfyBridgeReady ? `${config.comfyBridge.workflows.length} 个工作流已配置` : config.comfyBridge.enabled ? "待选择 Bridge 和工作流" : "未启用"}
+                                ready={comfyBridgeReady}
+                                onOpen={onOpenComfyUI}
+                            />
+                        ) : null}
+                    </div>
+                </section>
+            ) : null}
             {userChannels.length ? (
                 <div className="settings-channel-list space-y-2">
                     {userChannels.map((channel) => {
@@ -262,30 +269,85 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                             <section key={channel.id} aria-labelledby={`channel-${channel.id}-title`} className="settings-channel p-2.5 sm:p-3">
                                 <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2.5">
                                     <div className="min-w-0 flex-1 basis-52">
-                                        <h3 id={`channel-${channel.id}-title`} className="truncate text-sm font-semibold">{channel.name || "未命名渠道"}</h3>
+                                        <h3 id={`channel-${channel.id}-title`} className="truncate text-sm font-semibold">
+                                            {channel.name || "未命名渠道"}
+                                        </h3>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-foreground/55">
                                             {channelProtocolLabel(channel)} · 已保存 {channel.models.length} 个模型
                                             <ChannelStatus channel={channel} />
                                         </div>
                                     </div>
                                     <div className="flex w-full justify-end gap-2 sm:w-auto sm:shrink-0">
-                                        <Button className="h-10 sm:h-8" size="small" icon={<RefreshCw className="size-3.5" />} loading={loadingChannelIds.includes(channel.id)} disabled={loadingChannelIds.includes("all")} onClick={() => void refreshChannelModels(channel)}>拉取模型</Button>
+                                        <Button
+                                            className="h-10 sm:h-8"
+                                            size="small"
+                                            icon={<RefreshCw className="size-3.5" />}
+                                            loading={loadingChannelIds.includes(channel.id)}
+                                            disabled={loadingChannelIds.includes("all")}
+                                            onClick={() => void refreshChannelModels(channel)}
+                                        >
+                                            拉取模型
+                                        </Button>
                                         <Tooltip title={collapsed ? "展开渠道配置" : "收起渠道配置"}>
-                                            <Button className="size-10 p-0 sm:size-8" size="small" type="text" aria-label={`${collapsed ? "展开" : "收起"}渠道配置 ${channel.name || "未命名渠道"}`} aria-expanded={!collapsed} aria-controls={`channel-${channel.id}-details`} icon={collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />} onClick={() => toggleChannelCollapsed(channel.id)} />
+                                            <Button
+                                                className="size-10 p-0 sm:size-8"
+                                                size="small"
+                                                type="text"
+                                                aria-label={`${collapsed ? "展开" : "收起"}渠道配置 ${channel.name || "未命名渠道"}`}
+                                                aria-expanded={!collapsed}
+                                                aria-controls={`channel-${channel.id}-details`}
+                                                icon={collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+                                                onClick={() => toggleChannelCollapsed(channel.id)}
+                                            />
                                         </Tooltip>
                                         <Popconfirm title="删除个人模型渠道？" description="该渠道关联的模型选择会同时移除。" okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => deleteChannel(channel.id)}>
-                                            <Tooltip title="删除渠道"><Button className="size-10 p-0 sm:size-8" aria-label={`删除渠道 ${channel.name || "未命名渠道"}`} size="small" type="text" danger disabled={loadingChannelIds.includes(channel.id) || loadingChannelIds.includes("all")} icon={<Trash2 className="size-3.5" />} /></Tooltip>
+                                            <Tooltip title="删除渠道">
+                                                <Button
+                                                    className="size-10 p-0 sm:size-8"
+                                                    aria-label={`删除渠道 ${channel.name || "未命名渠道"}`}
+                                                    size="small"
+                                                    type="text"
+                                                    danger
+                                                    disabled={loadingChannelIds.includes(channel.id) || loadingChannelIds.includes("all")}
+                                                    icon={<Trash2 className="size-3.5" />}
+                                                />
+                                            </Tooltip>
                                         </Popconfirm>
                                     </div>
                                 </div>
                                 <div id={`channel-${channel.id}-details`} hidden={collapsed}>
                                     <div className="grid gap-x-3 gap-y-2 lg:grid-cols-12">
                                         <div className="settings-field-group-label lg:col-span-12">连接信息</div>
-                                        <Form.Item label="渠道名称" htmlFor={`channel-${channel.id}-name`} className="mb-0 lg:col-span-3"><Input id={`channel-${channel.id}-name`} value={channel.name} placeholder="例如：我的 NewAPI" onChange={(event) => updateChannel(channel.id, { name: event.target.value })} onBlur={(event) => updateChannel(channel.id, { name: event.target.value.trim() || "未命名渠道" })} /></Form.Item>
-                                        <Form.Item label="插件 Provider" className="mb-0 lg:col-span-4" extra="Provider 会带入 Base URL、鉴权和工作流；无需手工选择请求协议。">
-                                            <Select showSearch optionFilterProp="label" value={channel.interfaceType || undefined} placeholder="选择已安装插件 Provider" options={providerCatalog.map((provider) => ({ value: provider.value, label: `${provider.label} · ${provider.capability}` }))} onChange={(value) => updateChannelProvider(channel, value)} />
+                                        <Form.Item label="渠道名称" htmlFor={`channel-${channel.id}-name`} className="mb-0 lg:col-span-3">
+                                            <Input
+                                                id={`channel-${channel.id}-name`}
+                                                value={channel.name}
+                                                placeholder="例如：我的 NewAPI"
+                                                onChange={(event) => updateChannel(channel.id, { name: event.target.value })}
+                                                onBlur={(event) => updateChannel(channel.id, { name: event.target.value.trim() || "未命名渠道" })}
+                                            />
                                         </Form.Item>
-                                        <Form.Item label="目录连接类型" className="mb-0 lg:col-span-2" extra="仅影响模型目录拉取。"><Segmented<UserChannelConnection> block value={channelConnectionMode(channel)} options={[{ label: "OpenAI", value: "openai" }, { label: "Gemini", value: "gemini" }]} onChange={(value) => updateChannelConnection(channel, value)} /></Form.Item>
+                                        <Form.Item label="插件 Provider" className="mb-0 lg:col-span-4" extra="Provider 会带入 Base URL、鉴权和工作流；无需手工选择请求协议。">
+                                            <Select
+                                                showSearch
+                                                optionFilterProp="label"
+                                                value={channel.interfaceType || undefined}
+                                                placeholder="选择已安装插件 Provider"
+                                                options={providerCatalog.map((provider) => ({ value: provider.value, label: `${provider.label} · ${provider.capability}` }))}
+                                                onChange={(value) => updateChannelProvider(channel, value)}
+                                            />
+                                        </Form.Item>
+                                        <Form.Item label="目录连接类型" className="mb-0 lg:col-span-2" extra="仅影响模型目录拉取。">
+                                            <Segmented<UserChannelConnection>
+                                                block
+                                                value={channelConnectionMode(channel)}
+                                                options={[
+                                                    { label: "OpenAI", value: "openai" },
+                                                    { label: "Gemini", value: "gemini" },
+                                                ]}
+                                                onChange={(value) => updateChannelConnection(channel, value)}
+                                            />
+                                        </Form.Item>
                                         <UserLocalChannelFields
                                             channel={channel}
                                             visible={userLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, channel.allowLocalChannel).visible}
@@ -294,11 +356,43 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                                             hostname={desktopLocalChannelHostname}
                                             updateChannel={updateChannel}
                                         />
-                                        <Form.Item label="API Key" htmlFor={`channel-${channel.id}-api-key`} className="mb-0 lg:col-span-5"><Input.Password id={`channel-${channel.id}-api-key`} autoComplete="new-password" value={channel.apiKey} placeholder={channel.apiFormat === "gemini" ? "填写 Gemini API Key" : "填写当前渠道 API Key"} onChange={(event) => updateChannel(channel.id, { apiKey: event.target.value })} onBlur={(event) => updateChannel(channel.id, { apiKey: event.target.value.trim() })} /></Form.Item>
-                                        <Form.Item label="Secret Key（可选）" htmlFor={`channel-${channel.id}-secret-key`} className="mb-0 lg:col-span-5" extra="即梦等 AK/SK 协议需要；其他协议留空。"><Input.Password id={`channel-${channel.id}-secret-key`} autoComplete="new-password" value={channel.secretKey || ""} placeholder="填写 Secret Key" onChange={(event) => updateChannel(channel.id, { secretKey: event.target.value })} onBlur={(event) => updateChannel(channel.id, { secretKey: event.target.value.trim() })} /></Form.Item>
+                                        <Form.Item label="API Key" htmlFor={`channel-${channel.id}-api-key`} className="mb-0 lg:col-span-5">
+                                            <Input.Password
+                                                id={`channel-${channel.id}-api-key`}
+                                                autoComplete="new-password"
+                                                value={channel.apiKey}
+                                                placeholder={channel.apiFormat === "gemini" ? "填写 Gemini API Key" : "填写当前渠道 API Key"}
+                                                onChange={(event) => updateChannel(channel.id, { apiKey: event.target.value })}
+                                                onBlur={(event) => updateChannel(channel.id, { apiKey: event.target.value.trim() })}
+                                            />
+                                        </Form.Item>
+                                        <Form.Item label="Secret Key（可选）" htmlFor={`channel-${channel.id}-secret-key`} className="mb-0 lg:col-span-5" extra="即梦等 AK/SK 协议需要；其他协议留空。">
+                                            <Input.Password
+                                                id={`channel-${channel.id}-secret-key`}
+                                                autoComplete="new-password"
+                                                value={channel.secretKey || ""}
+                                                placeholder="填写 Secret Key"
+                                                onChange={(event) => updateChannel(channel.id, { secretKey: event.target.value })}
+                                                onBlur={(event) => updateChannel(channel.id, { secretKey: event.target.value.trim() })}
+                                            />
+                                        </Form.Item>
                                         <div className="settings-field-group-label lg:col-span-12">模型与能力</div>
-                                        <Form.Item label="模型列表" htmlFor={`channel-${channel.id}-models`} className="mb-0 lg:col-span-7"><Select id={`channel-${channel.id}-models`} mode="tags" showSearch allowClear maxTagCount="responsive" tokenSeparators={[",", "\n"]} placeholder="输入模型名，或点击拉取模型" value={channel.models} onChange={(models) => updateChannel(channel.id, { models: uniqueModels(models) })} /></Form.Item>
-                                        <div className="lg:col-span-12"><ChannelHeadersEditor value={channel.headers} onChange={(headers) => updateChannel(channel.id, { headers })} /></div>
+                                        <Form.Item label="模型列表" htmlFor={`channel-${channel.id}-models`} className="mb-0 lg:col-span-7">
+                                            <Select
+                                                id={`channel-${channel.id}-models`}
+                                                mode="tags"
+                                                showSearch
+                                                allowClear
+                                                maxTagCount="responsive"
+                                                tokenSeparators={[",", "\n"]}
+                                                placeholder="输入模型名，或点击拉取模型"
+                                                value={channel.models}
+                                                onChange={(models) => updateChannel(channel.id, { models: uniqueModels(models) })}
+                                            />
+                                        </Form.Item>
+                                        <div className="lg:col-span-12">
+                                            <ChannelHeadersEditor value={channel.headers} onChange={(headers) => updateChannel(channel.id, { headers })} />
+                                        </div>
                                     </div>
                                     <ChannelModelSettings channel={channel} onChange={(modelCosts) => updateChannel(channel.id, { modelCosts })} />
                                 </div>
@@ -306,7 +400,19 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                         );
                     })}
                 </div>
-            ) : <WorkspaceState icon="settings" compact title="当前没有个人模型渠道" description="管理员配置的系统渠道会出现在模型选择中；也可以添加自己的模型服务。" action={<Button icon={<Plus className="size-4" />} onClick={addChannel}>新增个人模型渠道</Button>} />}
+            ) : (
+                <WorkspaceState
+                    icon="settings"
+                    compact
+                    title="当前没有个人模型渠道"
+                    description="管理员配置的系统渠道会出现在模型选择中；也可以添加自己的模型服务。"
+                    action={
+                        <Button icon={<Plus className="size-4" />} onClick={addChannel}>
+                            新增个人模型渠道
+                        </Button>
+                    }
+                />
+            )}
         </Form>
     );
 }
@@ -315,14 +421,21 @@ function WorkflowChannelEntry({ icon, title, description, status, ready, onOpen 
     return (
         <div className="settings-channel flex min-w-0 items-center justify-between gap-3 p-3">
             <div className="flex min-w-0 items-start gap-2.5">
-                <span className="mt-0.5 shrink-0 text-[var(--workspace-accent)]" aria-hidden="true">{icon}</span>
+                <span className="mt-0.5 shrink-0 text-[var(--workspace-accent)]" aria-hidden="true">
+                    {icon}
+                </span>
                 <div className="min-w-0">
                     <h4 className="text-sm font-semibold">{title}</h4>
                     <p className="mt-0.5 truncate text-xs text-foreground/55">{description}</p>
-                    <span className={`settings-channel-status mt-1.5 ${ready ? "is-ready" : "is-warning"}`}><i aria-hidden="true" />{status}</span>
+                    <span className={`settings-channel-status mt-1.5 ${ready ? "is-ready" : "is-warning"}`}>
+                        <i aria-hidden="true" />
+                        {status}
+                    </span>
                 </div>
             </div>
-            <Button size="small" onClick={onOpen} disabled={!onOpen}>配置</Button>
+            <Button size="small" onClick={onOpen} disabled={!onOpen}>
+                配置
+            </Button>
         </div>
     );
 }
@@ -341,11 +454,32 @@ export function UserLocalChannelSwitch({ visible, checked, onChange }: { visible
     );
 }
 
-export function UserLocalChannelFields({ channel, visible, checked, desktopLocalChannelsEnabled, hostname, updateChannel }: { channel: ModelChannel; visible: boolean; checked: boolean; desktopLocalChannelsEnabled: boolean; hostname: string; updateChannel: (id: string, patch: Partial<ModelChannel>) => void }) {
+export function UserLocalChannelFields({
+    channel,
+    visible,
+    checked,
+    desktopLocalChannelsEnabled,
+    hostname,
+    updateChannel,
+}: {
+    channel: ModelChannel;
+    visible: boolean;
+    checked: boolean;
+    desktopLocalChannelsEnabled: boolean;
+    hostname: string;
+    updateChannel: (id: string, patch: Partial<ModelChannel>) => void;
+}) {
     return (
         <>
             <Form.Item label="Base URL" htmlFor={`channel-${channel.id}-base-url`} className="mb-0 lg:col-span-6">
-                <Input id={`channel-${channel.id}-base-url`} inputMode="url" value={channel.baseUrl} placeholder={checked ? DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL : "填写渠道 Base URL"} onChange={(event) => updateChannel(channel.id, { baseUrl: event.target.value })} onBlur={(event) => updateChannel(channel.id, { baseUrl: event.target.value.trim().replace(/\/+$/, "") })} />
+                <Input
+                    id={`channel-${channel.id}-base-url`}
+                    inputMode="url"
+                    value={channel.baseUrl}
+                    placeholder={checked ? DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL : "填写渠道 Base URL"}
+                    onChange={(event) => updateChannel(channel.id, { baseUrl: event.target.value })}
+                    onBlur={(event) => updateChannel(channel.id, { baseUrl: event.target.value.trim().replace(/\/+$/, "") })}
+                />
             </Form.Item>
             <UserLocalChannelSwitch visible={visible} checked={checked} onChange={(value) => updateChannel(channel.id, userLocalChannelChangePatch(desktopLocalChannelsEnabled, hostname, value))} />
         </>
@@ -390,7 +524,22 @@ function withChannels(config: AiConfig, channels: ModelChannel[]): AiConfig {
     const videoModels = filterModelsByCapability(models, "video", channels);
     const textModels = filterModelsByCapability(models, "text", channels);
     const audioModels = filterModelsByCapability(models, "audio", channels);
-    return { ...config, channels, models, baseUrl: channels[0]?.baseUrl || config.baseUrl, apiKey: channels[0]?.apiKey || config.apiKey, apiFormat: channels[0]?.apiFormat || config.apiFormat, imageModels, videoModels, textModels, audioModels, imageModel: normalizeDefaultModel(config.imageModel, imageModels), videoModel: normalizeDefaultModel(config.videoModel, videoModels), textModel: normalizeDefaultModel(config.textModel, textModels), audioModel: normalizeDefaultModel(config.audioModel, audioModels) };
+    return {
+        ...config,
+        channels,
+        models,
+        baseUrl: channels[0]?.baseUrl || config.baseUrl,
+        apiKey: channels[0]?.apiKey || config.apiKey,
+        apiFormat: channels[0]?.apiFormat || config.apiFormat,
+        imageModels,
+        videoModels,
+        textModels,
+        audioModels,
+        imageModel: normalizeDefaultModel(config.imageModel, imageModels),
+        videoModel: normalizeDefaultModel(config.videoModel, videoModels),
+        textModel: normalizeDefaultModel(config.textModel, textModels),
+        audioModel: normalizeDefaultModel(config.audioModel, audioModels),
+    };
 }
 
 function normalizeDefaultModel(value: string, options: string[]) {

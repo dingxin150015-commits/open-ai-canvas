@@ -82,7 +82,8 @@ export function modelCompatibilityError(config: AiConfig, model: string, require
     if (capability === "video") {
         const profile = modelCapabilityConfigFor(config, model).video!;
         if (requirements.videoSeconds && !videoDurationAllowed(profile, Number(requirements.videoSeconds))) return "不支持当前视频时长";
-        if (input?.videoCount && requirements.videoSeconds && profile.references.maxOutputDurationWithVideoSeconds && Number(requirements.videoSeconds) > profile.references.maxOutputDurationWithVideoSeconds) return `包含参考视频时最多支持 ${profile.references.maxOutputDurationWithVideoSeconds} 秒`;
+        if (input?.videoCount && requirements.videoSeconds && profile.references.maxOutputDurationWithVideoSeconds && Number(requirements.videoSeconds) > profile.references.maxOutputDurationWithVideoSeconds)
+            return `包含参考视频时最多支持 ${profile.references.maxOutputDurationWithVideoSeconds} 秒`;
         if (!input) return "";
         const visualReferenceCount = visualInputCount + input.videoCount;
         if (profile.references.maxVisualReferences && visualReferenceCount > profile.references.maxVisualReferences) return `最多支持 ${profile.references.maxVisualReferences} 个图片/视频视觉素材`;
@@ -238,7 +239,6 @@ export function defaultImageParamsForModel(config: AiConfig, model: string): Pic
     };
 }
 
-
 export type ModelGenerationDefaults = Pick<AiConfig, "size" | "quality" | "transparentBackground" | "count" | "videoSeconds" | "vquality" | "videoGenerateAudio" | "videoWatermark">;
 
 export function resolveModelGenerationDefaults(
@@ -325,11 +325,11 @@ export function modelGroupReferenceLimits(config: AiConfig, selected: string, ca
 
 export function inferVideoOperation(input: ModelInputSummary) {
     const visualInputCount = input.imageCount + input.characterCount;
-    // 纯音频参考使用独立能力；音频与图片、角色或视频组合时属于全模态参考，
-    // 不能把组合请求误路由到只支持 audio_to_video 的细分模型。
-    if (input.audioCount > 0) return visualInputCount > 0 || input.videoCount > 0 ? "reference_to_video" : "audio_to_video";
+    // 图片或角色决定图生视频主模式，音频只作为附加参考，不应把组合请求
+    // 提升为全模态参考；纯音频输入才使用独立的 audio_to_video 能力。
     if (input.videoCount > 0 || visualInputCount > 2) return "reference_to_video";
     if (visualInputCount > 0) return "image_to_video";
+    if (input.audioCount > 0) return "audio_to_video";
     return "text_to_video";
 }
 

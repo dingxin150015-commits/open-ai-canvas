@@ -33,14 +33,14 @@
 
 ## 六个显式冲突及解决合同
 
-| 文件 | 风险 | 解决合同 |
-| --- | --- | --- |
-| `backend/internal/service/finance.go` | 高。错误选择价格档会导致错误预扣、错误免费、线路切换失败或账单与请求规格不一致。 | 保留本地“服务端按完整 intent 重新选择价格档、缺失即 fail-closed”的行为；采用官方 intent-aware `newBillingOrderWithPriceTier` 签名。直接系统模型使用服务端选出的 tier ID 并同时传入 intent；逻辑模型和线路切换使用已选路由的 `PriceTier.ID`，不信任客户端或旧任务中的 `config.priceTierId`。补默认档、精确档、零价显式配置、线路切换和过期 ID 测试。 |
-| `docs/content/docs/progress/pending-test.mdx` | 低运行风险、高审计风险。任一侧覆盖都会丢失本地阶段历史或官方新增手工验收项。 | 保留本地历史/NO-GO 前言，再追加官方短剧、取帧、命名、默认价格、图生图、存储管理等章节；按二级标题去重，不把自动化通过升级成浏览器/生产验证。 |
-| `web/package.json` | 中。错误解决会丢测试、绕过 panic guard，形成假绿。 | 保留本地 `test` → panic guard → `test:main`/`test:cross-runtime` 拆分；把官方新增 `canvas-node-generation-mentions.test.ts`、`canvas-video-frame.test.ts` 纳入 `test:main`，并保留 `creation-settings-store`、`qwen-image-capability` 和跨 Runtime 独立门禁。官方没有 `bun.lock` 变化。 |
-| `web/src/components/video-settings-panel.tsx` | 高。可能重新显示不支持的尺寸、丢失智能时长，或让价格档与实际请求不一致。 | 采用官方 `ratios.length > 0` 才显示尺寸、画幅+分辨率推导只读宽高；保留本地 `-1` 智能时长、智能时长仅 fixed-request 可定价、声音/水印与模型能力驱动。删除任意宽高编辑入口，避免向只声明分辨率的工作流发送旧全局 size。 |
-| `web/src/lib/model-capabilities.ts` | 高。能力漂移会放大 Ready 模型参数、破坏显式空数组或丢失插件工作流能力。 | 取并集：保留 Qwen/Wan/HappyHorse 精确能力、视觉总数、智能时长、显式空数组和 `*` 三态；接入官方 `pluginWorkflowCapabilityConfig`、`resolveVideoRatioValue` 和“画幅可为空”。`normalizeVideoValue` 同时保留智能时长并使用 `resolveVideoRatioValue`。 |
-| `web/src/pages/create/index.tsx` | 高。可能丢失按用户/模型/操作的设置持久化、声音/水印授权摘要，或向不支持画幅的模型发送陈旧 size。 | 保留本地设置持久化与声音/水印 Switch/摘要；采用官方画幅可为空和 nullish 语义。视频请求只有 `videoProfile.ratios.length > 0` 时才写 `size`，避免空字符串或旧全局比例进入 payload；分辨率仍按能力归一化。 |
+| 文件                                          | 风险                                                                                             | 解决合同                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/internal/service/finance.go`         | 高。错误选择价格档会导致错误预扣、错误免费、线路切换失败或账单与请求规格不一致。                 | 保留本地“服务端按完整 intent 重新选择价格档、缺失即 fail-closed”的行为；采用官方 intent-aware `newBillingOrderWithPriceTier` 签名。直接系统模型使用服务端选出的 tier ID 并同时传入 intent；逻辑模型和线路切换使用已选路由的 `PriceTier.ID`，不信任客户端或旧任务中的 `config.priceTierId`。补默认档、精确档、零价显式配置、线路切换和过期 ID 测试。 |
+| `docs/content/docs/progress/pending-test.mdx` | 低运行风险、高审计风险。任一侧覆盖都会丢失本地阶段历史或官方新增手工验收项。                     | 保留本地历史/NO-GO 前言，再追加官方短剧、取帧、命名、默认价格、图生图、存储管理等章节；按二级标题去重，不把自动化通过升级成浏览器/生产验证。                                                                                                                                                                                                        |
+| `web/package.json`                            | 中。错误解决会丢测试、绕过 panic guard，形成假绿。                                               | 保留本地 `test` → panic guard → `test:main`/`test:cross-runtime` 拆分；把官方新增 `canvas-node-generation-mentions.test.ts`、`canvas-video-frame.test.ts` 纳入 `test:main`，并保留 `creation-settings-store`、`qwen-image-capability` 和跨 Runtime 独立门禁。官方没有 `bun.lock` 变化。                                                             |
+| `web/src/components/video-settings-panel.tsx` | 高。可能重新显示不支持的尺寸、丢失智能时长，或让价格档与实际请求不一致。                         | 采用官方 `ratios.length > 0` 才显示尺寸、画幅+分辨率推导只读宽高；保留本地 `-1` 智能时长、智能时长仅 fixed-request 可定价、声音/水印与模型能力驱动。删除任意宽高编辑入口，避免向只声明分辨率的工作流发送旧全局 size。                                                                                                                               |
+| `web/src/lib/model-capabilities.ts`           | 高。能力漂移会放大 Ready 模型参数、破坏显式空数组或丢失插件工作流能力。                          | 取并集：保留 Qwen/Wan/HappyHorse 精确能力、视觉总数、智能时长、显式空数组和 `*` 三态；接入官方 `pluginWorkflowCapabilityConfig`、`resolveVideoRatioValue` 和“画幅可为空”。`normalizeVideoValue` 同时保留智能时长并使用 `resolveVideoRatioValue`。                                                                                                   |
+| `web/src/pages/create/index.tsx`              | 高。可能丢失按用户/模型/操作的设置持久化、声音/水印授权摘要，或向不支持画幅的模型发送陈旧 size。 | 保留本地设置持久化与声音/水印 Switch/摘要；采用官方画幅可为空和 nullish 语义。视频请求只有 `videoProfile.ratios.length > 0` 时才写 `size`，避免空字符串或旧全局比例进入 payload；分辨率仍按能力归一化。                                                                                                                                             |
 
 ## 自动合并但必须语义复核的区域
 
@@ -88,3 +88,25 @@
 - 新增量可合并，但不是低风险三文件同步；建议按 6 个显式冲突、8 类语义复核和完整跨栈验证执行。
 - 当前框架只明确跟到 `ab89c05`，尚未 follow `4f07daa`；不能宣称已跟上官方实时主干。
 - 官方新增量没有修改根 `VERSION`，本地仍应保持用户确认的 `v1.1.4`，除非另行做版本发布决策。
+
+## 阶段 12A 实际结果
+
+- 用户批准后，开始前再次确认官方实时 `main` 仍为 `4f07daa`；恢复点六项关键文件 SHA-256 与登记值一致。
+- 已执行固定 SHA 的 `git merge --no-commit --no-ff 4f07daa`。真实冲突恰好为上文 6 个文件，共 8 个冲突区块；模拟结论无漂移。
+- 当前处于未提交合并状态，尚未解决任何冲突。阶段 12B、merge commit 和 push 分别需要后续批准。
+
+## 阶段 12B 实际结果
+
+- 2026-08-30，用户批准阶段 12B。六个冲突文件的八个区块均按本文件合同手工取并集，未解决索引项归零，没有创建 merge commit。
+- 计费增加 intent 与显式 tier ID 一致性校验；Create 对无画幅模型清空旧 `size`；测试入口保留 panic guard 并加入官方新增取帧和引用测试。
+- Web 相关 9 文件 69/69、TypeScript、Backend 纯逻辑计费/能力和 AutoDL 制品测试通过。宿主 SQLite 测试仅因既知 CGO stub 无法执行，数据库与完整跨栈验证保留到阶段 12C。
+- 八类自动合并语义区域已完成源码级复核，但运行数据库迁移、完整 Backend/Web/Canvas Agent、生产构建和浏览器验证尚未执行，不能升级为完整验证通过。
+- 阶段结束复核发现官方实时 `main=2f6832f`，相对固定合并目标 `4f07daa` 新增 1 个巨型提交、113 文件、7,016 行新增和 723 行删除。该尾差未 fetch/merge，不影响当前冲突解决结论，但意味着当前分支即使完成阶段 12C 也只能声明跟到固定 `4f07daa`。
+
+## 阶段 12C 实际结果
+
+- 2026-08-30，用户批准阶段 12C。隔离 Linux CGO Backend 全部包、Web 1082/1082 + 跨 Runtime 1/1、TypeScript、13,493 模块生产构建、Canvas Agent 主机 327/327 与构建全部通过。
+- Prettier 首次发现 36 个合并后格式漂移并机械修正；修正后 Prettier、TypeScript、相关 Web 69/69、AutoDL 制品、gofmt、Git diff/冲突标记、文档标题、Compose 和 13,493 模块生产构建复验通过；最终构建耗时 7 分 32 秒，最终暂存字节已有构建证据。
+- 两张赞助商 PNG 均可解析和查看：`fruivision.png` 为 793×801，`xmzm.png` 为 5270×3536；README 均以 160 像素宽度展示。未进行浏览器渲染验收。
+- 结束时官方 `main` 已为 `0893741`；`4f07daa..0893741` 是 2 个未审计提交、122 文件、8,431 行新增和 863 行删除。本轮固定合并和全部验证仍只覆盖到 `4f07daa`。
+- 当前停在本地 merge commit 决策门禁；提交、push、部署和新尾差合并均未执行。

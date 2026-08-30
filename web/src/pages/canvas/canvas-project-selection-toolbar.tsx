@@ -26,7 +26,12 @@ export function CanvasProjectSelectionToolbar({ anchorRef, containerRef, count, 
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
 
     const handlers = {
-        onAlign, onArrange, onCreateStoryboard, onCreateReferenceGroup, onBatchConnect, onMergeVideos,
+        onAlign,
+        onArrange,
+        onCreateStoryboard,
+        onCreateReferenceGroup,
+        onBatchConnect,
+        onMergeVideos,
     } as Partial<ToolbarHandlers> as ToolbarHandlers;
 
     const ctx: ToolContext = {
@@ -38,7 +43,7 @@ export function CanvasProjectSelectionToolbar({ anchorRef, containerRef, count, 
         isProjectLinked: false,
         canUndo: false,
         canRedo: false,
-        extractingVideoFrame: false,
+        extractingVideoFrames: false,
         extractingAudio: false,
         trimmingVideo: false,
         mergingVideos,

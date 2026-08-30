@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { ModelSetupGuide } from "@/components/layout/model-setup-guide";
 import { WorkspaceCommandPalette } from "@/components/layout/workspace-command-palette";
 import { WorkspaceSidebarNav } from "@/components/layout/workspace-sidebar-nav";
+import { readWorkspaceSidebarCollapsed, writeWorkspaceSidebarCollapsed } from "@/components/layout/workspace-sidebar-state";
 import { WorkspaceTopBar } from "@/components/layout/workspace-top-bar";
 import { cn } from "@/lib/utils";
 import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
@@ -12,7 +13,7 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const [mobileSidebarExpanded, setMobileSidebarExpanded] = useState(false);
-    const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+    const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(readWorkspaceSidebarCollapsed);
     const [paletteOpen, setPaletteOpen] = useState(false);
 
     const hideChrome = pathname.startsWith("/admin") || /^\/canvas\/[^/]+/.test(pathname);
@@ -27,7 +28,16 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
             setMobileSidebarExpanded((current) => !current);
             return;
         }
-        setDesktopSidebarCollapsed((current) => !current);
+        setDesktopSidebarCollapsed((current) => {
+            const next = !current;
+            writeWorkspaceSidebarCollapsed(next);
+            return next;
+        });
+    };
+
+    const expandDesktopSidebar = () => {
+        setDesktopSidebarCollapsed(false);
+        writeWorkspaceSidebarCollapsed(false);
     };
 
     const handleNavClick = () => {
@@ -64,19 +74,8 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
 
                 <div className="app-workspace-main-row flex min-h-0 min-w-0 flex-1 overflow-hidden">
                     {!hideChrome ? (
-                        <aside
-                            className={cn(
-                                "app-workspace-sidebar flex h-full shrink-0 flex-col overflow-hidden",
-                                mobileSidebarExpanded && "is-mobile-expanded",
-                                desktopSidebarCollapsed && "is-collapsed",
-                            )}
-                        >
-                            <WorkspaceSidebarNav
-                                collapsed={desktopSidebarCollapsed}
-                                onNavigate={handleNavClick}
-                                onOpenSearch={() => setPaletteOpen(true)}
-                                onExpand={() => setDesktopSidebarCollapsed(false)}
-                            />
+                        <aside className={cn("app-workspace-sidebar flex h-full shrink-0 flex-col overflow-hidden", mobileSidebarExpanded && "is-mobile-expanded", desktopSidebarCollapsed && "is-collapsed")}>
+                            <WorkspaceSidebarNav collapsed={desktopSidebarCollapsed} onNavigate={handleNavClick} onOpenSearch={() => setPaletteOpen(true)} onExpand={expandDesktopSidebar} />
                         </aside>
                     ) : null}
 

@@ -1,4 +1,4 @@
-import type { ModelProtocol } from "@/lib/model-protocols";
+import type { ModelProtocol, ModelProtocolWorkflow } from "@/lib/model-protocols";
 
 export type ModelCapabilityConfig = {
     version: number;
@@ -522,6 +522,22 @@ function applyHappyHorseVideoCapability(video: VideoCapabilityConfig, kind: stri
     }
 }
 
+export function pluginWorkflowCapabilityConfig(protocol: ModelProtocol, workflow: ModelProtocolWorkflow): ModelCapabilityConfig | undefined {
+    if (workflow.capability !== "image" && workflow.capability !== "video") return undefined;
+    const fallback = defaultModelCapabilityConfig(protocol, workflow.id);
+    const fields: WorkflowVideoFieldLike[] = workflow.parameters.map((parameter) => ({
+        fieldName: parameter.name,
+        source: parameter.mapping,
+        fieldType: parameter.type,
+        options: parameter.values,
+        defaultValue: workflow.defaults?.[parameter.name],
+    }));
+    if (workflow.capability === "image") {
+        return { ...fallback, image: workflowImageCapabilityConfig(fields, fallback.image!) };
+    }
+    return { ...fallback, video: workflowVideoCapabilityConfig(fields, fallback.video!) };
+}
+
 export function modelCapabilityConfigFor(config: { channels: Array<{ id: string; models: string[]; modelCosts?: Array<{ model: string; capabilityConfig?: ModelCapabilityConfig; protocol?: ModelProtocol }> }> }, model: string) {
     const separator = model.indexOf("::");
     const channelId = separator >= 0 ? model.slice(0, separator) : "";
@@ -599,13 +615,18 @@ export function workflowFieldRandomKey(field: WorkflowVideoFieldLike) {
 }
 
 export function workflowFieldSource(field: WorkflowVideoFieldLike) {
-    return String(field.source || "").trim().replace(/[\s_-]/g, "").toLowerCase();
+    return String(field.source || "")
+        .trim()
+        .replace(/[\s_-]/g, "")
+        .toLowerCase();
 }
 
 export function workflowParameterFields(fields: readonly WorkflowVideoFieldLike[]) {
     return fields.filter((field) => {
         const source = workflowFieldSource(field);
-        const fieldType = String(field.fieldType || "").trim().toUpperCase();
+        const fieldType = String(field.fieldType || "")
+            .trim()
+            .toUpperCase();
         if (!field.fieldName || !field.nodeId || field.enabled === false || !workflowFieldSafeToOverride(field)) return false;
         if (["prompt", "text", "positiveprompt", "positive", "referenceimage", "image", "referencevideo", "video", "referenceaudio", "audio", "mask"].includes(source)) return false;
         if (["IMAGE", "VIDEO", "AUDIO"].includes(fieldType)) return false;
@@ -615,8 +636,12 @@ export function workflowParameterFields(fields: readonly WorkflowVideoFieldLike[
 
 export function workflowFieldSafeToOverride(field: WorkflowVideoFieldLike) {
     if (field.safeToOverride === false) return false;
-    const classType = String(field.classType || "").trim().toLowerCase();
-    const fieldName = String(field.fieldName || "").trim().toLowerCase();
+    const classType = String(field.classType || "")
+        .trim()
+        .toLowerCase();
+    const fieldName = String(field.fieldName || "")
+        .trim()
+        .toLowerCase();
     if (classType === "int" && fieldName === "value") return false;
     return classType !== "imageresize+" || !["width", "height", "multiple_of"].includes(fieldName);
 }
@@ -624,12 +649,46 @@ export function workflowFieldSafeToOverride(field: WorkflowVideoFieldLike) {
 export function workflowFieldRole(field: WorkflowVideoFieldLike) {
     if (["prompt", "media", "business", "internal"].includes(String(field.role || ""))) return String(field.role);
     const source = workflowFieldSource(field);
-    const fieldType = String(field.fieldType || "").trim().toUpperCase();
+    const fieldType = String(field.fieldType || "")
+        .trim()
+        .toUpperCase();
     if (["prompt", "text", "positiveprompt", "positive"].includes(source)) return "prompt";
     if (["referenceimage", "image", "referencevideo", "video", "referenceaudio", "audio", "mask"].includes(source) || ["IMAGE", "VIDEO", "AUDIO"].includes(fieldType)) return "media";
     if (!workflowFieldSafeToOverride(field)) return "internal";
     const key = normalizeWorkflowVideoFieldKey(String(field.fieldName || ""));
-    if (["aspectratio", "ratio", "duration", "durationseconds", "seconds", "videoseconds", "quality", "resolution", "seed", "noiseseed", "steps", "step", "sigmapoints", "cfg", "cfgscale", "guidance", "guidancescale", "sampler", "samplername", "scheduler", "fps", "count", "batch", "batchsize", "generateaudio", "watermark", "negativeprompt", "systemprompt"].includes(key)) return "business";
+    if (
+        [
+            "aspectratio",
+            "ratio",
+            "duration",
+            "durationseconds",
+            "seconds",
+            "videoseconds",
+            "quality",
+            "resolution",
+            "seed",
+            "noiseseed",
+            "steps",
+            "step",
+            "sigmapoints",
+            "cfg",
+            "cfgscale",
+            "guidance",
+            "guidancescale",
+            "sampler",
+            "samplername",
+            "scheduler",
+            "fps",
+            "count",
+            "batch",
+            "batchsize",
+            "generateaudio",
+            "watermark",
+            "negativeprompt",
+            "systemprompt",
+        ].includes(key)
+    )
+        return "business";
     return field.classType ? "internal" : "business";
 }
 
@@ -680,16 +739,7 @@ export function workflowFieldSubmissionValue(field: WorkflowVideoFieldLike, valu
     return matches.length === 1 ? workflowFieldOptionValue(matches[0]) : value;
 }
 
-const resolutionSelectorAspectRatioOptions = [
-    "1:1 (Square)",
-    "2:3 (Portrait Photo)",
-    "3:2 (Photo)",
-    "3:4 (Portrait Standard)",
-    "4:3 (Standard)",
-    "9:16 (Portrait Widescreen)",
-    "16:9 (Widescreen)",
-    "21:9 (Ultrawide)",
-];
+const resolutionSelectorAspectRatioOptions = ["1:1 (Square)", "2:3 (Portrait Photo)", "3:2 (Photo)", "3:4 (Portrait Standard)", "4:3 (Standard)", "9:16 (Portrait Widescreen)", "16:9 (Widescreen)", "21:9 (Ultrawide)"];
 
 function workflowFieldSubmissionChoices(field: WorkflowVideoFieldLike) {
     const classType = normalizeWorkflowVideoFieldKey(String(field.classType || ""));
@@ -717,7 +767,9 @@ const workflowKnownOptions: Record<string, string[]> = {
 
 export function workflowFieldPresetOptions(field: WorkflowVideoFieldLike | undefined) {
     if (!field) return [];
-    const fieldType = String(field.fieldType || "").trim().toUpperCase();
+    const fieldType = String(field.fieldType || "")
+        .trim()
+        .toUpperCase();
     if (["NUMBER", "FLOAT", "INTEGER", "INT", "SLIDER", "BOOLEAN", "BOOL", "IMAGE", "VIDEO", "AUDIO"].includes(fieldType)) return [];
     const classType = normalizeWorkflowVideoFieldKey(String(field.classType || ""));
     const key = normalizeWorkflowVideoFieldKey(String(field.fieldName || ""));
@@ -735,13 +787,15 @@ export function workflowFieldConfigurationError(field: WorkflowVideoFieldLike) {
 export function workflowFieldValueError(field: WorkflowVideoFieldLike, value: unknown) {
     const configurationError = workflowFieldConfigurationError(field);
     if (configurationError) return configurationError;
-    const fieldType = String(field.fieldType || "").trim().toUpperCase();
+    const fieldType = String(field.fieldType || "")
+        .trim()
+        .toUpperCase();
     const bounds = workflowFieldNumberBounds(field);
     const numeric = ["NUMBER", "FLOAT", "INTEGER", "INT", "SLIDER"].includes(fieldType) || bounds.min !== undefined || bounds.max !== undefined || bounds.step !== undefined;
     if (numeric) {
         if (value === undefined || value === null || String(value).trim() === "" || !Number.isFinite(Number(value))) return "请输入有效数字";
         const parsed = Number(value);
-        if (bounds.min !== undefined && parsed < bounds.min || bounds.max !== undefined && parsed > bounds.max) return "数值超出允许范围";
+        if ((bounds.min !== undefined && parsed < bounds.min) || (bounds.max !== undefined && parsed > bounds.max)) return "数值超出允许范围";
         if (bounds.step !== undefined) {
             const start = bounds.min ?? 0;
             const steps = (parsed - start) / bounds.step;
@@ -767,11 +821,9 @@ export function workflowImageCapabilityConfig(fields: readonly WorkflowVideoFiel
         size: ratioField
             ? { parameter: "aspect_ratio", values: ratioOptions.length ? ratioOptions : ratioDefault ? [ratioDefault] : [], default: ratioDefault || ratioOptions[0] || "auto", allowCustom: false }
             : sizeField
-                ? { parameter: "size", values: sizeOptions.length ? sizeOptions : sizeDefault ? [sizeDefault] : [], default: sizeDefault || sizeOptions[0] || "auto", allowCustom: false }
-                : { ...fallback.size, values: [], default: "auto", allowCustom: false },
-        quality: qualityField
-            ? { supported: qualityOptions.length > 0, values: qualityOptions, default: workflowFieldDefaultValue(qualityField) || qualityOptions[0] || "auto" }
-            : { supported: false, values: [], default: "auto" },
+              ? { parameter: "size", values: sizeOptions.length ? sizeOptions : sizeDefault ? [sizeDefault] : [], default: sizeDefault || sizeOptions[0] || "auto", allowCustom: false }
+              : { ...fallback.size, values: [], default: "auto", allowCustom: false },
+        quality: qualityField ? { supported: qualityOptions.length > 0, values: qualityOptions, default: workflowFieldDefaultValue(qualityField) || qualityOptions[0] || "auto" } : { supported: false, values: [], default: "auto" },
         transparentBackground: { supported: false, default: false },
         maxOutputs: 1,
     };
@@ -807,12 +859,14 @@ export function workflowVideoCapabilityConfig(fields: readonly WorkflowVideoFiel
         const defaultValue = workflowFieldDefaultValue(resolutionField);
         if (bounds.min === undefined || bounds.max === undefined || bounds.max < bounds.min) {
             if (generated.length) profile.resolutions = generated;
-        }
-        else if (defaultValue !== "") profile.resolutions = [defaultValue];
+        } else if (defaultValue !== "") profile.resolutions = [defaultValue];
         if (profile.resolutions.length) profile.defaultResolution = matchWorkflowValue(defaultValue, profile.resolutions) || profile.resolutions[0];
     }
     if (durationField) {
-        const options = workflowFieldChoiceValues(durationField).map(workflowFieldOptionValue).map(workflowDurationNumber).filter((value): value is number => value !== undefined);
+        const options = workflowFieldChoiceValues(durationField)
+            .map(workflowFieldOptionValue)
+            .map(workflowDurationNumber)
+            .filter((value): value is number => value !== undefined);
         const bounds = workflowFieldNumberBounds(durationField);
         const generated = options.length ? options : workflowNumericFieldValues(durationField).map(Number).filter(Number.isFinite);
         const defaultValue = Number(workflowFieldDefaultValue(durationField));
@@ -847,9 +901,10 @@ export function workflowVideoCapabilityConfig(fields: readonly WorkflowVideoFiel
 
 /** 读取工作流当前选择的比例/尺寸；字段没有语义名时仅识别纯尺寸枚举。 */
 export function workflowOutputSizeValue(fields: readonly WorkflowVideoFieldLike[], values: Readonly<Record<string, unknown>>) {
-    const field = fields.find((item) => workflowVideoFieldMatches(item, "aspectratio"))
-        || fields.find((item) => workflowVideoFieldMatches(item, "size"))
-        || fields.find((item) => {
+    const field =
+        fields.find((item) => workflowVideoFieldMatches(item, "aspectratio")) ||
+        fields.find((item) => workflowVideoFieldMatches(item, "size")) ||
+        fields.find((item) => {
             const options = workflowFieldChoiceValues(item).map(workflowFieldOptionValue).filter(Boolean);
             return options.length > 1 && options.every(workflowOutputSizeLike);
         });
@@ -863,8 +918,20 @@ export function workflowVideoDefaultSize(fields: readonly WorkflowVideoFieldLike
     const candidates = fields.filter((field) => workflowDimensionFieldMatches(field, "width") || workflowDimensionFieldMatches(field, "height"));
     const groups = Array.from(new Set(candidates.map((field) => String(field.nodeId || "").trim()).filter(Boolean)));
     const orderedGroups = groups.sort((left, right) => {
-        const leftResize = candidates.some((field) => String(field.nodeId || "").trim() === left && String(field.label || "").toLowerCase().includes("imageresize"));
-        const rightResize = candidates.some((field) => String(field.nodeId || "").trim() === right && String(field.label || "").toLowerCase().includes("imageresize"));
+        const leftResize = candidates.some(
+            (field) =>
+                String(field.nodeId || "").trim() === left &&
+                String(field.label || "")
+                    .toLowerCase()
+                    .includes("imageresize"),
+        );
+        const rightResize = candidates.some(
+            (field) =>
+                String(field.nodeId || "").trim() === right &&
+                String(field.label || "")
+                    .toLowerCase()
+                    .includes("imageresize"),
+        );
         return Number(leftResize) - Number(rightResize);
     });
     for (const nodeId of orderedGroups) {
@@ -935,12 +1002,17 @@ function workflowBooleanDefault(field: WorkflowVideoFieldLike) {
 }
 
 function normalizeWorkflowVideoFieldKey(value: string) {
-    return String(value).toLowerCase().replace(/[\s_-]/g, "");
+    return String(value)
+        .toLowerCase()
+        .replace(/[\s_-]/g, "");
 }
 
 function workflowFieldOptionValues(options: unknown[] | undefined) {
     if (!Array.isArray(options)) return [] as string[];
-    return options.filter((option) => !workflowFieldOptionIsRange(option)).map(workflowFieldOptionValue).filter(Boolean);
+    return options
+        .filter((option) => !workflowFieldOptionIsRange(option))
+        .map(workflowFieldOptionValue)
+        .filter(Boolean);
 }
 
 function workflowFieldChoiceValuesFromProtocol(field: WorkflowVideoFieldLike | undefined) {
@@ -958,8 +1030,9 @@ function workflowFieldOptionIsRange(value: unknown) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
     const nested = item.range;
-    return [item, nested && typeof nested === "object" && !Array.isArray(nested) ? nested as Record<string, unknown> : undefined]
-        .some((candidate) => candidate && ["min", "max", "step", "minValue", "maxValue", "stepValue"].some((key) => candidate[key] !== undefined));
+    return [item, nested && typeof nested === "object" && !Array.isArray(nested) ? (nested as Record<string, unknown>) : undefined].some(
+        (candidate) => candidate && ["min", "max", "step", "minValue", "maxValue", "stepValue"].some((key) => candidate[key] !== undefined),
+    );
 }
 
 function workflowFieldOptionValue(value: unknown): string {
@@ -994,9 +1067,7 @@ export function workflowFieldCurrentValue(field: WorkflowVideoFieldLike | undefi
     // 字段语义相同但存储键不同。读取时按节点号和规范化字段名兼容，
     // 避免找不到用户已选值后回退到工作流或全局默认比例。
     const nodeKey = normalizeWorkflowParameterPart(field.nodeId);
-    const fieldKeys = [field.fieldName, field.source, field.label]
-        .map((value) => normalizeWorkflowParameterPart(value))
-        .filter(Boolean);
+    const fieldKeys = [field.fieldName, field.source, field.label].map((value) => normalizeWorkflowParameterPart(value)).filter(Boolean);
     if (nodeKey && fieldKeys.length) {
         for (const [key, value] of Object.entries(values)) {
             const match = key.match(/^field:([^:]+):(.+)$/i);
@@ -1011,9 +1082,7 @@ export function workflowFieldHasStoredValue(field: WorkflowVideoFieldLike | unde
     if (!field) return false;
     if ([workflowFieldKey(field), ...workflowFieldLegacyKeys(field)].some((key) => Object.prototype.hasOwnProperty.call(values, key))) return true;
     const nodeKey = normalizeWorkflowParameterPart(field.nodeId);
-    const fieldKeys = [field.fieldName, field.source, field.label]
-        .map((value) => normalizeWorkflowParameterPart(value))
-        .filter(Boolean);
+    const fieldKeys = [field.fieldName, field.source, field.label].map((value) => normalizeWorkflowParameterPart(value)).filter(Boolean);
     if (!nodeKey || !fieldKeys.length) return false;
     return Object.keys(values).some((key) => {
         const match = key.match(/^field:([^:]+):(.+)$/i);
@@ -1022,13 +1091,14 @@ export function workflowFieldHasStoredValue(field: WorkflowVideoFieldLike | unde
 }
 
 function normalizeWorkflowParameterPart(value: unknown) {
-    return String(value ?? "").trim().toLowerCase().replace(/[\s_-]/g, "");
+    return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_-]/g, "");
 }
 
 function workflowFieldLegacyKeys(field: WorkflowVideoFieldLike) {
-    const keys = [field.source, field.fieldName, field.label]
-        .map((value) => normalizeWorkflowVideoFieldKey(String(value || "")))
-        .filter(Boolean);
+    const keys = [field.source, field.fieldName, field.label].map((value) => normalizeWorkflowVideoFieldKey(String(value || ""))).filter(Boolean);
     if (keys.some((key) => ["aspectratio", "ratio", "imageaspectratio", "imageratio", "videoaspectratio", "videoratio"].includes(key))) {
         return ["source:aspectRatio", "source:aspect_ratio", "source:ratio"];
     }
@@ -1058,7 +1128,11 @@ function workflowNumber(value: unknown) {
 }
 
 function workflowDurationNumber(value: string) {
-    const parsed = Number(String(value).trim().replace(/(?:s|秒)$/i, ""));
+    const parsed = Number(
+        String(value)
+            .trim()
+            .replace(/(?:s|秒)$/i, ""),
+    );
     return Number.isFinite(parsed) ? parsed : undefined;
 }
 
@@ -1101,10 +1175,14 @@ export function normalizeVideoValue(profile: VideoCapabilityConfig, value: { sec
                   ? requestedDuration
                   : profile.duration.default
               : normalizeRangeDuration(profile, requestedDuration);
-    const ratio = profile.ratios.includes(value.ratio || "") ? value.ratio! : profile.defaultRatio;
+    const ratio = resolveVideoRatioValue(profile, value.ratio);
     // 前端状态历史上保存过 `720`，而能力配置和供应商通常使用 `720p`；统一按能力中的原始值返回，避免被误判为不支持。
     const resolution = resolveVideoResolutionValue(profile, value.resolution);
     return { seconds: String(duration), ratio, resolution };
+}
+
+export function resolveVideoRatioValue(profile: VideoCapabilityConfig, value: string | undefined) {
+    return profile.ratios.includes(value || "") ? value! : profile.defaultRatio || profile.ratios[0] || "";
 }
 
 export function resolveVideoResolutionValue(profile: VideoCapabilityConfig, value: string | undefined) {

@@ -461,7 +461,7 @@ func (s *Service) taskBillingOrder(userID string, task *model.Task, input map[st
 	if priceTier == nil {
 		return nil, BadAuthRequest("当前模型尚未配置所选规格的用户积分价格")
 	}
-	return s.newBillingOrderWithPriceTier(userID, task.ID, "task:"+task.ID+":"+newID(), channelID, modelKey, capability, scene, billingQuantity(capability, config["videoSeconds"]), estimateTaskBillingTokens(input, capability), priceTier.ID)
+	return s.newBillingOrderWithPriceTier(userID, task.ID, "task:"+task.ID+":"+newID(), channelID, modelKey, capability, scene, billingQuantity(capability, config["videoSeconds"]), estimateTaskBillingTokens(input, capability), priceTier.ID, intent)
 }
 
 func (s *Service) newLogicalModelBillingOrder(userID string, task *model.Task, input map[string]any) (*model.BillingOrder, error) {
@@ -483,7 +483,12 @@ func (s *Service) newLogicalModelBillingOrder(userID string, task *model.Task, i
 		capability = capabilityFromTaskType(task.Type)
 	}
 	if logicalModel.PricePolicy == "channel" {
-		order, priceErr := s.newBillingOrderWithPriceTier(userID, task.ID, "task:"+task.ID+":"+newID(), channelModel.ChannelID, channelModel.ModelKey, capability, firstNonEmpty(strings.TrimSpace(task.Operation), task.Type), billingQuantity(capability, config["videoSeconds"]), estimateTaskBillingTokens(input, capability), strings.TrimSpace(fmt.Sprint(config["priceTierId"])))
+		intent := ModelRequestIntentFromTaskInput(input, task.Type, task.Operation)
+		priceTier := channelModelPriceTierForIntent(*channelModel, intent)
+		if priceTier == nil {
+			return nil, BadAuthRequest("当前模型尚未配置所选规格的用户积分价格")
+		}
+		order, priceErr := s.newBillingOrderWithPriceTier(userID, task.ID, "task:"+task.ID+":"+newID(), channelModel.ChannelID, channelModel.ModelKey, capability, firstNonEmpty(strings.TrimSpace(task.Operation), task.Type), billingQuantity(capability, config["videoSeconds"]), estimateTaskBillingTokens(input, capability), priceTier.ID, intent)
 		if priceErr != nil {
 			return nil, priceErr
 		}
@@ -569,7 +574,7 @@ func (s *Service) newBillingOrder(userID string, taskID string, idempotencyKey s
 	return s.newBillingOrderWithPriceTier(userID, taskID, idempotencyKey, channelID, modelKey, capability, scene, requestedQuantity, tokenEstimate, "")
 }
 
-func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, idempotencyKey string, channelID string, modelKey string, capability string, scene string, requestedQuantity int64, tokenEstimate tokenBillingEstimate, priceTierID string) (*model.BillingOrder, error) {
+func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, idempotencyKey string, channelID string, modelKey string, capability string, scene string, requestedQuantity int64, tokenEstimate tokenBillingEstimate, priceTierID string, intents ...ModelRequestIntent) (*model.BillingOrder, error) {
 	item, err := s.repo.ChannelModelByKey(channelID, modelKey)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, BadAuthRequest("当前模型暂时不可用，请重新选择")
@@ -577,7 +582,7 @@ func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, ide
 	if err != nil {
 		return nil, err
 	}
-	tier := channelModelPriceTierForBilling(*item, priceTierID, capability)
+	tier := channelModelPriceTierForBilling(*item, priceTierID, capability, intents...)
 	if tier == nil {
 		return nil, BadAuthRequest("当前模型尚未配置所选规格的用户积分价格")
 	}
@@ -634,15 +639,28 @@ func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, ide
 	}, nil
 }
 
-func channelModelPriceTierForBilling(channelModel model.ChannelModel, priceTierID string, capability string) *model.ChannelModelPriceTier {
+func channelModelPriceTierForBilling(channelModel model.ChannelModel, priceTierID string, capability string, intents ...ModelRequestIntent) *model.ChannelModelPriceTier {
 	if priceTierID != "" {
 		for index := range channelModel.PriceTiers {
 			tier := &channelModel.PriceTiers[index]
 			if tier.ID == priceTierID && tier.Enabled && tier.PriceConfigured {
+				if len(intents) > 0 {
+					expected := channelModelPriceTierForIntent(channelModel, intents[0])
+					if expected == nil || expected.ID != tier.ID {
+						return nil
+					}
+				}
 				return tier
 			}
 		}
 		return nil
+	}
+	if len(intents) > 0 {
+		intent := intents[0]
+		if normalizeCapability(intent.Capability) == "" {
+			intent.Capability = capability
+		}
+		return channelModelPriceTierForIntent(channelModel, intent)
 	}
 	return channelModelPriceTierForIntent(channelModel, ModelRequestIntent{Capability: capability, Options: map[string]any{}})
 }

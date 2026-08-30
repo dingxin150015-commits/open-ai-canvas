@@ -151,4 +151,13 @@ describe("creation library button", () => {
         expect(source).toContain("videoWatermark: String(videoProfile.watermark.supported && videoWatermark)");
         expect(source).toContain("const canSubmit = Boolean(props.prompt.trim()) && !interactionBusy && props.settingsReady");
     });
+
+    test("omits stale video ratios when the selected capability declares no size", () => {
+        const source = compactSource(readFileSync(resolve(import.meta.dir, "../src/pages/create/index.tsx"), "utf8"));
+
+        expect(source).toContain("...(preferredVideoProfile.ratios.length > 0 ? { size: ratio } : {})");
+        expect(source).toContain('size: videoProfile.ratios.length > 0 ? (normalizedVideo?.ratio ?? ratio) : ""');
+        expect(source).toContain('const videoRatioSupported = props.mode === "video" && ratios.length > 0');
+        expect(source).toContain('videoRatioSupported || (props.mode !== "video" && mergedProfile.size.parameter !== "none")');
+    });
 });

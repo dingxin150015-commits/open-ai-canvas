@@ -273,6 +273,7 @@ export default function CreatePage() {
         [activeId, conversations],
     );
     const preferredModel = mode === "text" ? config.textModel : mode === "image" ? config.imageModel : config.videoModel;
+    const preferredVideoProfile = useMemo(() => modelCapabilityConfigFor(config, preferredModel).video!, [config, preferredModel]);
     const hasPrompt = Boolean(prompt.trim());
     const settingsOperation = useMemo(() => {
         const imageCount = attachments.filter(isImageAttachment).length;
@@ -302,10 +303,10 @@ export default function CreatePage() {
                 mode === "image"
                     ? { size: ratio, quality, count: Number(count), transparentBackground: config.transparentBackground === "true" }
                     : mode === "video"
-                      ? { size: ratio, videoSeconds: Number(seconds), vquality: videoQuality, videoGenerateAudio, videoWatermark }
+                      ? { ...(preferredVideoProfile.ratios.length > 0 ? { size: ratio } : {}), videoSeconds: Number(seconds), vquality: videoQuality, videoGenerateAudio, videoWatermark }
                       : {},
         }),
-        [attachments, config.transparentBackground, count, hasPrompt, mode, quality, ratio, seconds, videoGenerateAudio, videoQuality, videoWatermark],
+        [attachments, config.transparentBackground, count, hasPrompt, mode, preferredVideoProfile.ratios.length, quality, ratio, seconds, videoGenerateAudio, videoQuality, videoWatermark],
     );
     const selectedModel = resolveCompatibleModel(config, preferredModel, modelRequirements) || preferredModel;
     const imageProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).image!, [config, selectedModel]);
@@ -791,9 +792,9 @@ export default function CreatePage() {
                 ? { size: normalizedImage?.size || ratio, quality: normalizedImage?.quality || quality, count: normalizedImage?.count || count, videoSeconds: config.videoSeconds }
                 : mode === "video"
                   ? {
-                        size: normalizedVideo?.ratio || ratio,
+                        size: videoProfile.ratios.length > 0 ? (normalizedVideo?.ratio ?? ratio) : "",
                         videoSeconds: normalizedVideo?.seconds || seconds,
-                        vquality: (normalizedVideo?.resolution || videoQuality).replace(/p$/i, ""),
+                        vquality: (normalizedVideo?.resolution ?? videoQuality).replace(/p$/i, ""),
                         videoGenerateAudio: String(videoProfile.generateAudio.supported && videoGenerateAudio),
                         videoWatermark: String(videoProfile.watermark.supported && videoWatermark),
                     }
@@ -2226,6 +2227,7 @@ function GenerationSettingsMenu(props: ComposerProps) {
         setCustomRatioOpen(false);
     };
     const videoResolutionSupported = props.mode === "video" && resolutions.length > 0;
+    const videoRatioSupported = props.mode === "video" && ratios.length > 0;
     const videoGenerateAudio = props.videoGenerateAudio;
     const videoWatermark = props.videoWatermark;
     const imageSummary = [
@@ -2236,7 +2238,7 @@ function GenerationSettingsMenu(props: ComposerProps) {
     const summary =
         props.mode === "video"
             ? [
-                  props.ratio,
+                  ...(videoRatioSupported ? [props.ratio] : []),
                   ...(videoResolutionSupported ? [videoResolutionLabel(props.videoQuality)] : []),
                   ...(props.videoProfile.generateAudio.supported ? [videoGenerateAudio ? "有声" : "无声"] : []),
                   ...(props.videoProfile.watermark.supported ? [videoWatermark ? "有水印" : "无水印"] : []),
@@ -2244,7 +2246,7 @@ function GenerationSettingsMenu(props: ComposerProps) {
             : imageSummary;
     const panel = (
         <div className="creation-parameter-menu">
-            {props.mode === "video" || mergedProfile.size.parameter !== "none" ? (
+            {videoRatioSupported || (props.mode !== "video" && mergedProfile.size.parameter !== "none") ? (
                 <SettingSection title="画幅" value={referenceImageSizeSelected ? referenceImageSizeLabel : props.mode === "image" && usesImageResolutionPicker ? activeImageRatio : props.ratio}>
                     <div className="creation-parameter-content">
                         <div className="creation-choice-grid is-ratio">

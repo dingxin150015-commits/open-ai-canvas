@@ -2,7 +2,7 @@
 
 ## 状态
 
-- 当前阶段：阶段 11 新增量审计已完成；等待用户批准以固定 `4f07daa` 执行 no-commit 合并和冲突处理。
+- 当前阶段：阶段 12C 已完成并停在本地 merge commit 决策门禁；等待用户批准阶段 12D 的本地提交，push 仍不在授权内。
 - 阶段 4-8 已解决全部 29 个文本冲突，当前 `git diff --name-only --diff-filter=U` 为空。
 - 本次批准仅包括先固化固定快照 `ab89c05`，再重新只读确认官方 `main` 后同步已审计的轻量提交 `115e228`；若官方已出现新的未审计代码增量，则停止并重新分析。
 - push 仍需后续单独远程写入批准。
@@ -115,6 +115,38 @@
 - 只读 `merge-tree` 模拟得到 6 个显式冲突：`finance.go`、`pending-test.mdx`、`web/package.json`、`video-settings-panel.tsx`、`model-capabilities.ts`、`create/index.tsx`。
 - 本阶段未执行真实 merge、冲突编辑、merge commit、push、PR、远程 CI、部署、数据库/卷操作或 Provider 调用。
 - 功能分组、逐文件解决合同、8 类语义复核和阶段 12 验证门禁见 `UPSTREAM_INCREMENT_AUDIT_20260829.md`。
+
+### 阶段 12A 执行结果
+
+- 开始前再次只读确认官方实时 `main` 仍为固定候选 `4f07daae9ec3b4e4cb0a8cd35a6e0c1a4b593f29`。
+- 工作树干净、`VERSION=v1.1.4`、无进行中合并；私有恢复点 `BKP-20260828-164620-UPSTREAM-PREMERGE` 目录仍存在，数据库、WAL、独立恢复库、`.settings-key`、迁移标记和 Git bundle 六项 SHA-256 均与登记值一致。
+- 已执行 `git merge --no-commit --no-ff 4f07daa`。当前 `HEAD=ae58ecf`、`MERGE_HEAD=4f07daa`，没有 merge commit。
+- 真实冲突集合与模拟完全一致：6 个文件、8 个冲突区块，无意外新增或缺失；107 个官方增量路径进入合并索引，状态计数为新增 26、修改 75、未合并 6。
+- 本阶段没有解决冲突、运行源码测试、push、PR、远程 CI、部署、数据库/卷操作或 Provider 调用。下一步必须等待用户批准阶段 12B。
+
+### 阶段 12B 执行结果
+
+- 六个显式冲突、八个冲突区块均已逐文件手工解决，未使用批量 ours/theirs；`git diff --name-only --diff-filter=U` 为空。
+- `finance.go` 保留服务端按完整 `ModelRequestIntent` 重新选择价格档，直接任务、逻辑模型和线路切换均使用服务端选出的 tier ID；显式旧 ID 与 intent 不一致时 fail-closed。新增两个计费防回归测试。
+- `model-capabilities.ts` 保留 Qwen/Wan/HappyHorse、视觉总数、智能时长和图片尺寸三态，同时接入插件工作流能力与画幅可为空；视频设置取官方只读尺寸推导并保留智能时长/声音/水印。
+- Create 保留按用户/模型/操作的设置持久化与输出开关；无画幅模型不显示画幅，并把旧全局 `size` 清为空值，模型兼容检查也不再提交该选项。`web/package.json` 保留 panic guard/跨 Runtime 拆分并纳入两个官方新增测试。
+- 自动合并区域已做源码语义复核：SupportStatus 与默认/规格价格并存；图片+音频继续受参考音频上限约束；资源新旧匿名路由、签名、Range 和脱敏日志并存；AutoDL 包/Manifest 合同、短剧归属、公告引用删除和安全 Markdown 边界均保留。
+- 验证：Web 9 个相关测试文件 69/69、`bun run typecheck` 通过；Backend 不依赖 SQLite 的计费/能力专项通过；AutoDL 插件制品专项通过。
+- Backend 宿主专项首次受 Go 缓存 ACL 阻断，主机权限启动后只有 `CGO_ENABLED=0` 的 `go-sqlite3` stub 失败；这属于已知环境限制，不是业务断言失败。数据库、短剧、公告、资源删除和完整 Backend 仍必须在阶段 12C 使用隔离 Linux CGO 门禁验证。
+- 当前没有 merge commit、push、PR、远程 CI、部署、运行数据库/卷或 Provider 操作；下一步必须等待阶段 12C 批准。
+- 结束时官方实时 `main` 已从固定候选 `4f07daa` 前进到 `2f6832f`。GitHub Compare 显示仅 1 个提交，但涉及短剧工作台、技能运行、任务恢复、Backend/Web/Canvas Agent 共 113 文件、7,016 行新增和 723 行删除；本轮没有 fetch/merge 该尾差。当前阶段 12C 仍只验证已解决的固定 `4f07daa` 合并，`2f6832f` 必须另行审计和批准。
+
+### 阶段 12C 执行结果
+
+- 隔离 Linux CGO Backend `go test -count=1 ./...` 全部包通过；测试镜像 manifest 为 `sha256:867a29ee02893ab284625580f15adcf734d81a5fad4619676f7dbc45cd355c03`，未挂载运行数据、备份、密钥或数据卷。
+- Web panic guard 主套件 1082/1082、跨 Runtime 1/1、TypeScript 和生产构建通过；Vite 转换 13,493 个模块，构建耗时 8 分 36 秒，仅有大 chunk 与插件耗时警告。
+- Canvas Agent 在主机权限下 327/327 通过，覆盖真实 Windows 进程树终止、Dreamina 围栏/调度/恢复、Local Runtime、插件和技能合同；Windows 无符号链接权限项按既定边界由 Linux CI 保留。`npm run build` 通过。
+- Prettier 首次检查发现 36 个官方新增/修改文本文件格式漂移；仅做机械格式化后，全部受支持暂存文本文件检查通过，Web TypeScript、相关 9 文件 69/69、AutoDL 制品专项和 13,493 模块生产构建复验通过；最终构建耗时 7 分 32 秒。全部 staged Go 文件 gofmt 通过。
+- 六份 Compose 单独配置和 deploy+build 叠加配置解析通过。`server` 首次在缺失必填数据库密码时按设计 fail-closed；使用仅供 `config --quiet` 的虚拟值后全部通过，未启动服务或连接数据库。
+- `git diff --cached --check`、冲突标记扫描、待测文档二级标题去重和 JSON/MDX 格式通过；两张赞助商 PNG 可读取并完成视觉检查，README 使用固定宽度引用。
+- Web 生产构建在 Prettier 机械修正前首次通过；修正后又完整复跑并通过 13,493 模块生产构建，最终暂存字节已获得构建证据。
+- 结束时官方实时 `main=0893741`。相对固定目标 `4f07daa` 新增 2 个提交、122 文件、8,431 行新增和 863 行删除；本轮未 fetch/merge，未来必须独立审计。
+- 当前没有 merge commit、push、PR、远程 CI、部署、运行数据库/卷或 Provider 操作。下一步只允许在用户新批准后创建本地 merge commit；push 继续是独立门禁。
 
 ## 永久 NO-GO
 
