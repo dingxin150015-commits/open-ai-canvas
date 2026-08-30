@@ -4,7 +4,7 @@
 
 ## Git 与远程
 
-- 当前分支：`codex/upstream-20260828-ab89c05`。阶段 12D 本地 merge commit 为 `e2326856b1cc3a854ea11fcd54c5c3e2866c8ac3`，父提交精确为本地 `ae58ecf` 与官方固定 `4f07daa`；分支已包含 `4f07daa`，`VERSION=v1.1.4`。用户随后授权远程检查点，已首次推送 `origin/codex/upstream-20260828-ab89c05@265c997` 并设置本地跟踪；远程 SHA 与首次推送 HEAD 一致，`origin/main` 仍为 `11931d0`，PR 查询为空。官方 `0893741` 尾差未纳入。
+- 当前分支：`codex/upstream-20260828-ab89c05`。用户 fork 远程检查点为 `origin/codex/upstream-20260828-ab89c05@9815464`，审计开始时本地与远程 ahead/behind 0/0、工作树干净，已包含官方固定 `4f07daa`，`VERSION=v1.1.4`。用户批准独立尾差审计后，官方实时 `main` 已前进并固定为 `c8b60ce`；该尾差为 4 提交、164 文件、26,364 行新增和 2,696 行删除，未执行 merge、业务代码修改或远程写入。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 15 的系统报价与部署安全收口已固化为本地提交 `f9317fa`；尚未 push、未创建 PR、未触发远程 CI。
@@ -26,7 +26,7 @@
 - 阶段 0-2 的计划、恢复点、remote 和实时冲突结果已由当前纯文档提交固化；阶段 3 应从干净的当前 main 创建集成分支，不回退到 `405d25a`，但功能差异分析仍以该阶段 0 起点为准。
 - 用户确认其 fork 是集成分支未来的线上归属，并批准阶段 3 按推荐方案执行：本地先创建 `codex/upstream-20260828-ab89c05`，引入固定官方 SHA 并只核对冲突；本阶段不 push，未验证代码不进入 `origin/main`。
 - 阶段 4-8 已完成全部 29 个文本冲突的分层解决。阶段 8 最后处理 CI、`.gitignore`、Changelog、数据库/待测文档和影策插件 README；根版本保持用户确认的 `v1.1.4`，上游新增功能归入 `Unreleased`。当前 Git 未解决冲突为 0。
-- 阶段 12C 门禁通过：隔离 Linux CGO Backend 全部包；Web 主套件 1082/1082、跨 Runtime 1/1、TypeScript、13,493 模块生产构建；Canvas Agent 主机全量 327/327 与 TypeScript 构建；AutoDL 制品、Prettier、gofmt、冲突标记、cached diff、六份 Compose 和 deploy+build 叠加解析均通过。Prettier 首次发现 36 个官方新增/修改文件格式漂移，机械修正后格式、TypeScript、AutoDL、相关 69/69 和最终生产构建复验通过；最终构建耗时 7 分 32 秒。阶段 12D 已本地提交，随后只推送同名集成分支；`origin/main`、PR、部署和新尾差审计仍需独立批准。
+- 阶段 12C 门禁通过并由 `e232685` 固化，用户 fork 检查点已建立。后续 `4f07daa..c8b60ce` 尾差审计发现 17 个显式冲突文件、48 个冲突区块和 11 个自动合并语义复核文件；详细合同见 `UPSTREAM_TAIL_AUDIT_20260830.md`。下一步真实尾差合并必须重新批准；`origin/main`、PR 和部署仍未授权。
 
 ## 运行与数据
 
