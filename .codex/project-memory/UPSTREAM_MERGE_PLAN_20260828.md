@@ -2,7 +2,7 @@
 
 ## 状态
 
-- 当前阶段：阶段 12C 已完成并停在本地 merge commit 决策门禁；等待用户批准阶段 12D 的本地提交，push 仍不在授权内。
+- 当前阶段：阶段 12D 本地 merge commit 已完成；停在用户 fork 远程写入和新尾差审计门禁。
 - 阶段 4-8 已解决全部 29 个文本冲突，当前 `git diff --name-only --diff-filter=U` 为空。
 - 本次批准仅包括先固化固定快照 `ab89c05`，再重新只读确认官方 `main` 后同步已审计的轻量提交 `115e228`；若官方已出现新的未审计代码增量，则停止并重新分析。
 - push 仍需后续单独远程写入批准。
@@ -147,6 +147,14 @@
 - Web 生产构建在 Prettier 机械修正前首次通过；修正后又完整复跑并通过 13,493 模块生产构建，最终暂存字节已获得构建证据。
 - 结束时官方实时 `main=0893741`。相对固定目标 `4f07daa` 新增 2 个提交、122 文件、8,431 行新增和 863 行删除；本轮未 fetch/merge，未来必须独立审计。
 - 当前没有 merge commit、push、PR、远程 CI、部署、运行数据库/卷或 Provider 操作。下一步只允许在用户新批准后创建本地 merge commit；push 继续是独立门禁。
+
+### 阶段 12D 执行结果
+
+- 用户批准后创建本地 merge commit `e2326856b1cc3a854ea11fcd54c5c3e2866c8ac3`，提交说明为 `chore(upstream): 官方主线 - 合并 4f07daa 新增量`。
+- 双父提交精确为 `ae58ecfe1ebadcfd8e915559081983422516e58b` 与 `4f07daae9ec3b4e4cb0a8cd35a6e0c1a4b593f29`；`git merge-base --is-ancestor 4f07daa HEAD` 通过。
+- 提交后 `.git/MERGE_HEAD` 不存在、工作树干净、根 `VERSION` 仍为 `v1.1.4`。
+- 官方实时 `main` 复核仍为 `08937417ec8e11c20c77a7effeaf026787577650`；未 fetch/merge 该尾差。
+- 没有 push、PR、远程 CI、部署、运行数据库/卷或 Provider 操作。下一步若推送集成分支到用户 fork，必须获得新的远程写入批准；是否先审计 `0893741` 也需用户决策。
 
 ## 永久 NO-GO
 
