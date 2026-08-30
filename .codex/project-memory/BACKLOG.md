@@ -4,7 +4,7 @@
 
 ## P0：接管与数据安全
 
-- [ ] 按 `UPSTREAM_MERGE_PLAN_20260828.md` 完成官方上游增量合并；固定 `4f07daa` 已由本地 merge commit `e232685` 固化，冲突解决和阶段 12C 完整跨栈验证通过。官方新尾差 `4f07daa..0893741`（2 提交、122 文件）不在当前范围，需未来独立审计；push 到用户 fork 仍需单独授权。
+- [ ] 按 `UPSTREAM_MERGE_PLAN_20260828.md` 完成官方上游增量合并；固定 `4f07daa` 已由本地 merge commit `e232685` 固化并推送到用户 fork 同名集成分支，冲突解决和阶段 12C 完整跨栈验证通过。官方新尾差 `4f07daa..0893741`（2 提交、122 文件）不在当前范围，需未来独立审计；`origin/main`、PR 和远程 CI 仍未执行。
 
 - [x] 对当前 SQLite 主库和 WAL 做一致性备份，并验证完整性、独立恢复副本和 OSS 密文解密。
 - [x] 记录当前镜像 ID、容器、卷、数据目录和关键文件哈希。
@@ -84,7 +84,7 @@
 - [x] Microsoft Edge 首页、管理后台和创作页人工只读冒烟。
 - [x] 创建 `BKP-20260827-160505-STAGE16-FINAL` 并登记最终本地镜像标签。
 - [x] 生成 `STAGE16_FINAL_HANDOFF.md` 并清理项目记忆中的已修复旧结论。
-- [ ] push、PR、远程 Actions、Git tag 和 Release；全部等待用户另行授权。
+- [ ] 集成分支 push 已完成；PR、远程 Actions、更新 `origin/main`、Git tag 和 Release 仍等待用户另行授权。
 
 ## 阶段 1 后续门禁
 

@@ -2,7 +2,7 @@
 
 ## 状态
 
-- 当前阶段：阶段 12D 本地 merge commit 已完成；停在用户 fork 远程写入和新尾差审计门禁。
+- 当前阶段：用户 fork 同名集成分支远程检查点已建立；停在 `0893741` 尾差审计、PR/远程 CI 和 `origin/main` 更新门禁。
 - 阶段 4-8 已解决全部 29 个文本冲突，当前 `git diff --name-only --diff-filter=U` 为空。
 - 本次批准仅包括先固化固定快照 `ab89c05`，再重新只读确认官方 `main` 后同步已审计的轻量提交 `115e228`；若官方已出现新的未审计代码增量，则停止并重新分析。
 - push 仍需后续单独远程写入批准。
@@ -155,6 +155,14 @@
 - 提交后 `.git/MERGE_HEAD` 不存在、工作树干净、根 `VERSION` 仍为 `v1.1.4`。
 - 官方实时 `main` 复核仍为 `08937417ec8e11c20c77a7effeaf026787577650`；未 fetch/merge 该尾差。
 - 没有 push、PR、远程 CI、部署、运行数据库/卷或 Provider 操作。下一步若推送集成分支到用户 fork，必须获得新的远程写入批准；是否先审计 `0893741` 也需用户决策。
+
+### 用户 fork 远程检查点
+
+- 用户明确授权“下一步”后，按既定顺序仅推送已验证集成分支，没有更新 `origin/main` 或创建 PR。
+- `git push --set-upstream origin codex/upstream-20260828-ab89c05` 成功；首次远程 SHA 为 `265c9970840b8be755c14dda23e697b83bc1cfa0`，与当时本地 HEAD 一致，本地分支开始跟踪 `origin/codex/upstream-20260828-ab89c05`。
+- 只读复核 `origin/main=11931d0085ccfec3952a4a7e30bd482173c51492`，同名 head 的 PR 查询返回空数组。
+- 本项目记忆提交会在同一次已授权远程检查点操作中继续同步到该集成分支；最终远程 SHA 以 `git ls-remote` 实时结果为准。
+- 未创建 PR、未触发部署、未操作运行数据、未调用 Provider，也未 fetch/merge 官方 `0893741` 尾差。
 
 ## 永久 NO-GO
 
