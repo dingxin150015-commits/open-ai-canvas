@@ -4,7 +4,7 @@
 
 ## Git 与远程
 
-- 当前分支：`codex/upstream-20260828-ab89c05`。固定 `4ba9694` 已创建本地 merge commit `d0def5f807e7d8c410103c85bd5ded43506b39b3`，双父为 `3510997` / `4ba9694`，tree `49580c569687e0ef30b47cce0f5d1aa8e9aa9ff7`，`VERSION=v1.1.4`；提交后工作树曾干净，当前仅有本次提交后项目记忆增量未提交。阶段 C 的 Backend Linux CGO、Web 1122/1122 + 跨 Runtime 1/1 + TypeScript + 13,469 模块生产构建、Canvas Agent 328/328 + build、格式/Compose 均通过。fork 集成分支仍为 `9815464`，dry-run确认可 fast-forward 到 `d0def5f`，但 push 未授权、未执行；非 main 分支 push不会触发现有 quality/publish工作流。运行部署仍是8月27日阶段16 `f9317fa` 镜像。官方实时已到 `b7348ab` / `v1.2.3.1`，相对 `4ba9694` 新增22提交、216文件，未来模拟冲突29文件/52区块，未合并。
+- 当前分支：`codex/upstream-20260828-ab89c05`。固定 `4ba9694` 本地 merge commit为 `d0def5f807e7d8c410103c85bd5ded43506b39b3`，阶段 C完整通过；提交后评审记忆固化为 `768705338b525af63ba8f9fb1babfcd7b92670cd`。用户已授权并完成 fork fast-forward push，首次独立复核 `origin/codex/upstream-20260828-ab89c05=7687053`、本地/远程 ahead/behind 0/0、工作树干净；本记录将作为最终检查点记忆提交继续同步，同名远程应保持与包含本记录的当前 HEAD一致，精确最终 SHA以 Git实时查询为准。没有 force、没有更新 `origin/main`、没有PR/远程CI/部署。运行部署仍是8月27日阶段16 `f9317fa` 镜像；官方实时审计引用为 `b7348ab` / `v1.2.3.1`，新尾差未合并。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 15 的系统报价与部署安全收口已固化为本地提交 `f9317fa`；尚未 push、未创建 PR、未触发远程 CI。
