@@ -24,9 +24,17 @@ export type CanvasResourceReference = {
     mentionToken?: string;
 };
 
+export function canvasSkillMentionToken(skillId: string) {
+    return `@[skill:${skillId}]`;
+}
+
+export function canvasNodeMentionToken(nodeId: string) {
+    return `@[node:${nodeId}]`;
+}
+
 export function canvasResourceMentionToken(reference: CanvasResourceReference) {
     if (reference.mentionToken) return reference.mentionToken;
-    if (reference.kind === "skill" && reference.skill?.skill_id) return `@[skill:${reference.skill.skill_id}]`;
+    if (reference.kind === "skill" && reference.skill?.skill_id) return canvasSkillMentionToken(reference.skill.skill_id);
     if (reference.assetId) return `@[asset:${reference.assetId}]`;
     return `@${reference.label}`;
 }
@@ -34,7 +42,7 @@ export function canvasResourceMentionToken(reference: CanvasResourceReference) {
 export function normalizeCanvasNodeMentionTokens(prompt: string, references: CanvasResourceReference[]) {
     return references.reduce((value, reference) => {
         if (!reference.nodeId || reference.assetId || reference.kind === "skill") return value;
-        return value.split(`@[node:${reference.nodeId}]`).join(`@${reference.label}`);
+        return value.split(canvasNodeMentionToken(reference.nodeId)).join(`@${reference.label}`);
     }, prompt);
 }
 
@@ -44,19 +52,21 @@ export function buildAssetMentionReferences(assets: Asset[]): CanvasResourceRefe
         const kind: CanvasResourceKind = asset.kind === "entity" ? "character" : asset.kind;
         const previewUrl = asset.kind === "image" ? asset.data.dataUrl : asset.kind === "video" ? asset.data.url : asset.coverUrl;
         const text = asset.kind === "text" ? asset.data.content : undefined;
-        return [{
-            id: `asset:${asset.id}`,
-            nodeId: "",
-            assetId: asset.id,
-            kind,
-            label: asset.title,
-            title: asset.title,
-            previewUrl,
-            storageKey: "storageKey" in asset.data ? asset.data.storageKey : undefined,
-            text,
-            active: false,
-            category: asset.category || "other",
-        }];
+        return [
+            {
+                id: `asset:${asset.id}`,
+                nodeId: "",
+                assetId: asset.id,
+                kind,
+                label: asset.title,
+                title: asset.title,
+                previewUrl,
+                storageKey: "storageKey" in asset.data ? asset.data.storageKey : undefined,
+                text,
+                active: false,
+                category: asset.category || "other",
+            },
+        ];
     });
 }
 
@@ -142,7 +152,14 @@ function labelResourceNodes(nodes: CanvasNodeData[], active: boolean) {
                 title: node.title || label,
                 previewUrl: node.metadata?.workflowKind === "character" ? node.metadata.characterCoverUrl : node.type === CanvasNodeType.Drawing ? node.metadata?.drawingPreviewUrl : node.metadata?.previewContent || node.metadata?.content,
                 storageKey: node.metadata?.storageKey,
-                text: node.metadata?.workflowKind === "character" ? node.metadata.characterPrompt : node.type === CanvasNodeType.Text ? node.metadata?.content || node.metadata?.prompt : node.type === CanvasNodeType.Skill ? skillResourceText(node) : undefined,
+                text:
+                    node.metadata?.workflowKind === "character"
+                        ? node.metadata.characterPrompt
+                        : node.type === CanvasNodeType.Text
+                          ? node.metadata?.content || node.metadata?.prompt
+                          : node.type === CanvasNodeType.Skill
+                            ? skillResourceText(node)
+                            : undefined,
                 active,
                 sourceType: node.type,
             },

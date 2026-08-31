@@ -97,7 +97,7 @@ describe("creation library button", () => {
         expect(styles).toContain(".creation-reference-track.is-expanded");
         expect(styles).toContain(".creation-reference-stack-card:is(:hover, :focus-within) .creation-reference-card-content");
         expect(styles).toContain("@media (hover: none)");
-        expect(styles).toContain(".creation-reference-card-remove { opacity: 1; }");
+        expect(styles).toMatch(/\.creation-home \.creation-reference-card-remove\s*\{\s*opacity: 1;\s*\}/);
         expect(styles).not.toContain(".creation-reference-track:not(.is-expanded) .creation-reference-stack-card:nth-child(n+5) { display: block; }");
     });
 

@@ -1,8 +1,9 @@
 import { Button } from "antd";
+import { useQuery } from "@tanstack/react-query";
 import { Clock3, Film, Layers3, PackageCheck } from "lucide-react";
 import { Link } from "react-router";
 
-import type { ProjectDetail } from "@/services/api/projects";
+import { listProjectAssetsPage, type ProjectDetail } from "@/services/api/projects";
 
 import { assetCategoryLabel, formatDuration, MetricCard, StageHeading } from "./workflow-shared";
 
@@ -26,18 +27,20 @@ export function StoryStage({ detail, projectId, unitId }: { detail: ProjectDetai
 
 export function AssetsStage({ detail, projectId, unitId }: { detail: ProjectDetail; projectId: string; unitId: string }) {
     const candidates = detail.assetCandidates.filter((item) => !item.unitId || item.unitId === unitId);
+    const assetCountsQuery = useQuery({ queryKey: ["project", projectId, "assets", "workflow-counts"], queryFn: () => listProjectAssetsPage(projectId, { page: 1, pageSize: 1 }) });
+    const confirmedCounts = assetCountsQuery.data?.categoryCounts || {};
     const categories = ["character", "environment", "wardrobe", "prop", "weapon"];
     return (
         <section className="mx-auto max-w-6xl">
             <StageHeading eyebrow="02 / 资产拆分" title="确认镜头真正会使用的资产" description="角色、场景、服饰、配饰与武器先建立稳定版本，镜头再绑定具体版本。" />
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {categories.map((category) => {
-                    const confirmed = detail.assets.filter((item) => item.category === category).length;
+                    const confirmed = confirmedCounts[category] || 0;
                     const pending = candidates.filter((item) => item.category === category && item.status === "pending_confirmation").length;
                     return (
                         <div key={category} className="border-t border-border/70 py-4">
                             <div className="text-xs font-medium text-foreground/55">{assetCategoryLabel(category)}</div>
-                            <div className="mt-3 text-2xl font-semibold">{confirmed}</div>
+                            <div className="mt-3 text-2xl font-semibold">{assetCountsQuery.isLoading ? "—" : confirmed}</div>
                             <div className="mt-1 text-[var(--fs-micro)] text-foreground/42">已确认 · {pending} 待处理</div>
                         </div>
                     );

@@ -41,25 +41,56 @@ test("writeSkillFiles creates Codex-compatible SKILL.md inputs and unique names"
       description: "second",
       instruction: "do second",
     },
+    {
+      skillId: "package",
+      name: "目录技能",
+      description: "package",
+      files: [
+        {
+          path: "SKILL.md",
+          contentBase64: Buffer.from(
+            "# 目录技能\n\n按需读取参考文件。",
+            "utf8",
+          ).toString("base64"),
+        },
+        {
+          path: "references/guide.md",
+          contentBase64: Buffer.from("# Guide", "utf8").toString("base64"),
+        },
+      ],
+    },
     { skillId: "empty", name: "空技能", instruction: "   " },
   ]);
 
   try {
-    assert.equal(prepared.inputs.length, 2);
+    assert.equal(prepared.inputs.length, 3);
     assert.deepEqual(
       prepared.inputs.map((item) => item.type),
-      ["skill", "skill"],
+      ["skill", "skill", "skill"],
     );
     assert.deepEqual(
       prepared.inputs.map((item) => item.name),
-      ["canvas-same", "canvas-same-2"],
+      ["canvas-same", "canvas-same-2", "canvas-package"],
     );
-    for (const item of prepared.inputs) {
+    for (const item of prepared.inputs.slice(0, 2)) {
       assert.equal(path.basename(item.path), "SKILL.md");
       const body = await fs.readFile(item.path, "utf8");
       assert.match(body, /^---\nname: canvas-same(?:-2)?\ndescription: /);
       assert.match(body, /\n---\n\n#/);
     }
+    const packageInput = prepared.inputs[2];
+    assert.equal(path.basename(packageInput.path), "SKILL.md");
+    assert.match(
+      await fs.readFile(packageInput.path, "utf8"),
+      /^---\nname: canvas-package\ndescription: /,
+    );
+    assert.equal(
+      await fs.readFile(
+        path.join(path.dirname(packageInput.path), "references", "guide.md"),
+        "utf8",
+      ),
+      "# Guide",
+    );
   } finally {
     await Promise.all(
       prepared.directories.map((directory) =>
@@ -75,20 +106,47 @@ test("parseAgentSkills validates and bounds browser skill bundles", () => {
       skillId: "safe",
       name: " safe ",
       description: " desc ",
-      instruction: " instruction ",
+      version: " v2 ",
+      files: [
+        {
+          path: "SKILL.md",
+          mimeType: "text/markdown",
+          contentBase64: Buffer.from("# Safe").toString("base64"),
+        },
+        {
+          path: "references/a.md",
+          mimeType: "text/markdown",
+          contentBase64: Buffer.from("A").toString("base64"),
+        },
+      ],
     },
+    { skillId: "legacy", name: "legacy", instruction: " instruction " },
     { name: "missing instruction" },
     null,
+    {
+      name: "unsafe",
+      files: [
+        {
+          path: "../SKILL.md",
+          contentBase64: Buffer.from("bad").toString("base64"),
+        },
+      ],
+    },
     { name: "too long", instruction: "x".repeat(25_000) },
   ];
   const parsed = parseAgentSkills(input);
 
-  assert.equal(parsed.length, 2);
-  assert.deepEqual(parsed[0], {
-    skillId: "safe",
-    name: "safe",
-    description: "desc",
+  assert.equal(parsed.length, 3);
+  assert.equal(parsed[0].name, "safe");
+  assert.equal(parsed[0].version, "v2");
+  assert.deepEqual(
+    parsed[0].files?.map((file) => file.path),
+    ["SKILL.md", "references/a.md"],
+  );
+  assert.deepEqual(parsed[1], {
+    skillId: "legacy",
+    name: "legacy",
     instruction: "instruction",
   });
-  assert.equal(parsed[1].instruction.length, 24_000);
+  assert.equal(parsed[2].instruction.length, 24_000);
 });

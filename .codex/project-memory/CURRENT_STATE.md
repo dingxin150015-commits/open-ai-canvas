@@ -4,7 +4,7 @@
 
 ## Git 与远程
 
-- 当前分支：`codex/upstream-20260828-ab89c05`。用户 fork 远程检查点为 `origin/codex/upstream-20260828-ab89c05@9815464`，审计开始时本地与远程 ahead/behind 0/0、工作树干净，已包含官方固定 `4f07daa`，`VERSION=v1.1.4`。用户批准独立尾差审计后，官方实时 `main` 已前进并固定为 `c8b60ce`；该尾差为 4 提交、164 文件、26,364 行新增和 2,696 行删除，未执行 merge、业务代码修改或远程写入。
+- 当前分支：`codex/upstream-20260828-ab89c05`。固定 `4ba9694` 未提交合并已完成阶段 C：当前提交前基线为 `HEAD=3510997`、`MERGE_HEAD=4ba9694`、未解决索引项 0、非暂存 0、`VERSION=v1.1.4`；既有解决结果由 `refs/codex/safety/b2-pre-4ba9694@82758b2` 保护。Backend Linux CGO 全量、Web 1122/1122 + 跨 Runtime 1/1 + TypeScript + 13,469 模块生产构建、Canvas Agent 328/328 + build、145 文件 Prettier、gofmt/JSON/文档/七组 Compose 均通过。用户已在本轮单独授权创建本地 merge commit，本文件随该合并提交固化；提交后的实际 HEAD SHA 以 Git 历史和会话记录为准。push、`origin/main`、PR、CI、部署和官方新尾差仍未授权；用户 fork 集成检查点仍为 `9815464`，`origin/main` 仍为 `11931d0`。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 15 的系统报价与部署安全收口已固化为本地提交 `f9317fa`；尚未 push、未创建 PR、未触发远程 CI。
@@ -26,7 +26,7 @@
 - 阶段 0-2 的计划、恢复点、remote 和实时冲突结果已由当前纯文档提交固化；阶段 3 应从干净的当前 main 创建集成分支，不回退到 `405d25a`，但功能差异分析仍以该阶段 0 起点为准。
 - 用户确认其 fork 是集成分支未来的线上归属，并批准阶段 3 按推荐方案执行：本地先创建 `codex/upstream-20260828-ab89c05`，引入固定官方 SHA 并只核对冲突；本阶段不 push，未验证代码不进入 `origin/main`。
 - 阶段 4-8 已完成全部 29 个文本冲突的分层解决。阶段 8 最后处理 CI、`.gitignore`、Changelog、数据库/待测文档和影策插件 README；根版本保持用户确认的 `v1.1.4`，上游新增功能归入 `Unreleased`。当前 Git 未解决冲突为 0。
-- 阶段 12C 门禁通过并由 `e232685` 固化，用户 fork 检查点已建立。后续 `4f07daa..c8b60ce` 尾差审计发现 17 个显式冲突文件、48 个冲突区块和 11 个自动合并语义复核文件；详细合同见 `UPSTREAM_TAIL_AUDIT_20260830.md`。下一步真实尾差合并必须重新批准；`origin/main`、PR 和部署仍未授权。
+- 尾差阶段 B 已完成逐文件取并集：保留本地 Catalog/价格迁移、30MB Runtime 上限、panic guard、百炼/Create 安全合同，并接入技能包、真实进度、项目分页、短剧恢复和后台重构；后台 CSS 的模型编辑器 raw color 已改用 scoped admin token。TypeScript、Web 相关专项、Canvas Agent skills/Runtime 12/12、Backend 技能解析/进度纯逻辑专项通过。下一步完整阶段 C 前应先决定是否审计官方 `c8b60ce..4ba9694` 的直接修复尾差；`origin/main`、PR、push 和部署仍未授权。
 
 ## 运行与数据
 

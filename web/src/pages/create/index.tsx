@@ -76,7 +76,6 @@ import { createPluginHostContext } from "@/services/plugin-host";
 import { usePluginStore } from "@/stores/use-plugin-store";
 import {
     buildCreationMentionReferences,
-    creationReferenceMetadata,
     displayCreationPrompt,
     expandCreationPrompt,
     reconcileCreationAttachmentLimit,
@@ -105,6 +104,7 @@ import {
     splitCreationAttachments,
     type CreationAttachment,
 } from "./creation-assets";
+import { skillRuntime } from "@/services/skill-runtime";
 
 type CreationMode = "text" | "image" | "video";
 type CreationViewMode = "chat" | "storyboard";
@@ -736,8 +736,22 @@ export default function CreatePage() {
             audioCount: referenceAudios.length,
             characterCount: 0,
         });
-        const expandedPrompt = expandCreationPrompt(text, references, attachments);
-        const referenceMetadata = creationReferenceMetadata(references);
+        const skillReferences = references.flatMap((reference) => (reference.skill ? [reference.skill] : []));
+        let skillExecution: Awaited<ReturnType<typeof skillRuntime.prepare<"creation">>>;
+        try {
+            skillExecution = await skillRuntime.prepare({
+                profile: "creation",
+                prompt: expandCreationPrompt(text, references, attachments),
+                skills: skillReferences,
+                selectedSkillIds: skillReferences.map((skill) => skill.skill_id),
+            });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "技能上下文加载失败");
+            releaseRetryLock();
+            return;
+        }
+        const expandedPrompt = skillExecution.prompt;
+        const referenceMetadata = skillExecution.metadata;
         followLatestMessageRef.current = true;
         const userMessage = newMessage("user", text, { mode, model: selectedModel, attachments, references, settings });
         const assistantMessage = newMessage("assistant", "", { mode, model: selectedModel, status: mode === "text" ? "streaming" : "pending", settings, ...retryContext });

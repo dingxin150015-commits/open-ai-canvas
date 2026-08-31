@@ -74,6 +74,12 @@ export type GenerationTask = {
         nodeId?: string;
         batchIndex?: number;
         batchCount?: number;
+        domainProjectId?: string;
+        chapterId?: string;
+        chapterOperation?: "characters" | "storyboard";
+        shotId?: string;
+        workflowStepId?: string;
+        artifactType?: string;
     };
     created_at?: string;
     updated_at?: string;
@@ -172,7 +178,7 @@ export type CreateSessionInput = {
     projectStyle?: { presetId: string; title: string; prompt: string };
     characters?: Array<{ assetId: string; versionId: string; name: string; definition: Record<string, unknown> }>;
     config?: Record<string, unknown>;
-	logicalModelId?: string;
+    logicalModelId?: string;
 };
 
 export type CreateTaskInput = {
@@ -183,7 +189,7 @@ export type CreateTaskInput = {
     prompt: string;
     provider?: string;
     model?: string;
-	logicalModelId?: string;
+    logicalModelId?: string;
     input?: Record<string, unknown>;
 };
 
@@ -655,7 +661,7 @@ async function waitForGenerationTaskTextEvents(id: string, options: WaitForGener
 }
 
 function asTaskTextStreamRecord(value: unknown): Record<string, unknown> {
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function numberValue(value: unknown) {
@@ -675,7 +681,7 @@ class TaskTextStreamFatalError extends Error {
 
 async function taskTextStreamHTTPError(response: Response) {
     try {
-        const payload = await response.json() as { msg?: unknown };
+        const payload = (await response.json()) as { msg?: unknown };
         if (typeof payload.msg === "string" && payload.msg.trim()) return payload.msg;
     } catch {
         // SSE 错误响应可能是空正文或网关 HTML，只返回状态码，避免泄露正文。

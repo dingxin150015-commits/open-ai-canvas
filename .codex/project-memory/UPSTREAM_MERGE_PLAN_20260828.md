@@ -2,7 +2,7 @@
 
 ## 状态
 
-- 当前阶段：`4f07daa..c8b60ce` 官方尾差独立审计已完成；停在固定 SHA no-commit 合并、PR/远程 CI 和 `origin/main` 更新门禁。
+- 当前阶段：尾差阶段 B 已完成；停在 `4ba9694` 新尾差审计或固定 `c8b60ce` 完整阶段 C 验证的用户决策门禁。
 - 阶段 4-8 已解决全部 29 个文本冲突，当前 `git diff --name-only --diff-filter=U` 为空。
 - 本次批准仅包括先固化固定快照 `ab89c05`，再重新只读确认官方 `main` 后同步已审计的轻量提交 `115e228`；若官方已出现新的未审计代码增量，则停止并重新分析。
 - push 仍需后续单独远程写入批准。
@@ -172,6 +172,54 @@
 - 核心风险是技能包/自动 GitHub 同步与启动迁移、短剧工作台大重构、任务恢复/真实进度、积分日志，以及约 8,770 行后台 CSS 与本地设计系统合同冲突。
 - 完整功能、逐文件解决合同、安全审计和后续阶段见 `UPSTREAM_TAIL_AUDIT_20260830.md`。
 - 本阶段没有真实 merge、业务代码修改、push、PR、远程 CI、部署、数据库/卷、技能同步或 Provider 操作。
+
+### 尾差阶段 A 执行结果
+
+- 开始前复核本地工作树干净、`VERSION=v1.1.4`，本地 `HEAD=3510997` 比 fork 检查点领先 1 个纯审计文档提交；官方实时 `main` 三次确认均为固定 `c8b60ce`。
+- 私有恢复点目录仍存在，数据库、WAL、独立恢复库、`.settings-key`、迁移标记和 Git bundle 六项 SHA-256 与登记值一致。
+- 已执行 `git merge --no-commit --no-ff c8b60ce`。当前 `HEAD=3510997`、`MERGE_HEAD=c8b60ce`，没有 merge commit。
+- 真实冲突集合与 merge-tree 审计完全一致：17 个文件、48 个区块，无新增或缺失；164 个官方尾差路径进入索引，状态为新增 36、修改 111、未合并 17。
+- 本阶段没有解决冲突、运行源码测试、push、PR、远程 CI、部署、数据库/卷、技能同步或 Provider 操作。下一步必须等待尾差阶段 B 批准。
+
+### 尾差阶段 B 执行结果
+
+- 17 个显式冲突文件、48 个区块均已解决，未解决索引项归零。除公告编辑器和分页项目详情使用经过逐段审阅的官方完整重构作为基线外，短剧 workbench、Schema、技能、Create、后台和 CSS 均逐区块取并集；未做批量 ours/theirs。
+- Schema 同时保留本地 Catalog 回填、官方章节字数回填和价格选择器迁移；Canvas Agent skills 测试取并集；声音样本使用真实 MIME/扩展名；Create 保留设置/输出/引用合同并接入 Skill Runtime。
+- 短剧 workbench 接入分页资产、技能、任务恢复、真实进度、镜头删除/解绑和三阶段状态，同时保留本地镜头画面/动态提示词字段、Backend 任务生命周期和 fail-closed 生成门禁。
+- Local Runtime 保持 30MB 签名 JSON 上限；后台回归测试改为经 panic guard 运行；后台模型编辑器 raw color 改为 admin token，并新增 CSS scope/panic guard 回归测试。
+- 验证：Web TypeScript 通过；11 文件专项首轮 92/93，唯一失败是删除按钮测试对白空白敏感，修正后该文件 2/2、短剧关键 9/9 复验通过；后台回归 10/10。Canvas Agent skills/Runtime 12/12，Backend 技能包解析/Provider 进度纯逻辑专项通过。完整 SQLite/Backend/Web/Canvas Agent/构建仍留阶段 C。
+- 格式、gofmt、cached diff、冲突标记和待测文档标题检查通过；当前 165 个业务/官方路径暂存，项目记忆另行暂存。
+- 结束复核发现官方实时 `main=4ba9694`。`c8b60ce..4ba9694` 为 8 个提交、42 文件、+2,398/-414，包含多项直接修复分镜模型计价、并行生成、角色图声资产、视频参考协议和镜头台词；本轮未 fetch/merge。
+- 没有 merge commit、push、PR、远程 CI、部署、数据库/卷、技能同步或 Provider 操作。建议用户先决定是否审计 `4ba9694` 修复尾差，再进入阶段 C。
+
+### 修复尾差独立审计与阶段 B2 建议
+
+- `c8b60ce..4ba9694` 已完成独立审计；固定目标通过独立 `official/audit-4ba9694` 引用获取，本地 `official/main` 和当前 `MERGE_HEAD=c8b60ce` 未改变。
+- 当前已解决索引与该尾差有 11 个重叠文件；merge-tree 预测 3 个显式冲突文件、15 个区块，其中工作台 13 个。
+- 前 5 个短剧/协议修复应作为一个耦合组在阶段 C 前纳入，但先修复 xAI 尾帧在前端、Backend Provider 和协议 Adapter 的三路径不一致。
+- 浅色画布修复必须 token 化。首页仪表盘默认暂缓；若纳入，先修 `taskCenterEnabled`、查询错误态和 300 条统计截断。`4ba9694` 的工作台横向滚动 CSS 可与首页部分拆开纳入。
+- 下一步定义为修复尾差阶段 B2：只在用户明确批准后打开固定 `4ba9694` 的 no-commit 增量、解决 3 文件/15 区块并做必要修正；完成后再进入完整阶段 C。merge commit、push、PR、CI、部署和 Provider 调用仍为独立门禁。
+
+### 修复尾差阶段 B2 执行结果
+
+- 用户批准后，先以安全树和双父安全提交 `82758b2` 保护当前 `c8b60ce` 已解决索引，再标准重开固定 `4ba9694` no-commit 合并。直接冲突 18 文件/52 区块，经安全三方结果恢复后精确收敛为 3 文件/15 区块并逐区块解决。
+- 当前 `HEAD=3510997`、`MERGE_HEAD=4ba9694`、未解决索引项 0、非暂存 0、`VERSION=v1.1.4`。安全引用 `refs/codex/safety/b2-pre-4ba9694` 暂时保留到后续 merge commit 门禁完成。
+- xAI 尾帧在协议 Adapter、Backend 类型化 Provider 和前端直连统一 fail-closed；R2V 忽略陈旧帧元数据。浅色画布背景 token 化；首页仪表盘暂缓，工作台横向滚动 CSS 保留。
+- B2 专项验证通过 TypeScript、尾差 Prettier、xAI 协议/Service、gofmt/JSON/marker/diff。Web Bun 和 Linux CGO/全量/构建/Edge 未完成，转入阶段 C。
+- 官方实时 `main=fb089b2`，相对固定目标的新尾差未审计、未 fetch/merge。没有 commit、push、PR、CI、部署、数据或 Provider 操作。
+
+### 固定 `4ba9694` 阶段 C 执行结果
+
+- Backend Linux CGO `go test -count=1 ./...` 全部通过；Web 最终 admin 10/10、主套件 1122/1122、跨 Runtime 1/1、TypeScript 和 13,469 模块生产构建通过；Canvas Agent 最终字节 328/328、build通过。
+- 首轮 Web 3 个失败均为测试合同漂移，只修正 xAI 测试签名和两个空白/新调用合同断言；专项23/23后完整套件通过。测试镜像补齐 Agent锁文件依赖后跨 Runtime通过。
+- 145 暂存文本 Prettier、暂存 Go gofmt、JSON、文档标题和七组 Compose解析通过；运行容器/数据未改变，没有 Edge 候选验收。
+- 当前固定合并满足创建本地 merge commit的源码门禁，但提交仍需单独批准。提交时必须验证双父 `3510997` / `4ba9694`、最终树和版本；不得包含或宣称已包含官方实时 `e124a9e`。
+- 当前未提交状态不可作为完整合并推送。merge commit完成后，用户 fork 同名集成分支 `9815464` 可被 fast-forward，但 push、PR、CI、`origin/main` 和部署继续是独立门禁。
+
+### 固定 `4ba9694` 本地 merge commit 授权
+
+- 用户已单独授权本轮创建本地 merge commit；提交说明使用项目约定格式，双父必须为提交前 `HEAD=3510997` 与固定官方 `4ba9694`，提交树必须等于最终暂存树。
+- 本轮授权不包含 push。提交完成后只读复核 fork、运行部署和官方实时主干并评估推送可行性；不更新 `origin/main`，不处理官方新尾差。
 
 ## 永久 NO-GO
 

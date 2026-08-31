@@ -228,14 +228,14 @@ export default function ChannelsPage() {
                 </div>
             ),
         },
-        { title: "模型", dataIndex: "models", width: 100, render: (models: string[]) => `${models?.length || 0} 个` },
-        { title: "最大并发", dataIndex: "concurrencyLimit", width: 120, render: (value: number) => (value > 0 ? value : <span className="text-foreground/45">跟随系统</span>) },
-        { title: "凭证", width: 130, render: (_, channel) => <AdminStatusBadge label={channel.hasApiKey ? (channel.hasSecretKey ? "AK/SK 已配置" : "API Key 已配置") : "未配置"} tone={channel.hasApiKey ? "success" : "neutral"} /> },
-        { title: "状态", dataIndex: "enabled", width: 100, render: (enabled) => <AdminStatusBadge label={enabled !== false ? "已启用" : "已停用"} tone={enabled !== false ? "success" : "neutral"} /> },
+        { title: "模型", dataIndex: "models", width: 100, align: "center", render: (models: string[]) => `${models?.length || 0} 个` },
+        { title: "最大并发", dataIndex: "concurrencyLimit", width: 120, align: "center", render: (value: number) => (value > 0 ? value : <span className="text-foreground/45">跟随系统</span>) },
+        { title: "凭证", width: 130, align: "center", render: (_, channel) => <AdminStatusBadge label={channel.hasApiKey ? (channel.hasSecretKey ? "AK/SK 已配置" : "API Key 已配置") : "未配置"} tone={channel.hasApiKey ? "success" : "neutral"} /> },
+        { title: "状态", dataIndex: "enabled", width: 100, align: "center", render: (enabled) => <AdminStatusBadge label={enabled !== false ? "已启用" : "已停用"} tone={enabled !== false ? "success" : "neutral"} /> },
         {
             title: "操作",
             width: 250,
-            align: "right",
+            align: "center",
             render: (_, channel) => (
                 <AdminRowActions
                     primary={{ label: "模型管理", onClick: () => setManagingChannel(channel) }}
@@ -312,6 +312,7 @@ export default function ChannelsPage() {
                 }
                 toolbarFilters={
                     <Select
+                        aria-label="筛选渠道状态"
                         className="w-32"
                         value={status}
                         onChange={(value) => updateUrl({ status: value, page: 1 })}
@@ -359,7 +360,7 @@ export default function ChannelsPage() {
                 open={drawerOpen}
                 width={760}
                 onCancel={closeDrawer}
-                maskClosable={!saving}
+                mask={{ closable: !saving }}
                 destroyOnHidden
                 footer={
                     <div className="flex justify-end gap-2">
