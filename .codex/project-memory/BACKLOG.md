@@ -4,7 +4,7 @@
 
 ## P0：接管与数据安全
 
-- [ ] 按 `UPSTREAM_MERGE_PLAN_20260828.md` 完成官方上游增量合并；固定 `4ba9694` 阶段 C 已通过全部源码门禁，用户已单独授权本轮创建本地 merge commit并核对双父/最终树。本轮只在提交后评审 fork fast-forward 推送，不执行 push。`origin/main`、PR、远程 CI、部署和官方实时新尾差均未授权。
+- [ ] 按 `UPSTREAM_MERGE_PLAN_20260828.md` 完成官方上游增量合并；固定 `4ba9694` 已固化为本地 merge commit `d0def5f`，阶段 C门禁通过。fork 同名集成分支可从 `9815464` fast-forward到该提交，但 push 未授权；推送该非 main分支不会自动触发 quality/publish工作流。当前需先决定是否把本次提交后项目记忆另行固化，再单独授权 push。`origin/main`、PR、远程CI、部署及官方 `4ba9694..b7348ab` 新尾差均未授权。
 
 - [x] 对当前 SQLite 主库和 WAL 做一致性备份，并验证完整性、独立恢复副本和 OSS 密文解密。
 - [x] 记录当前镜像 ID、容器、卷、数据目录和关键文件哈希。

@@ -4,7 +4,7 @@
 
 ## Git 与远程
 
-- 当前分支：`codex/upstream-20260828-ab89c05`。固定 `4ba9694` 未提交合并已完成阶段 C：当前提交前基线为 `HEAD=3510997`、`MERGE_HEAD=4ba9694`、未解决索引项 0、非暂存 0、`VERSION=v1.1.4`；既有解决结果由 `refs/codex/safety/b2-pre-4ba9694@82758b2` 保护。Backend Linux CGO 全量、Web 1122/1122 + 跨 Runtime 1/1 + TypeScript + 13,469 模块生产构建、Canvas Agent 328/328 + build、145 文件 Prettier、gofmt/JSON/文档/七组 Compose 均通过。用户已在本轮单独授权创建本地 merge commit，本文件随该合并提交固化；提交后的实际 HEAD SHA 以 Git 历史和会话记录为准。push、`origin/main`、PR、CI、部署和官方新尾差仍未授权；用户 fork 集成检查点仍为 `9815464`，`origin/main` 仍为 `11931d0`。
+- 当前分支：`codex/upstream-20260828-ab89c05`。固定 `4ba9694` 已创建本地 merge commit `d0def5f807e7d8c410103c85bd5ded43506b39b3`，双父为 `3510997` / `4ba9694`，tree `49580c569687e0ef30b47cce0f5d1aa8e9aa9ff7`，`VERSION=v1.1.4`；提交后工作树曾干净，当前仅有本次提交后项目记忆增量未提交。阶段 C 的 Backend Linux CGO、Web 1122/1122 + 跨 Runtime 1/1 + TypeScript + 13,469 模块生产构建、Canvas Agent 328/328 + build、格式/Compose 均通过。fork 集成分支仍为 `9815464`，dry-run确认可 fast-forward 到 `d0def5f`，但 push 未授权、未执行；非 main 分支 push不会触发现有 quality/publish工作流。运行部署仍是8月27日阶段16 `f9317fa` 镜像。官方实时已到 `b7348ab` / `v1.2.3.1`，相对 `4ba9694` 新增22提交、216文件，未来模拟冲突29文件/52区块，未合并。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 15 的系统报价与部署安全收口已固化为本地提交 `f9317fa`；尚未 push、未创建 PR、未触发远程 CI。
