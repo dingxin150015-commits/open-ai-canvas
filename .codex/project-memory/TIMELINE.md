@@ -406,3 +406,12 @@
 - 先提交5份提交后项目记忆为 `768705338b525af63ba8f9fb1babfcd7b92670cd`。推送前重新读取远程仍为 `9815464`，tracking ref一致且为本地祖先；dry-run通过。
 - 实际push将 `origin/codex/upstream-20260828-ab89c05` 从 `9815464` fast-forward到 `7687053`，没有force、没有更新`origin/main`。随后独立 `ls-remote` 返回同一SHA，本地/远程 ahead/behind为0/0，工作树干净。
 - 本记录作为最终检查点记忆提交继续fast-forward同步；最终远程必须与包含本记录的当前HEAD精确一致。非main push未触发quality/publish工作流，不能声称远程CI通过。
+
+## 2026-09-01：路线B保留卷升级至固定 `4ba9694` 本地候选
+
+- 新增本地部署标识提交 `c3f5479`，根版本改为 `v1.1.4+local.4ba.e02cee1`，未推送fork。
+- 创建 `BKP-20260901-114427-ROUTE-B-PREDEPLOY`：完整数据、原始DB/WAL/SHM/密钥/迁移标记、独立恢复库、Git bundle和回滚镜像标签均验证；完整性ok、外键0、60表、业务计数1/1/320/3/5/5/1，逐文件ACL无额外主体。
+- 构建Backend `8182cc0a`、Web `522109d7`候选；Web 13,469模块并包含新版本标识。
+- 禁网克隆卷第一次迁移60→72表、生成33个规范化skill包；第二次启动表数和全部业务计数稳定，迁移错误0、密钥不变。演练容器/卷随后删除。
+- 在旧镜像回滚标签保护下，仅执行local Compose `up -d --no-build --force-recreate`，保留真实 `open-ai-canvas_backend-data`；新容器healthy/restart0/OOMfalse。
+- HTTP健康、Web版本、日志和升级后真实卷快照通过；数据库完整性ok、外键0、72表，关键Schema/计数与演练一致。当前停在用户Microsoft Edge人工验收前，无真实模型/OSS外部写入。

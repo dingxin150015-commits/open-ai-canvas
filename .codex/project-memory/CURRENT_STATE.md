@@ -4,7 +4,7 @@
 
 ## Git 与远程
 
-- 当前分支：`codex/upstream-20260828-ab89c05`。固定 `4ba9694` 本地 merge commit为 `d0def5f807e7d8c410103c85bd5ded43506b39b3`，阶段 C完整通过；提交后评审记忆固化为 `768705338b525af63ba8f9fb1babfcd7b92670cd`。用户已授权并完成 fork fast-forward push，首次独立复核 `origin/codex/upstream-20260828-ab89c05=7687053`、本地/远程 ahead/behind 0/0、工作树干净；本记录将作为最终检查点记忆提交继续同步，同名远程应保持与包含本记录的当前 HEAD一致，精确最终 SHA以 Git实时查询为准。没有 force、没有更新 `origin/main`、没有PR/远程CI/部署。运行部署仍是8月27日阶段16 `f9317fa` 镜像；官方实时审计引用为 `b7348ab` / `v1.2.3.1`，新尾差未合并。
+- 当前分支：`codex/upstream-20260828-ab89c05`。fork固定 `4ba9694` 检查点为 `e02cee1`；本地增加部署标识提交 `c3f5479`，未推送，UI版本为 `v1.1.4+local.4ba.e02cee1`。路线B已完成私有恢复点、候选镜像、两次克隆卷迁移幂等和真实保留卷升级；当前运行Backend `8182cc0a`、Web `522109d7`，均healthy/restart0/OOMfalse，真实卷仍为 `open-ai-canvas_backend-data`。升级后数据库完整性ok、外键0、72张表，业务计数保持用户/渠道/模型/任务/资源/素材/画布1/1/320/3/5/5/1，skills/versions/files为33，密钥和迁移标记不变。当前状态为 `runtime_candidate_healthy / edge_pending`；没有真实模型调用、OSS删除或候选Edge验收。官方实时新尾差仍未合并。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 15 的系统报价与部署安全收口已固化为本地提交 `f9317fa`；尚未 push、未创建 PR、未触发远程 CI。
