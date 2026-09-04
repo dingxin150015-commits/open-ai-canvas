@@ -4,7 +4,7 @@
 
 ## Git 与远程
 
-- 2026-09-04 用户批准把下一轮官方增量目标固定为 `v1.2.5@f8e87bcc4ce3e6f7eae7a89dc8b9231801116072`，采用“双轨来源、单树交付”：官方 Release 负责上游功能，本地独立模块/补丁负责自研功能，临时集成分支验证后才晋升长期 `codex/dingxin-stable`。阶段 0–4 可连续执行，阶段 4 后必须停止；阶段 5–9、Astravia 安装/启用仍未授权执行。详见 `UPSTREAM_V125_PLAN_20260904.md`。
+- 2026-09-04 用户批准把下一轮官方增量目标固定为 `v1.2.5@f8e87bcc4ce3e6f7eae7a89dc8b9231801116072`，采用“双轨来源、单树交付”。阶段 0–1 已把历史检查点和新 `origin/codex/dingxin-stable` 安全 fast-forward 到 `44e8c10`；阶段 2 完整对象审计确认官方增量 66 提交/506 文件、双方重叠 89 路径、模拟 47 个显式冲突/149 区块。当前分支 `codex/upstream-v1.2.5-20260904@44e8c10` 尚未 push、尚未打开 merge；阶段 0–4 可连续执行，阶段 4 后必须停止，阶段 5–9和Astravia仍未授权。详见 `UPSTREAM_V125_PLAN_20260904.md` 与 `UPSTREAM_V125_AUDIT_20260904.md`。
 - 当前分支：`codex/upstream-20260828-ab89c05`。fork固定 `4ba9694` 检查点为 `e02cee1`；本地增加部署标识提交 `c3f5479` 和路线B记录提交 `15342d5`，均未推送，UI版本为 `v1.1.4+local.4ba.e02cee1`。路线B已完成私有恢复点、候选镜像、两次克隆卷迁移幂等和真实保留卷升级；当前运行Backend `8182cc0a`、Web `522109d7`，均healthy/restart0/OOMfalse，真实卷仍为 `open-ai-canvas_backend-data`。升级后数据库完整性ok、外键0、72张表，业务计数保持用户/渠道/模型/任务/资源/素材/画布1/1/320/3/5/5/1，skills/versions/files为33，密钥和迁移标记不变。2026-09-04 用户在登录态Microsoft Edge完成11张截图的人工只读冒烟，版本/会话、稳定首页、项目/章节、空资产分镜、5项素材、3条任务、Skill详情、后台和DevTools基础健康通过，状态为 `runtime_candidate_edge_smoke_passed_limited`。真实资产绑定分镜、多镜头生成/恢复、Provider、精确计费、OSS新写入和强写路径仍未验证；官方实时新尾差仍未合并。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。

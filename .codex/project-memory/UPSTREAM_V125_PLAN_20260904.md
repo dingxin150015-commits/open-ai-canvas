@@ -20,8 +20,8 @@
 
 ## 已知规模和审计重点
 
-- 相对已集成共同基点 `4ba9694`，官方 `v1.2.5` 有 66 个提交、300 个文件、约 `+16,725/-657`。
-- 当前本地与官方目标有 40 个重叠路径；这是语义复核集合，不是最终显式冲突数。
+- 相对已集成共同基点 `4ba9694`，固定标签完整 fetch 后确认官方 `v1.2.5` 有 66 个提交、506 个文件、`+38,322/-3,646`。早先 300 文件数字来自 GitHub Compare API 文件列表上限，已被本地 Git 对象统计替代。
+- 当前本地与官方目标有 89 个重叠路径；merge-tree 模拟为 47 个显式冲突文件、149 个区块，另有 40 个 changed-both 自动合并路径需要语义复核。
 - 高风险区域：Backend schema/model/provider/task/resource/finance/channel model；协议 Registry 和能力；Web 资产/mention/节点生成/工具栏；Docker/Compose/VERSION/CHANGELOG；插件 Manifest、文档和测试入口。
 - 先完成 v1.2.5 集成，再单独做“本地扩展边界收口”，避免把上游大增量和本地重构混为一个变量。
 
