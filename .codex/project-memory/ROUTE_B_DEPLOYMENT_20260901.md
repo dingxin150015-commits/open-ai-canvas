@@ -10,7 +10,8 @@
   - Web `sha256:522109d7e69f0ece1ea6c7d48440bd45dfde81be0cff6d9821bd200cb8347d10`
 - 当前容器：Backend `bbe85006b5df`，Web `abbc9af6205f`；均 running/healthy、RestartCount=0、OOM=false。
 - 真实数据卷保持 `open-ai-canvas_backend-data:/data`，没有删除或替换。
-- 当前停在 Microsoft Edge 人工验收之前；没有真实模型调用、OSS 删除或候选 Edge 证据。
+- 2026-09-04 用户已使用登录态 Microsoft Edge 完成人工只读冒烟并回传 11 张截图；当前状态升级为 `runtime_candidate_edge_smoke_passed_limited`。
+- 本次验收没有真实模型调用、模型测试、计费写入、OSS 写入/删除、Skill 同步或其他外部写入；这些不属于已通过范围。
 
 ## 恢复点
 
@@ -114,4 +115,25 @@
 - 版本不是 `v1.1.4+local.4ba.e02cee1`；
 - Console未捕获异常或关键API 5xx。
 
-人工验收完成前，本部署状态为 `runtime_candidate_healthy / edge_pending`，不能升级为已验收发布。
+## 2026-09-04 Microsoft Edge 人工冒烟结果
+
+### 已确认
+
+- 版本与登录：左下角显示 `v1.1.4+local.4ba.e02cee1`，原登录会话可用。
+- 首页与全局导航：稳定首页、侧栏和工作台入口正常；没有启用此前暂缓的首页统计仪表盘。
+- 项目与章节：原有 `测试项目`、1 章、1 张项目画布可见，项目概览和章节流程可进入。
+- 分镜工作台：在项目资产为 0 的现状下，镜头列表、脚本字段、预览区、底部镜头轨道和主要按钮正常显示；用户确认当前可测试部分正常。
+- 素材、任务与技能：素材库显示 5 项（2 图、3 视频），任务页显示 3 条已完成任务，Skill 详情可打开并读取 `SKILL.md`。
+- 管理后台：数据概览、模型编辑/价格区域等已检查页面正常；概览显示用户 1、生成任务 3、服务质量 100%、异常请求 0、队列 0。
+- DevTools：Console 截图没有可见未捕获异常；Network 截图所示请求为 200，包括概览和模型价格接口。用户确认没有持续 401/403/404/500 或整体报错。
+- 2026-09-04 非浏览器复核：Backend/Web 继续 running/healthy、RestartCount=0、OOM=false，真实卷仍为 `open-ai-canvas_backend-data:/data`，`/api/health` 仍返回业务 `code=0/status=ok`。
+
+### 覆盖限制与后续门禁
+
+- 项目当前没有项目资产，因此未验证真实角色/场景/道具绑定与解绑、`@` mention、历史角色图/当前声音、音频引用、长资产名溢出和刷新后恢复。
+- 未执行多镜头并行生成、失败恢复、历史产物回填或下载；未验证真实 Provider、精确计费或 OSS 新写入。
+- 未执行模型测试、模型/价格保存、存储连接测试/保存、Skill 安装/同步、删除或其他强写路径。
+- 用户提到 Network 中有少量“内容没找到”，但现有截图没有可定位的 URL、状态码或失败响应，且没有持续 4xx/5xx；当前不登记为已确认缺陷。若复现，应记录精确 URL、status、initiator、response 和时间后单独诊断。
+- 本次结论是路线 B 的登录态、导航、数据可见性和主要只读页面冒烟通过，不等同于完整生产验收或付费生成验收。
+
+当前部署状态为 `runtime_candidate_edge_smoke_passed_limited`。无需因本次结果回滚；恢复点和旧镜像标签继续保持 `protected`，在真实资产分镜与外部写路径另行验收前不清理。

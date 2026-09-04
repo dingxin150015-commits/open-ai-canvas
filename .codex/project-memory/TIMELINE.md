@@ -415,3 +415,12 @@
 - 禁网克隆卷第一次迁移60→72表、生成33个规范化skill包；第二次启动表数和全部业务计数稳定，迁移错误0、密钥不变。演练容器/卷随后删除。
 - 在旧镜像回滚标签保护下，仅执行local Compose `up -d --no-build --force-recreate`，保留真实 `open-ai-canvas_backend-data`；新容器healthy/restart0/OOMfalse。
 - HTTP健康、Web版本、日志和升级后真实卷快照通过；数据库完整性ok、外键0、72表，关键Schema/计数与演练一致。当前停在用户Microsoft Edge人工验收前，无真实模型/OSS外部写入。
+
+## 2026-09-04：路线B Microsoft Edge 人工只读冒烟
+
+- 用户使用既有登录态Microsoft Edge完成清单并回传11张截图；左下角版本为 `v1.1.4+local.4ba.e02cee1`，登录会话、稳定首页和全局导航正常。
+- 原有 `测试项目`、1章、1张项目画布、5项素材和3条已完成任务可见；Skill详情及 `SKILL.md`、管理后台数据概览和模型编辑/价格区域均能加载。
+- 项目资产当前为0，因此只确认分镜工作台空资产状态下的布局、字段、轨道和入口；真实资产绑定/mention/声音/引用、长名称、多镜头生成与恢复未覆盖。
+- Console无可见未捕获异常；Network截图中的概览、模型价格等请求为200。用户确认没有持续401/403/404/500；未提供可定位的单次“内容没找到”请求，暂不登记为缺陷。
+- 同日非浏览器复核Backend/Web仍healthy、restart0、OOMfalse，真实卷未变，`/api/health`业务健康。部署状态升级为 `runtime_candidate_edge_smoke_passed_limited`，无需回滚。
+- 本轮没有模型调用、模型测试、计费/OSS写入、存储保存、Skill同步、删除、push、PR或远程CI；恢复点及旧镜像标签继续保护。

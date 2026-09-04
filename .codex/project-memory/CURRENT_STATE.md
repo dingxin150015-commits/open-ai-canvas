@@ -1,10 +1,10 @@
 # 当前状态
 
-更新时间：2026-08-28
+更新时间：2026-09-04
 
 ## Git 与远程
 
-- 当前分支：`codex/upstream-20260828-ab89c05`。fork固定 `4ba9694` 检查点为 `e02cee1`；本地增加部署标识提交 `c3f5479`，未推送，UI版本为 `v1.1.4+local.4ba.e02cee1`。路线B已完成私有恢复点、候选镜像、两次克隆卷迁移幂等和真实保留卷升级；当前运行Backend `8182cc0a`、Web `522109d7`，均healthy/restart0/OOMfalse，真实卷仍为 `open-ai-canvas_backend-data`。升级后数据库完整性ok、外键0、72张表，业务计数保持用户/渠道/模型/任务/资源/素材/画布1/1/320/3/5/5/1，skills/versions/files为33，密钥和迁移标记不变。当前状态为 `runtime_candidate_healthy / edge_pending`；没有真实模型调用、OSS删除或候选Edge验收。官方实时新尾差仍未合并。
+- 当前分支：`codex/upstream-20260828-ab89c05`。fork固定 `4ba9694` 检查点为 `e02cee1`；本地增加部署标识提交 `c3f5479` 和路线B记录提交 `15342d5`，均未推送，UI版本为 `v1.1.4+local.4ba.e02cee1`。路线B已完成私有恢复点、候选镜像、两次克隆卷迁移幂等和真实保留卷升级；当前运行Backend `8182cc0a`、Web `522109d7`，均healthy/restart0/OOMfalse，真实卷仍为 `open-ai-canvas_backend-data`。升级后数据库完整性ok、外键0、72张表，业务计数保持用户/渠道/模型/任务/资源/素材/画布1/1/320/3/5/5/1，skills/versions/files为33，密钥和迁移标记不变。2026-09-04 用户在登录态Microsoft Edge完成11张截图的人工只读冒烟，版本/会话、稳定首页、项目/章节、空资产分镜、5项素材、3条任务、Skill详情、后台和DevTools基础健康通过，状态为 `runtime_candidate_edge_smoke_passed_limited`。真实资产绑定分镜、多镜头生成/恢复、Provider、精确计费、OSS新写入和强写路径仍未验证；官方实时新尾差仍未合并。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 15 的系统报价与部署安全收口已固化为本地提交 `f9317fa`；尚未 push、未创建 PR、未触发远程 CI。
