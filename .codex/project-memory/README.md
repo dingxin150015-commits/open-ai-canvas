@@ -51,4 +51,5 @@
 - `UPSTREAM_TAIL_AUDIT_20260830.md`：`4f07daa..c8b60ce` 尾差、17 个显式冲突、技能包/短剧/后台设计风险、逐文件解决合同和验证门禁。
 - `UPSTREAM_FIX_TAIL_AUDIT_20260830.md`：`c8b60ce..4ba9694` 八个修复提交、当前已解决索引的 3 文件/15 区块模拟、协议/首页阻断项和阶段 B2 建议。
 - `ROUTE_B_DEPLOYMENT_20260901.md`：固定 `4ba9694` 本地候选的构建标识、恢复点、克隆迁移、保留卷升级结果和 Microsoft Edge 人工验收清单。
+- `UPSTREAM_V125_PLAN_20260904.md`：固定官方 `v1.2.5`、双轨来源/单树交付模型、阶段 0–9、冲突保护合同和 Astravia 延后边界。
 - `MAINTENANCE.md`：记忆更新规则。
