@@ -1,10 +1,12 @@
-import { memo, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { memo, useMemo, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { Link2 } from "lucide-react";
 
 import { ConnectionPath } from "@/components/canvas/canvas-connections";
 import { CanvasFrameNode } from "@/components/canvas/canvas-frame-node";
 import { CanvasNode } from "@/components/canvas/canvas-node";
 import type { CanvasBatchConnectionPreview } from "@/lib/canvas/canvas-batch-connection";
+import { resolveActiveCanvasMediaNodeId } from "@/lib/canvas/canvas-performance-mode";
+import { sortCanvasNodesByStackOrder, type CanvasNodeStackOrder } from "@/lib/canvas/canvas-node-stack-order";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { isFrameNode } from "@/lib/canvas/canvas-frame";
 import type { CanvasDisplayConnection, CanvasFolderStyle, CanvasFolderTheme, CanvasNodeData, ConnectionHandle, Position, SelectionBox } from "@/types/canvas";
@@ -25,6 +27,7 @@ type CanvasProjectWorldLayersProps = {
     connectionTargetNodeId: string | null;
     nodeById: Map<string, CanvasNodeData>;
     visibleNodes: CanvasNodeData[];
+    nodeStackOrder: CanvasNodeStackOrder;
     frameChildrenById: Map<string, CanvasNodeData[]>;
     linkedFolderPreviewNodesById: Map<string, CanvasNodeData[]>;
     dragPreview: DragPreview;
@@ -80,6 +83,17 @@ const EMPTY_CANVAS_NODES: CanvasNodeData[] = [];
 
 export const CanvasProjectWorldLayers = memo(function CanvasProjectWorldLayers(props: CanvasProjectWorldLayersProps) {
     const { viewportScale } = props;
+    const activeMediaNodeId = resolveActiveCanvasMediaNodeId(props.selectedNodeIds, props.nodeById);
+    const orderedVisibleNodes = useMemo(
+        () => [
+            ...props.visibleNodes.filter(isFrameNode),
+            ...sortCanvasNodesByStackOrder(
+                props.visibleNodes.filter((node) => !isFrameNode(node)),
+                props.nodeStackOrder,
+            ),
+        ],
+        [props.nodeStackOrder, props.visibleNodes],
+    );
     const framePreviewNodes = (node: CanvasNodeData) => {
         const assetFolderId = node.metadata?.folder?.assetFolderId;
         if (assetFolderId) return props.linkedFolderPreviewNodesById.get(assetFolderId) || EMPTY_CANVAS_NODES;
@@ -104,13 +118,15 @@ export const CanvasProjectWorldLayers = memo(function CanvasProjectWorldLayers(p
                         toScrollTop={props.scriptScrollTopById[to.id] || 0}
                         active={props.selectedConnectionId === connection.id || props.relatedConnectionIds.has(connection.id)}
                         visualMode="hover-only"
+                        // 拖动预览由 Leafer 图形层逐帧同步；隐藏这层静态 SVG 描边，避免两套位置叠出残影。
+                        hideVisual={props.isNodeDragging}
                         onSelect={() => props.onConnectionSelect(connection.id)}
                         onContextMenu={(event) => props.onConnectionContextMenu(event, connection.id)}
                     />
                 ))}
             </svg>
 
-            {props.visibleNodes.map((node) =>
+            {orderedVisibleNodes.map((node) =>
                 isFrameNode(node) ? (
                     <CanvasFrameNode
                         key={node.id}
@@ -135,6 +151,7 @@ export const CanvasProjectWorldLayers = memo(function CanvasProjectWorldLayers(p
                         dragOffset={props.dragPreview?.nodeIds.has(node.id) ? props.dragPreview : undefined}
                         scale={viewportScale}
                         isSelected={props.selectedNodeIds.has(node.id)}
+                        mediaActive={activeMediaNodeId === node.id}
                         isRelated={props.relatedNodeIds.has(node.id)}
                         isFocusRelated={props.activeNodeId === node.id}
                         isConnectionTarget={props.connectionTargetNodeId === node.id || props.batchConnectionPreview?.targetNodeId === node.id}
@@ -187,12 +204,7 @@ export const CanvasProjectWorldLayers = memo(function CanvasProjectWorldLayers(p
                     }}
                 >
                     {props.batchSourceNodeIds.length > 0 ? (
-                        <BatchConnectionHandle
-                            scale={viewportScale}
-                            count={props.batchSourceNodeIds.length}
-                            active={Boolean(props.batchConnectionPreview)}
-                            onPointerDown={(event) => props.onStartBatchConnection(event, props.batchSourceNodeIds)}
-                        />
+                        <BatchConnectionHandle scale={viewportScale} count={props.batchSourceNodeIds.length} active={Boolean(props.batchConnectionPreview)} onPointerDown={(event) => props.onStartBatchConnection(event, props.batchSourceNodeIds)} />
                     ) : null}
                 </div>
             ) : null}

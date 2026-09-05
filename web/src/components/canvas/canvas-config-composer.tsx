@@ -24,9 +24,7 @@ type CanvasConfigComposerProps = {
     workspaceMode?: CanvasWorkspaceMode;
 };
 
-type Token =
-    | { type: "text"; value: string }
-    | { type: "reference"; nodeId: string };
+type Token = { type: "text"; value: string } | { type: "reference"; nodeId: string };
 
 type MentionState = {
     query: string;
@@ -57,13 +55,7 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
     const normalizedValue = useMemo(() => normalizeGenerationNodeMentionTokens(value, inputs), [inputs, value]);
     const tokens = useMemo(() => parseComposerTokens(normalizedValue, inputs), [inputs, normalizedValue]);
     const referenceById = useMemo(() => new Map(inputs.map((input) => [input.nodeId, input])), [inputs]);
-    const videoFrameOptions = useMemo(
-        () =>
-            inputs
-                .filter((input) => input.type === "image" && input.image)
-                .map((input) => ({ nodeId: input.nodeId, label: resourceLabel(input, inputs), title: input.title, previewUrl: input.image?.dataUrl })),
-        [inputs],
-    );
+    const videoFrameOptions = useMemo(() => inputs.filter((input) => input.type === "image" && input.image).map((input) => ({ nodeId: input.nodeId, label: resourceLabel(input, inputs), title: input.title, previewUrl: input.image?.dataUrl })), [inputs]);
     const candidates = useMemo(() => {
         if (!mention) return [];
         const query = (mention.query || "").trim().toLowerCase();
@@ -198,7 +190,11 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
                 </div>
             ) : null}
             <div className="canvas-config-composer-editor relative rounded-lg" style={{ background: theme.node.fill }}>
-                {!value.trim() ? <div className="pointer-events-none absolute left-4 top-3 text-sm leading-7" style={{ color: theme.node.placeholder }}>输入提示词，按 @ 引用连接素材或技能</div> : null}
+                {!value.trim() ? (
+                    <div className="pointer-events-none absolute left-4 top-3 text-sm leading-7" style={{ color: theme.node.placeholder }}>
+                        输入提示词，按 @ 引用连接素材或技能
+                    </div>
+                ) : null}
                 <div
                     ref={editorRef}
                     contentEditable
@@ -254,7 +250,6 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
             {imagePreview ? <Image src={imagePreview} alt="引用图片预览" style={{ display: "none" }} preview={{ visible: true, src: imagePreview, onVisibleChange: (visible) => !visible && setImagePreview(null) }} /> : null}
         </div>
     );
-
 }
 
 function removeActiveSlash(editor: HTMLDivElement) {
@@ -274,7 +269,19 @@ function removeActiveSlash(editor: HTMLDivElement) {
     selection?.addRange(range);
 }
 
-function MentionMenu({ candidates, allInputs, activeIndex, theme, onSelect }: { candidates: ComposerCandidate[]; allInputs: NodeGenerationInput[]; activeIndex: number; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onSelect: (candidate: ComposerCandidate) => void }) {
+function MentionMenu({
+    candidates,
+    allInputs,
+    activeIndex,
+    theme,
+    onSelect,
+}: {
+    candidates: ComposerCandidate[];
+    allInputs: NodeGenerationInput[];
+    activeIndex: number;
+    theme: (typeof canvasThemes)[keyof typeof canvasThemes];
+    onSelect: (candidate: ComposerCandidate) => void;
+}) {
     const selectedRef = useRef(false);
     const activeItemRef = useRef<HTMLButtonElement | null>(null);
 
@@ -331,7 +338,7 @@ function ResourcePreview({ candidate }: { candidate: ComposerCandidate }) {
         );
     }
     if (input.type === "image" && input.image) return <img src={input.image.dataUrl} alt="" className="size-9 rounded-md object-cover" />;
-    if (input.type === "video" && input.video) return <video src={input.video.url} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+    if (input.type === "video" && input.previewUrl) return <img src={input.previewUrl} alt="" className="size-9 rounded-md bg-black object-cover" loading="lazy" decoding="async" />;
     const Icon = input.type === "audio" ? Music2 : input.type === "video" ? Video : input.type === "image" ? ImageIcon : FileText;
     return (
         <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
@@ -352,9 +359,10 @@ function createReferenceChip(input: NodeGenerationInput, inputs: NodeGenerationI
     wrapper.dataset.referenceToken = `@${generationInputMentionLabel(input, inputs)}`;
     wrapper.className = "mx-px inline-flex h-7 max-w-40 items-center justify-center overflow-hidden rounded-md border px-1 text-xs leading-none align-middle";
     Object.assign(wrapper.style, chipStyle(theme));
-    if (input.type === "image" && input.image && input.sourceKind !== "drawing") {
+    const previewUrl = input.type === "image" && input.image && input.sourceKind !== "drawing" ? input.image.dataUrl : input.type === "video" ? input.previewUrl : "";
+    if (previewUrl) {
         const image = document.createElement("img");
-        image.src = input.image.dataUrl;
+        image.src = previewUrl;
         image.alt = input.title;
         image.className = "size-6 rounded object-cover";
         wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded align-middle";
@@ -362,7 +370,7 @@ function createReferenceChip(input: NodeGenerationInput, inputs: NodeGenerationI
         wrapper.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            onImagePreview(input.image?.dataUrl || "");
+            onImagePreview(previewUrl);
         });
     } else {
         wrapper.title = input.sourceKind === "drawing" ? resourceLabel(input, inputs) : input.text || input.title;

@@ -166,7 +166,15 @@ test("dispose aborts a poll-heartbeat state-lock waiter before it can renew", as
         await reconciler.start();
         await observing;
         releaseExternalLock = await acquireStateLock(box.stateFile);
-        await renewing;
+        const renewalStart = await Promise.race([
+            renewing.then(() => "started" as const),
+            new Promise<"timeout">((resolve) => {
+                timeout = setTimeout(() => resolve("timeout"), 250);
+            }),
+        ]);
+        if (timeout) clearTimeout(timeout);
+        timeout = undefined;
+        assert.equal(renewalStart, "started");
         releaseObserve();
         await committingSyncError;
 

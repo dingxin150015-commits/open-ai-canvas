@@ -586,3 +586,22 @@ ACL 仅允许当前用户、SYSTEM、Administrators；逐文件复核无额外�
 逐文件ACL仅当前用户、SYSTEM、Administrators；Git bundle验证完整。升级前回滚镜像：Backend `open-ai-canvas-backend:pre-route-b-20260901-114427`（`f94f555b...`），Web `open-ai-canvas-web:pre-route-b-20260901-114427`（`31417063...`）。
 
 路线B运行候选：Backend `8182cc0a...`、Web `522109d7...`，真实卷保持 `open-ai-canvas_backend-data`。升级后容器healthy/restart0/OOMfalse，版本 `v1.1.4+local.4ba.e02cee1`。当前未完成Edge人工验收；若仅代码/UI失败，优先回滚镜像并保留已迁移数据库。只有确认数据迁移错误且用户再次批准时，才恢复原始DB/WAL/SHM、匹配密钥和迁移标记；禁止删除卷。
+
+## BKP-20260905-143709-STAGE5-V125
+
+| 字段 | 值 |
+| --- | --- |
+| 状态 | `verified`, `protected`, `pre-v1.2.5-merge` |
+| 私有位置 | `<private-backup-root>\stage5-v125-premerge-20260905-143709` |
+| 预迁移 DB/WAL/SHM | 3,207,168 / 4,247,752 / 32,768 bytes |
+| 预迁移 DB/WAL SHA-256 | `E5414A370C1C1FDDE697A097BDA695869DC2007CC54D55F4F17231966C288CFB` / `77D6239224CFFEFBBA08EBCE3C95F8C58ADC32A96F63CF8A836074C6AF387921` |
+| `.settings-key` / 迁移标记 SHA-256 | `E4B4B107C3060A18D65AD3AAD4E329D063A924A71CCF23EAB15B9ABF8120A6D5` / `0435B398CEC770046D79B55E9C2E6AB06D236A7759FBB44503266E1DFEA0C8F3` |
+| 预迁移完整性 / 外键 / 表 | `ok` / 0 / 72 |
+| 克隆迁移 | 同一独立卷连续两次无网络启动均 `healthy`；迁移后 `ok` / 外键0 / 80表 |
+| 迁移后 DB SHA-256 | `57CB5FA8CD270824DC8CA6089A53B7E6221125BA8B217B4AE3C04091AE41786B` |
+| 业务计数 | 用户1、会话1、渠道1、模型320、任务3、资源5、素材5、画布2；迁移前后保持 |
+| 候选镜像 | Backend `sha256:6b04464b...`；Web `sha256:36dc2302...` |
+
+ACL 对每个目录和文件关闭继承，仅显式授予当前用户、SYSTEM、Administrators，宽泛主体命中 0。预迁移和迁移后快照都能使用匹配 `.settings-key` 解密已有 OSS Secret，未输出明文。精确位置记录在 Git 忽略指针；克隆卷 `open-ai-canvas-stage5-v125-clone-20260905-143709` 保留，真实卷未修改或替换。
+
+恢复仍需用户即时批准。普通代码问题优先使用旧镜像回滚；仅确认数据迁移错误且再次获批时，才恢复 DB/WAL/SHM、匹配密钥和迁移标记。禁止删除真实卷。

@@ -4,8 +4,11 @@
 
 ## P0：接管与数据安全
 
-- [x] 固定 `v1.2.5@f8e87bc` 并完成阶段 0–2：历史检查点与新 `origin/codex/dingxin-stable` 均为 `44e8c10`；完整对象审计为 66 提交/506 文件、89 重叠路径、47 显式冲突文件/149 区块。官方 `main@7ec5173` 的 6 个后续提交保持在外。
-- [ ] 在 `codex/upstream-v1.2.5-20260904` 完成阶段 3 no-commit/no-ff 真实冲突核对与阶段 4 五组语义解决；完成后停止，阶段 5–9 需新批准。
+- [x] 固定 `v1.2.5@f8e87bc` 并完成阶段 0–2：历史检查点与新 `origin/codex/dingxin-stable` 均为 `44e8c10`；完整对象审计为 66 提交/506 文件、89 重叠路径、模拟 47 显式冲突文件/149 区块。官方 `main@7ec5173` 的 6 个后续提交保持在外。
+- [x] 在 `codex/upstream-v1.2.5-20260904` 完成阶段 3–4：真实 49 未合并路径/139 文本区块已按五组解决，未解决 0；当前 `HEAD=39c7e62`、`MERGE_HEAD=f8e87bc`、状态 `merge_open_resolved_unvalidated`。
+- [ ] 获得新批准后进入阶段 5；先审计最终 staged bytes，再执行格式、Backend Linux CGO、迁移副本双启动、Web/Agent/Docs/Compose/Windows 脚本门禁。阶段 5 通过前不得创建 merge commit。
+- [ ] 阶段 5 第一项必须移除 Create 对已删除 `backendModelRuntimeRequired` 的依赖，按官方 v1.2.5 统一走 `runBackendGenerationTask`，保留本地元数据/reasoning/任务恢复合同并补专项复核；修复前 TypeScript 预期无法通过。
+- [ ] 在阶段 8/9 前为 Host Updater增加用户 fork Release/镜像源与版本策略，或显式保持不可用；当前默认 `ddcat-ai/open-ai-canvas` 不能用于自维护版本在线更新。
 - [ ] v1.2.5 完成后再实施本地扩展边界收口，并在阶段 0–9 全部完成后单独评估/安装 Astravia Windows；当前不安装、不向其开放生产数据库、密钥或稳定 checkout。
 - [x] 固定 `4ba9694` 已固化为本地 merge commit `d0def5f`，阶段 C通过；提交后评审记忆提交 `7687053` 已fast-forward推送fork并独立复核一致。本次最终检查点记忆继续以小型docs提交同步，完成后该集成分支作为已验证固定4ba远程检查点。没有force、未更新`origin/main`、未触发远程CI或部署。
 - [ ] 后续独立事项：决定是否为fork集成分支建立可手工触发或PR触发的远程质量门禁；审计官方 `4ba9694..b7348ab` 22提交/216文件新尾差；另行规划阶段16部署到新本地提交的备份、迁移、镜像和Edge验收。
@@ -104,3 +107,13 @@
 - [x] 阶段 6 创建 pre/post-deploy verified/protected 备份，保留卷逐个更新 Backend/Web，完成 Schema、数据计数、OSS 密文和运行哈希核对。
 - [x] 阶段 7 已使用登录 Microsoft Edge 验证模型拉取、80 项补充目录、11 Ready/308 Planned、管理后台支持状态、重复拉取真实幂等，以及普通用户创作台不暴露未定价且停用模型；未点击生成。
 - [x] 阶段 8 已完成一次授权内 Wan 3.0 真实调用、精确 SKU 账务、阿里云 OSS 物化、Resource/Asset、Edge 播放、无声/无水印、模型安全恢复和调用后 verified/protected 备份。实际画幅为 adaptive，未补发第二次任务。
+
+## v1.2.5 阶段 5 后续
+
+- [x] Create Backend-only 主链、重叠 Web 语义修复、官方公告图片自引用缺陷修复。
+- [x] Web 类型/默认全套/补充专项/生产构建、Backend Linux CGO 全量、Compose 与 PowerShell 静态门禁。
+- [x] 独立候选镜像、verified/protected 快照、两次无网络克隆迁移和计数/密钥验证。
+- [x] Canvas Agent 以 Node 22 + Bun 1.4 Linux 隔离环境完成 328 项测试和构建；修正 unref heartbeat 测试的有界等待，0 fail、0 cancelled。
+- [x] 阶段 5 最终 staged-bytes、冲突标记、敏感路径和版本复核通过；阶段 6 merge commit 仍需用户批准。
+- [ ] Host Updater 完成 fork 仓库、镜像命名空间、版本策略和祖先校验前保持不可用。
+- [ ] 最终 Microsoft Edge 验收对比本地画布底板/柔和网格与官方 v1.2.5 底板/80% 网格；由用户选择最终默认，当前实现不得被表述为永久产品决定。

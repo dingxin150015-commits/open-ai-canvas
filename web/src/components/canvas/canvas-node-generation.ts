@@ -5,6 +5,7 @@ import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { CanvasNodeType, type CanvasConnection, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import { getGenerationResourceNodes, getContextResourceNodes, getMentionResourceNodes } from "@/lib/canvas/canvas-resource-references";
+import { canvasNodeVideoPreviewUrl, canvasVideoAssetPreviewUrl } from "@/lib/canvas/canvas-media-preview";
 import { isNeutralColorGrade, resolveCanvasColorGradeReference } from "@/lib/canvas/canvas-color-grade";
 import { getNodeResourceKind } from "@/lib/canvas/node-registry";
 import { resolveCanvasDrawingReference } from "@/lib/canvas/canvas-drawing-reference";
@@ -53,6 +54,7 @@ export type NodeGenerationInput = {
     type: "text" | "image" | "video" | "audio" | "character";
     sourceKind?: "drawing";
     title: string;
+    previewUrl?: string;
     alwaysIncludeText?: boolean;
     text?: string;
     image?: ReferenceImage;
@@ -78,15 +80,16 @@ export function buildNodeGenerationContext(nodeId: string, nodes: CanvasNodeData
     assertResolvableGenerationMentions(prompt, mentionInputs);
     const hasExplicitResourceMention = hasResolvableGenerationMention(prompt, mentionInputs);
     const isWorkflowSource = sourceNode?.type === CanvasNodeType.Config && isCanvasWorkflowProvider(sourceNode.metadata);
-    if ((Boolean(sourceNode?.metadata?.composerContent?.trim()) && (sourceNode?.type === CanvasNodeType.Config || isWorkflowSource)) || hasExplicitResourceMention) {
+    const hasConnectedMedia = connectedInputs.some((input) => input.type === "image" || input.type === "video" || input.type === "audio" || input.type === "character");
+    if ((promptOnly && hasConnectedMedia) || (Boolean(sourceNode?.metadata?.composerContent?.trim()) && (sourceNode?.type === CanvasNodeType.Config || isWorkflowSource)) || hasExplicitResourceMention) {
         const autoIncludeWorkflowMedia = isWorkflowSource;
         return buildComposerGenerationContext(
             mentionInputs,
             prompt,
             // 工作流节点由字段映射接收全部连线媒体；视频节点的历史首尾帧字段不能再额外追加参考图。
-            autoIncludeWorkflowMedia ? [] : [sourceNode?.metadata?.videoStartFrameNodeId, sourceNode?.metadata?.videoEndFrameNodeId].filter((id): id is string => Boolean(id)),
+            autoIncludeWorkflowMedia || (promptOnly && hasConnectedMedia) ? [] : [sourceNode?.metadata?.videoStartFrameNodeId, sourceNode?.metadata?.videoEndFrameNodeId].filter((id): id is string => Boolean(id)),
             promptOnly,
-            autoIncludeWorkflowMedia,
+            autoIncludeWorkflowMedia || (promptOnly && hasConnectedMedia),
             connectedInputs,
         );
     }
@@ -173,7 +176,7 @@ function buildComposerGenerationContext(inputs: NodeGenerationInput[], prompt: s
                 if (input.type === "text") textBlocks.push(`【${label}】\n${input.text || ""}`);
                 else selectedInputs.push(input);
             }
-            nextPrompt += input.type === "text" ? `【${label}】` : label;
+            nextPrompt += input.type === "text" ? `【${label}】` : `@${label}`;
         } else nextPrompt += match[0];
         lastIndex = match.index + match[0].length;
     }
@@ -327,7 +330,7 @@ function buildGenerationInputs(resourceNodes: CanvasNodeData[], nodes: CanvasNod
         // 调色节点在下游就是一张普通参考图，按 image 标签即正确。
         if (image) return [{ nodeId: node.id, type: "image" as const, sourceKind: image.source?.kind === "drawing" ? "drawing" : undefined, title: node.title, image }];
         const video = readReferenceVideo(node);
-        if (video) return [{ nodeId: node.id, type: "video" as const, title: node.title, video }];
+        if (video) return [{ nodeId: node.id, type: "video" as const, title: node.title, previewUrl: canvasNodeVideoPreviewUrl(node), video }];
         const audio = readReferenceAudio(node);
         if (audio) return [{ nodeId: node.id, type: "audio" as const, title: node.title, audio }];
         const text = readNodeTextInput(node);
@@ -366,6 +369,7 @@ function buildAssetGenerationInputs(assets: Asset[]): NodeGenerationInput[] {
                     nodeId,
                     type: "video",
                     title: asset.title,
+                    previewUrl: canvasVideoAssetPreviewUrl(asset.data.url, asset.coverUrl),
                     video: {
                         id: asset.id,
                         name: asset.title,

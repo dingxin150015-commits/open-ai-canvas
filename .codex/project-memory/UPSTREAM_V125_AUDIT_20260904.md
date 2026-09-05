@@ -97,5 +97,34 @@
 
 ## 当前停止条件
 
-- 审计完成后可按既有批准打开固定 no-commit/no-ff 合并并解决冲突。
-- 阶段 4 完成后必须停止；未运行阶段 5 前，任何 resolved index 都是 `unvalidated`，禁止 merge commit、候选 push、stable 晋升、部署或 Provider 调用。
+- 阶段 3 已从本地审计提交 `39c7e62` 打开固定 no-commit/no-ff 合并；`MERGE_HEAD=f8e87bcc4ce3e6f7eae7a89dc8b9231801116072`。
+- 真实 merge 得到 49 个未合并路径：47 个文本冲突和 `plugin-packages/autodl-comfyui/manifest.json`、`web/src/pages/home/index.tsx` 两个 modify/delete 决策；工作树冲突标记为 139 个。差异来自 modify/delete 不生成文本标记以及 merge-tree 对相邻区块的计数方式。
+- 阶段 4 已按五组逐区块解决并加入 index，未解决路径为 0。AutoDL 源 Manifest 作为本地扩展源保留；稳定首页按既有产品决定保留；官方打包插件、素材/回收站/搜索、平台外观、画布媒体/历史/外观、支付和更新基础同时纳入。
+- 当前根版本为 `v1.2.5+dingxin.1`，明确区别于官方原版；是否作为最终构建标识仍由阶段 6 前复核。
+- 阶段 4 结构检查：冲突标记 0、未解决索引 0、非暂存文件 0；冲突 Go 文件已执行 gofmt，`web/package.json` 与保留的 AutoDL Manifest 可解析，cached diff check 通过。稳定首页组件保留并恢复 `/home` 路由；官方 `/` 创作入口保持不变。以上不是阶段 5 类型、测试、构建或运行验证。
+- 2026-09-05 只读吸收审计确认：417 个本地未触碰的官方变更路径与 `f8e87bc` blob 逐字节一致；229 个官方新增路径全部存在。在线更新、upload_key迁移、素材分类/回收站/批量上传、密码找回、平台外观、支付、AI审美、画布历史/外观/空间索引、视频布尔能力和80个官方插件包的结构入口均存在。
+- 已确认一个阶段 5 阻断项：官方已把 Create 文本生成统一为 `runBackendGenerationTask`，并删除 `backendModelRuntimeRequired`；当前 `web/src/pages/create/index.tsx` 仍导入该已不存在的导出，并保留 `requestImageQuestion` 旧分流。必须在阶段 5 采用官方 Backend-only 生命周期，同时保留本地任务元数据、reasoning、Prompt Cache所需的其他路径，然后运行类型和任务恢复测试。
+- 有意不原样吸收的官方差异：保留 `/home` 稳定首页和AutoDL源 Manifest；保留本地画布底色/网格 token；章节角色再提取只对待确认候选去重，而不以已确认角色永久阻止再提取。这些是本地产品策略，不是遗漏，但需阶段 5 专项锁定。
+- 官方 Host Updater代码已吸收，但默认仓库仍为 `ddcat-ai/open-ai-canvas`；在更新源、镜像仓库和版本比较适配用户 fork 前只能视为结构存在、不可用于本地自维护版本更新。
+- 当前状态是 `merge_open_resolved_unvalidated`。阶段 4 完成后必须停止；阶段 5 尚未运行，禁止 merge commit、候选 push、stable 晋升、部署、真实数据迁移或 Provider 调用。
+
+## 阶段 5：源码、构建与克隆迁移门禁（2026-09-05）
+
+- Create 已采用官方 Backend-only 任务生命周期，同时保留本地 `metadata`、`reasoning`、`clientOperationId`、任务恢复/取消和 Dreamina 专用路径。
+- 修复真实合并回归：画布节点动作 Context 恢复稳定 memo，节点拖动首帧 `dragPreview` 同步关闭浮层；保留 `/home`、AutoDL 源 Manifest、本地主题 token、章节角色再提取和 Provider 脱敏合同。
+- 修复官方 v1.2.5 公告图片自引用缺陷：仅豁免正在原子替换的当前公告和正在丢弃的自身草稿，其他业务引用继续 fail closed。
+- Backend 测试镜像复制全部插件包；项目封面引用测试补齐快照表夹具，字符串错误码测试同步本地脱敏合同。
+- Web TypeScript、默认全套测试（主套件 1158/1158、画布 33/33、跨 Runtime 1/1）、补充专项和生产构建通过；构建转换 13,543 模块，无 Rolldown panic。直接并发 `bun test test` 会因共享 `window/localforage` 竞态产生假失败，不能替代项目串行分组。
+- Backend 隔离 Linux CGO `go test -count=1 ./...` 全部通过；Canvas Agent 在 Node 22 + Bun 1.4 Linux 隔离环境完成 328 项（322 pass、6 个 Windows 专项 skip、0 fail、0 cancelled）及 TypeScript 构建。为避免 unref heartbeat 令测试宿主提前退出，测试增加了有界 renewal-start watchdog；Windows 本机长驻进程树用例受 `taskkill` 权限限制，不作为最终宿主。
+- Compose 六种组合仅解析通过；2 个 PowerShell 文件 AST 解析通过。Host Updater 在 fork 源适配前仍不可执行。
+- 候选镜像：Backend `sha256:6b04464b6d03246db988cbf5b79906fcca20bddb5a26c7033eea63e269a51ca4`，Web `sha256:36dc2302122eb17be3e4c14de059978d872a2c14ad52f2280770333129d50118`。
+- `BKP-20260905-143709-STAGE5-V125` 已 `verified/protected`：预迁移 `ok`/外键0/72表；克隆卷连续两次无网络启动 healthy，迁移后 `ok`/外键0/80表，业务计数和 OSS 密钥合同不变。
+- 真实 Backend 保持旧镜像 `sha256:8182cc0a...` 且 `running/healthy`、Paused=false、RestartCount=0；真实卷和 Web 均未替换。没有 merge commit、push、PR、Edge 控制或 Provider 调用。
+- 最终 staged-bytes 复核通过：517 个 staged 文件、unmerged 0、unstaged 0、新增冲突标记 0、敏感文件路径 0、高置信 Secret 新增命中 0、`git diff --cached --check` 通过；仓库既有 `.claude` 文档中的 3 行冲突示例不属于本次新增。
+- 当前状态：`stage5_complete_ready_for_stage6_approval`。阶段 6 merge commit 仍需用户明确批准；不得自动 push、部署、控制 Edge 或调用 Provider。
+
+## 阶段 6–7 授权与画布颜色门禁
+
+- 2026-09-05 用户批准阶段 6 本地 merge commit 与阶段 7 fork 候选分支推送连续执行；授权不包含 `origin/main`、稳定分支晋升、部署、Edge 控制或 Provider 调用。
+- 当前候选继续保留本地 `workspaceBackground` 和柔和网格 token，但该选择不是永久封死。最终 Microsoft Edge 视觉验收必须将画布颜色列为独立验收项，比较本地方案与官方 v1.2.5 的 `#f0f0f0/#000000 + 80% 网格` 方向。
+- 若最终选择官方方案，应仅调整画布语义 token/默认外观来源与对应测试，不回退官方已吸收的自定义外观、项目持久化和账号级默认功能；不得在部署前凭静态测试代替视觉决定。

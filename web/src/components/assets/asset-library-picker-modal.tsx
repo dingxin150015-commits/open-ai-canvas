@@ -1,6 +1,6 @@
-import { Button, Dropdown, Modal } from "antd";
+import { App, Button, Dropdown, Modal, Popconfirm } from "antd";
 import type { MenuProps } from "antd";
-import { Check, ChevronDown, FileText, FolderOpen, HardDrive, Image as ImageIcon, LoaderCircle, Music2, Puzzle, Search, Upload, UserRound, Video } from "lucide-react";
+import { Check, ChevronDown, FileText, FolderOpen, HardDrive, Image as ImageIcon, LoaderCircle, Music2, Puzzle, RotateCcw, Search, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AssetMediaPreview } from "@/components/asset-media-preview";
@@ -9,12 +9,14 @@ import { CachedResourceImage } from "@/components/cached-resource-image";
 import { PaginationBar } from "@/components/layout/workspace-page";
 import { cn } from "@/lib/utils";
 import type { ExternalAssetPickerReference } from "@/lib/plugins/plugin-types";
-import type { Asset } from "@/stores/use-asset-store";
+import { flushAssetStorePersistence, useAssetStore, type Asset } from "@/stores/use-asset-store";
+import { deleteAssetWithRemoteSync, saveRemoteUserDataNow } from "@/services/user-data-sync";
 
 export type AssetLibraryPickerItem = {
     id: string;
     title: string;
     category: string;
+    archived?: boolean;
     kindLabel: string;
     asset?: Asset;
     imageUrl?: string;
@@ -91,6 +93,7 @@ export function AssetLibraryPickerModal({
     onConfirm,
     onFolderAction,
 }: Props) {
+    const { message } = App.useApp();
     const [category, setCategory] = useState(initialCategory);
     const [folderId, setFolderId] = useState(initialFolderId);
     const [source, setSource] = useState<"local" | "plugin">("local");
@@ -114,13 +117,22 @@ export function AssetLibraryPickerModal({
     const pluginItems = useMemo(() => allItems.filter((item) => Boolean(item.external)), [allItems]);
     const hasPluginSource = useMemo(() => Object.keys(categoryLabels).some((value) => value.startsWith("external:")) || pluginItems.some((item) => item.category.startsWith("external:")), [categoryLabels, pluginItems]);
     const sourceItems = source === "plugin" ? pluginItems : localItems;
+    const activeSourceItems = useMemo(() => sourceItems.filter((item) => !item.archived), [sourceItems]);
+    const archivedItems = useMemo(() => sourceItems.filter((item) => item.archived), [sourceItems]);
     const sourceFolders = source === "plugin" ? folders : [];
     const showCategories = source === "local" || !sourceFolders.length;
-    const categories = useMemo(() => ["all", ...Array.from(new Set(sourceItems.map((item) => item.category || "other")))], [sourceItems]);
+    const normalCategories = useMemo(() => ["all", ...Array.from(new Set(activeSourceItems.map((item) => item.category || "other"))).filter((value) => value !== "all")], [activeSourceItems]);
+    const archivedCount = archivedItems.length;
+    const isRecycleBin = category === "archived";
+
     const visibleItems = useMemo(() => {
         const query = keyword.trim().toLowerCase();
         return sourceItems.filter((item) => {
-            if (category !== "all" && item.category !== category) return false;
+            if (category === "archived") {
+                if (!item.archived) return false;
+            } else if (item.archived || (category !== "all" && item.category !== category)) {
+                return false;
+            }
             if (folderId !== "all" && (item.folderId || "") !== folderId) return false;
             return !query || [item.title, item.searchText || "", item.description || ""].join(" ").toLowerCase().includes(query);
         });
@@ -133,6 +145,7 @@ export function AssetLibraryPickerModal({
             }),
         [allItems, selected],
     );
+    const archivedSelectedIds = useMemo(() => selectedIds.filter((id) => allItems.find((item) => item.id === id)?.archived), [allItems, selectedIds]);
 
     useEffect(() => {
         if (!open) return;
@@ -150,9 +163,9 @@ export function AssetLibraryPickerModal({
     }, [initialCategory, initialFolderId, open]);
 
     useEffect(() => {
-        if (category === "all" || categories.includes(category)) return;
+        if (category === "all" || category === "archived" || normalCategories.includes(category)) return;
         setCategory("all");
-    }, [categories, category]);
+    }, [normalCategories, category]);
 
     useEffect(() => {
         if (hasPluginSource || source === "local") return;
@@ -187,6 +200,55 @@ export function AssetLibraryPickerModal({
             await onConfirm(selectedIds);
         } catch (reason) {
             setError(reason instanceof Error ? reason.message : "素材操作失败，请重试");
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const handleRestoreSelected = async () => {
+        if (!archivedSelectedIds.length) return;
+        setWorking(true);
+        try {
+            for (const id of archivedSelectedIds) {
+                useAssetStore.getState().updateAsset(id, { status: "confirmed" });
+            }
+            await flushAssetStorePersistence();
+            await saveRemoteUserDataNow();
+            setSelected(new Set());
+            message.success(`已还原 ${archivedSelectedIds.length} 个素材至素材库`);
+            setCategory("all");
+        } catch {
+            message.warning("已在本地还原，稍后自动同步至云端");
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (!archivedSelectedIds.length) return;
+        setWorking(true);
+        try {
+            for (const id of archivedSelectedIds) await deleteAssetWithRemoteSync(id);
+            setSelected(new Set());
+            message.success(`已彻底删除 ${archivedSelectedIds.length} 个素材`);
+        } catch (err) {
+            message.error(err instanceof Error ? err.message : "删除失败");
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const handleEmptyRecycleBin = async () => {
+        const toDelete = archivedItems;
+        if (!toDelete.length) return;
+        setWorking(true);
+        try {
+            for (const item of toDelete) await deleteAssetWithRemoteSync(item.id);
+            setSelected(new Set());
+            message.success(`已清空回收站 ${toDelete.length} 个素材`);
+            setCategory("all");
+        } catch (err) {
+            message.error(err instanceof Error ? err.message : "清空回收站失败");
         } finally {
             setWorking(false);
         }
@@ -229,7 +291,7 @@ export function AssetLibraryPickerModal({
         }
     };
 
-    const countFor = (value: string) => (value === "all" ? sourceItems.length : sourceItems.filter((item) => item.category === value).length);
+    const countFor = (value: string) => (value === "all" ? activeSourceItems.length : activeSourceItems.filter((item) => item.category === value).length);
     const sourceLabel = source === "plugin" ? "插件来源" : "本地素材";
     const sourceMenuItems: MenuProps["items"] = [
         {
@@ -238,7 +300,7 @@ export function AssetLibraryPickerModal({
             label: (
                 <span className="asset-picker-source-menu-label">
                     <span>本地素材</span>
-                    <em>{localItems.length}</em>
+                    <em>{localItems.filter((item) => !item.archived).length}</em>
                 </span>
             ),
         },
@@ -257,7 +319,7 @@ export function AssetLibraryPickerModal({
               ]
             : []),
     ];
-    const activeUpload = source === "plugin" ? upload?.external : upload;
+    const activeUpload = isRecycleBin ? undefined : source === "plugin" ? upload?.external : upload;
     const uploading = uploadingCount > 0;
 
     return (
@@ -294,7 +356,7 @@ export function AssetLibraryPickerModal({
                                 }}
                             >
                                 <button type="button" className="asset-picker-title-trigger" aria-haspopup="menu" aria-expanded={sourceMenuOpen} aria-label={"素材库来源：" + sourceLabel}>
-                                    <strong>{title}</strong>
+                                    <strong>{isRecycleBin ? "回收站" : title}</strong>
                                     <ChevronDown aria-hidden="true" />
                                 </button>
                             </Dropdown>
@@ -317,18 +379,34 @@ export function AssetLibraryPickerModal({
                                     <span className="assets-filter-item-label">全部文件夹</span>
                                     <span className="assets-filter-count">{sourceItems.length}</span>
                                 </button>
-                                {renderPickerFolders(sourceFolders, sourceItems, folderId, setFolderId)}
+                                {renderPickerFolders(sourceFolders, activeSourceItems, folderId, setFolderId)}
                             </>
                         ) : null}
                         {showCategories ? (
                             <>
                                 <span className="asset-picker-nav-label">分类</span>
-                                {categories.map((value) => (
+                                {normalCategories.map((value) => (
                                     <button key={value} type="button" className={cn("assets-filter-item", category === value && "is-active")} aria-pressed={category === value} onClick={() => setCategory(value)}>
-                                        <span className="assets-filter-item-label">{categoryLabels[value] || "其他"}</span>
+                                        <span className="assets-filter-item-label">{categoryLabels[value] || (value === "all" ? "全部素材" : "其他")}</span>
                                         <span className="assets-filter-count">{countFor(value)}</span>
                                     </button>
                                 ))}
+                                {archivedCount > 0 ? (
+                                    <div className="mt-3 border-t border-border/40 pt-2">
+                                        <button
+                                            type="button"
+                                            className={cn("assets-filter-item text-amber-500 hover:text-amber-400 dark:text-amber-400", category === "archived" && "is-active !bg-amber-500/10")}
+                                            aria-pressed={category === "archived"}
+                                            onClick={() => setCategory("archived")}
+                                        >
+                                            <span className="assets-filter-item-label flex items-center gap-1.5">
+                                                <Trash2 className="size-3.5" />
+                                                <span>回收站</span>
+                                            </span>
+                                            <span className="assets-filter-count">{archivedCount}</span>
+                                        </button>
+                                    </div>
+                                ) : null}
                             </>
                         ) : null}
                     </nav>
@@ -345,8 +423,8 @@ export function AssetLibraryPickerModal({
                             ) : (
                                 <div className="asset-picker-empty">
                                     <FolderOpen />
-                                    <strong>{emptyTitle}</strong>
-                                    <span>{activeUpload ? "换个分类，或从底部上传一份新素材。" : emptyDescription}</span>
+                                    <strong>{isRecycleBin ? "回收站是空的" : emptyTitle}</strong>
+                                    <span>{isRecycleBin ? "删除画布或手动归档的素材会暂存到这里，可在需要时还原。" : activeUpload ? "换个分类，或从底部上传一份新素材。" : emptyDescription}</span>
                                 </div>
                             )}
                         </div>
@@ -376,17 +454,40 @@ export function AssetLibraryPickerModal({
                         </span>
                     ) : null}
                     <div className="asset-picker-actions">
-                        {onFolderAction && folderId !== "all" && (folderActionSource !== "local" || source === "local") ? (
-                            <Button type="text" icon={<FolderOpen />} disabled={working} onClick={() => void runFolderAction()}>
-                                {folderActionLabel}
-                            </Button>
-                        ) : null}
-                        <Button type="text" onClick={onClose} disabled={working}>
-                            取消
-                        </Button>
-                        <Button type="primary" icon={<Check />} disabled={working || !selectedIds.length} loading={working && !uploading} onClick={() => void confirm()}>
-                            {confirmLabel(selectedIds.length)}
-                        </Button>
+                        {isRecycleBin ? (
+                            <>
+                                <Popconfirm title="确认清空回收站？" description="清空后所有回收站素材及其物理文件将被彻底删除，不可恢复。" onConfirm={handleEmptyRecycleBin} okText="清空" okButtonProps={{ danger: true }} cancelText="取消">
+                                    <Button type="text" danger disabled={working || !archivedCount}>
+                                        清空回收站
+                                    </Button>
+                                </Popconfirm>
+                                <Popconfirm title="确认彻底删除已选素材？" onConfirm={handleDeleteSelected} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
+                                    <Button type="text" danger disabled={working || !archivedSelectedIds.length}>
+                                        彻底删除
+                                    </Button>
+                                </Popconfirm>
+                                <Button type="text" onClick={onClose} disabled={working}>
+                                    关闭
+                                </Button>
+                                <Button type="primary" icon={<RotateCcw className="size-3.5" />} disabled={working || !archivedSelectedIds.length} loading={working} onClick={handleRestoreSelected}>
+                                    还原已选素材{archivedSelectedIds.length ? `（${archivedSelectedIds.length}）` : ""}
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                {onFolderAction && folderId !== "all" && (folderActionSource !== "local" || source === "local") ? (
+                                    <Button type="text" icon={<FolderOpen />} disabled={working} onClick={() => void runFolderAction()}>
+                                        {folderActionLabel}
+                                    </Button>
+                                ) : null}
+                                <Button type="text" onClick={onClose} disabled={working}>
+                                    取消
+                                </Button>
+                                <Button type="primary" icon={<Check />} disabled={working || !selectedIds.length} loading={working && !uploading} onClick={() => void confirm()}>
+                                    {confirmLabel(selectedIds.length)}
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </footer>
             </div>

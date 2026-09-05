@@ -5,16 +5,7 @@ type CanvasNodeTimestampFallback = {
     updatedAt?: string;
 };
 
-const HYDRATED_MEDIA_KEYS = new Set<keyof CanvasNodeMetadata>([
-    "content",
-    "storageKey",
-    "naturalWidth",
-    "naturalHeight",
-    "bytes",
-    "mimeType",
-    "durationMs",
-    "drawingPreviewUrl",
-]);
+const HYDRATED_MEDIA_KEYS = new Set<keyof CanvasNodeMetadata>(["content", "storageKey", "naturalWidth", "naturalHeight", "bytes", "mimeType", "durationMs", "hasAudio", "videoPreview", "drawingPreviewUrl"]);
 
 const MEDIA_NODE_TYPES = new Set<string>([CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio, CanvasNodeType.Drawing]);
 
@@ -23,15 +14,7 @@ export function canvasNodeCreatedAt(node: CanvasNodeData, fallback?: string) {
 }
 
 export function canvasNodeUpdatedAt(node: CanvasNodeData, fallback?: string) {
-    return firstValidDate(
-        node.updatedAt,
-        node.metadata?.taskUpdatedAt,
-        node.metadata?.drawingUpdatedAt,
-        node.metadata?.subtitleUpdatedAt,
-        node.metadata?.taskCompletedAt,
-        canvasNodeCreatedAt(node),
-        fallback,
-    );
+    return firstValidDate(node.updatedAt, node.metadata?.taskUpdatedAt, node.metadata?.drawingUpdatedAt, node.metadata?.subtitleUpdatedAt, node.metadata?.taskCompletedAt, canvasNodeCreatedAt(node), fallback);
 }
 
 export function normalizeCanvasNodeTimestamps(nodes: CanvasNodeData[], fallback: CanvasNodeTimestampFallback = {}) {
@@ -48,17 +31,18 @@ export function normalizeCanvasNodeTimestamps(nodes: CanvasNodeData[], fallback:
 
 export function stampCanvasNodeChanges(previousNodes: CanvasNodeData[], nextNodes: CanvasNodeData[], now = new Date().toISOString()) {
     if (previousNodes === nextNodes) return previousNodes;
-    const previousById = new Map(previousNodes.map((node) => [node.id, node]));
+    // Most canvas edits preserve order and replace one node. Avoid allocating a
+    // 50k-entry id map and comparing metadata for every untouched node in that
+    // hot path. The map fallback still handles inserts, deletes and reorders.
+    const sameOrder = previousNodes.length === nextNodes.length && previousNodes.every((node, index) => node.id === nextNodes[index]?.id);
+    const previousById = sameOrder ? null : new Map(previousNodes.map((node) => [node.id, node]));
     let changed = false;
-    const stamped = nextNodes.map((node) => {
-        const previous = previousById.get(node.id);
+    const stamped = nextNodes.map((node, index) => {
+        const previous = sameOrder ? previousNodes[index] : previousById?.get(node.id);
+        if (previous === node) return node;
         const createdAt = canvasNodeCreatedAt(node, canvasNodeCreatedAt(previous || node, now)) || now;
         const meaningfulChange = previous ? canvasNodeMeaningfullyChanged(previous, node) : false;
-        const updatedAt = previous
-            ? meaningfulChange
-                ? now
-                : canvasNodeUpdatedAt(node, canvasNodeUpdatedAt(previous, createdAt)) || createdAt
-            : canvasNodeUpdatedAt(node, createdAt) || createdAt;
+        const updatedAt = previous ? (meaningfulChange ? now : canvasNodeUpdatedAt(node, canvasNodeUpdatedAt(previous, createdAt)) || createdAt) : canvasNodeUpdatedAt(node, createdAt) || createdAt;
         if (node.createdAt === createdAt && node.updatedAt === updatedAt) return node;
         changed = true;
         return { ...node, createdAt, updatedAt };
@@ -66,16 +50,42 @@ export function stampCanvasNodeChanges(previousNodes: CanvasNodeData[], nextNode
     return changed ? stamped : nextNodes;
 }
 
+/**
+ * Update one node without routing through the generic full-array timestamp
+ * reconciliation. This is used by media metadata callbacks, which can fire
+ * in bursts while a large canvas is first becoming visible.
+ */
+export function updateCanvasNode(nodes: CanvasNodeData[], nodeId: string, update: (node: CanvasNodeData) => CanvasNodeData, now = new Date().toISOString()) {
+    return updateCanvasNodes(nodes, new Map([[nodeId, update]]), now);
+}
+
+export function updateCanvasNodes(nodes: CanvasNodeData[], updates: ReadonlyMap<string, (node: CanvasNodeData) => CanvasNodeData>, now = new Date().toISOString()) {
+    if (!updates.size) return nodes;
+    let changed = false;
+    const next = nodes.map((current) => {
+        const update = updates.get(current.id);
+        if (!update) return current;
+        const updated = update(current);
+        if (updated === current) return current;
+        changed = true;
+        const createdAt = canvasNodeCreatedAt(updated, canvasNodeCreatedAt(current, now)) || now;
+        const updatedAt = canvasNodeMeaningfullyChanged(current, updated) ? now : canvasNodeUpdatedAt(updated, canvasNodeUpdatedAt(current, createdAt)) || createdAt;
+        return updated.createdAt === createdAt && updated.updatedAt === updatedAt ? updated : { ...updated, createdAt, updatedAt };
+    });
+    return changed ? next : nodes;
+}
+
 function canvasNodeMeaningfullyChanged(previous: CanvasNodeData, next: CanvasNodeData) {
     if (
-        previous.type !== next.type
-        || previous.title !== next.title
-        || previous.parentId !== next.parentId
-        || previous.width !== next.width
-        || previous.height !== next.height
-        || previous.position.x !== next.position.x
-        || previous.position.y !== next.position.y
-    ) return true;
+        previous.type !== next.type ||
+        previous.title !== next.title ||
+        previous.parentId !== next.parentId ||
+        previous.width !== next.width ||
+        previous.height !== next.height ||
+        previous.position.x !== next.position.x ||
+        previous.position.y !== next.position.y
+    )
+        return true;
     if (previous.metadata === next.metadata) return false;
 
     const previousMetadata = previous.metadata || {};

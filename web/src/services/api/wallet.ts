@@ -14,11 +14,12 @@ export type CreditAccount = {
 export type CreditLedgerEntry = {
     id: string;
     userId: string;
-    type: "redeem" | "admin_grant" | "consume" | "refund" | "admin_adjustment" | "signup_bonus" | "checkin_bonus";
+    type: "redeem" | "payment_topup" | "admin_grant" | "consume" | "refund" | "admin_adjustment" | "signup_bonus" | "checkin_bonus";
     amountMicrocredits: number;
     availableAfterMicrocredits: number;
     reservedAfterMicrocredits: number;
     billingOrderId?: string;
+    paymentOrderId?: string;
     model?: string;
     channelId?: string;
     scene?: string;
@@ -71,7 +72,7 @@ export type ChannelModel = {
     priceVersion: number;
     capabilityVersion?: number;
     capabilityConfig?: import("@/lib/model-capabilities").ModelCapabilityConfig;
-	priceTiers: ChannelModelPriceTier[];
+    priceTiers: ChannelModelPriceTier[];
     createdAt: string;
     updatedAt: string;
 };
@@ -96,8 +97,8 @@ export type ChannelModelFetchResult = {
 export type ChannelModelPriceTier = {
     id: string;
     channelModelId: string;
-	selector: Record<string, string>;
-	selectorKey: string;
+    selector: Record<string, string>;
+    selectorKey: string;
     resolution: string;
     videoSeconds: number;
     providerModelKey: string;
@@ -123,7 +124,7 @@ export type ChannelModelMutation = {
     protocol?: ChannelModel["protocol"];
     enabled?: boolean;
     capabilityConfig?: ChannelModel["capabilityConfig"];
-	priceTiers?: Array<Omit<ChannelModelPriceTier, "id" | "channelModelId" | "selectorKey" | "priceVersion" | "createdAt" | "updatedAt">>;
+    priceTiers?: Array<Omit<ChannelModelPriceTier, "id" | "channelModelId" | "selectorKey" | "priceVersion" | "createdAt" | "updatedAt">>;
     billingMode?: ChannelModel["billingMode"];
     unitPriceMicrocredits?: number;
     inputTokenPriceMicrocredits?: number;
@@ -308,7 +309,7 @@ export function updateAdminChannelModel(channelId: string, id: string, input: Ch
 }
 
 export function deleteAdminChannelModel(channelId: string, id: string) {
-	return request<{ ok: boolean }>(api.delete(`/admin/channels/${encodeURIComponent(channelId)}/models/${encodeURIComponent(id)}`));
+    return request<{ ok: boolean }>(api.delete(`/admin/channels/${encodeURIComponent(channelId)}/models/${encodeURIComponent(id)}`));
 }
 
 export type AdminFinanceListParams = { keyword?: string; status?: string; validity?: string; page?: number; limit?: number };

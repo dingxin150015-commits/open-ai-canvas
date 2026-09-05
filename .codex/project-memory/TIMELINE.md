@@ -440,3 +440,28 @@
 - 完整 Git 对象审计确认共同基点 `4ba9694`、本地/官方独有 54/66 提交、官方 506 文件 `+38,322/-3,646`、本地 303 文件 `+83,085/-18,138`、重叠 89 路径。
 - merge-tree 模拟得到 47 个显式冲突文件/149 区块，另有 40 个 changed-both 自动合并路径。旧 300 文件估计来自 GitHub Compare API 文件列表上限，现已被替代。
 - 创建本地 `codex/upstream-v1.2.5-20260904@44e8c10`，尚未 push、尚未 merge；运行容器和真实数据卷未变。
+
+## 2026-09-04：`v1.2.5` 阶段 3–4
+
+- 在审计提交 `39c7e62` 上执行 `git merge --no-commit --no-ff f8e87bc`；`MERGE_HEAD` 精确为固定 Release commit，没有追入 `official/main` 尾差。
+- 实际产生 49 个未合并路径，其中 47 个文本冲突、139 个工作树冲突标记，另有 AutoDL Manifest 和稳定首页两个 modify/delete 决策；这修正了 merge-tree 的 47 文件/149 区块模拟口径。
+- 按文档/版本、部署、数据库/资源、Provider/计费/任务、Web 画布五组逐区块处理。保留本地 Bailian、精确计费、xAI fail-closed、日志/SSRF/资源归属、30MB Runtime、Create 持久化与稳定首页；吸收官方 v1.2.5 素材、回收站、平台外观、画布、任务、插件、支付和更新基础。
+- AutoDL 源 Manifest 保留以支持本地扩展维护，官方打包 `.yingce-plugin` 同时进入索引；根版本暂定 `v1.2.5+dingxin.1`。
+- 阶段 4 最小结构检查为冲突标记 0、未解决索引 0、非暂存 0、冲突 Go gofmt、两份 JSON 可解析和 cached diff check 通过；`/home` 稳定首页路由保留。未运行 TypeScript、测试、构建、Compose 或迁移演练。
+- 未解决路径已归零，但尚未执行阶段 5 全量验证，当前为 `merge_open_resolved_unvalidated`。没有 merge commit、候选 push、stable 晋升、部署、真实卷迁移、Edge 或 Provider 调用。
+
+## 2026-09-05：`v1.2.5` 官方能力吸收只读审计
+
+- 417个本地未修改的官方路径与固定目标blob一致，229个官方新增路径全部存在；六类主要官方功能入口结构上均已纳入。
+- 确认 Create 文本链路没有完整吸收官方 Backend-only 改造：页面仍导入已删除的 `backendModelRuntimeRequired` 并保留旧直连分流，是阶段5前置阻断项。
+- `/home`、AutoDL源Manifest、画布颜色token和章节角色再提取去重策略属于有意本地差异；Host Updater虽已纳入，但默认官方仓库源尚不适用于用户fork。
+- 本轮只读审计未运行TypeScript/测试/构建，未修改业务代码、未提交、未push、未部署。
+
+## 2026-09-05：`v1.2.5` 阶段 5
+
+- 完成 Create Backend-only 收口及 Web 合并回归修复，保留批准的本地首页、主题、AutoDL、角色提取与安全脱敏合同。
+- 发现并修复官方 v1.2.5 公告图片草稿/当前公告自引用导致合法替换和丢弃永久阻断的问题。
+- Web 默认全套、补充专项、类型和生产构建通过；Backend Linux CGO 全量通过；Canvas Agent 在 Node 22 + Bun 1.4 Linux 完成 328 项测试与构建，0 fail、0 cancelled。
+- 建立独立候选镜像和 verified/protected 恢复点；独立卷连续两次完成 72→80 表迁移，业务计数与 OSS 密钥合同保持；真实环境未部署。
+- 最终复核为 517 个 staged 文件、unmerged/unstaged/新增冲突标记/敏感路径/高置信 Secret 命中均为 0，cached diff check 通过；清理临时 remerge worktree 和两个无卷诊断容器，保留候选镜像、私有恢复点和克隆卷。
+- 用户随后批准阶段 6 本地 merge commit 与阶段 7 fork 候选推送连续执行；画布颜色进入最终 Edge 独立视觉验收，当前本地 token 仅作为候选，保留改用官方默认方案的空间。

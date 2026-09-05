@@ -13,6 +13,7 @@ import { InfiniteCanvas } from "@/components/canvas/infinite-canvas";
 import { FullScreenLoader } from "@/components/ui/aceternity/full-screen-loader";
 import { WorkspaceState } from "@/components/layout/workspace-state";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
+import { canvasAppearanceBaseTheme, canvasAppearanceForTheme, DEFAULT_CANVAS_BACKGROUND_MODE, normalizeCanvasAppearance, resolveCanvasAppearance, type CanvasAppearance } from "@/lib/canvas/canvas-appearance";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { FOLDER_COLLAPSED_HEIGHT, FOLDER_COLLAPSED_WIDTH, isCanvasFolderNode, isFrameNode, isNodeHiddenByCollapsedFrame, resolveFrameConnection } from "@/lib/canvas/canvas-frame";
 import { ensureMediaNodeMinimumSize } from "@/lib/canvas/canvas-node-size";
@@ -26,7 +27,8 @@ type DragState = { primaryId: string; nodeIds: string[]; startX: number; startY:
 export default function SharedCanvasPage() {
     const { token = "" } = useParams();
     const { message } = App.useApp();
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const colorTheme = useThemeStore((state) => state.theme);
+    const theme = canvasThemes[colorTheme];
     const containerRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const dragRef = useRef<DragState | null>(null);
@@ -34,6 +36,7 @@ export default function SharedCanvasPage() {
     const [title, setTitle] = useState("共享画布");
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<Awaited<ReturnType<typeof getPublicCanvasShare>>["project"]["connections"]>([]);
+    const [appearance, setAppearance] = useState<CanvasAppearance>(() => canvasAppearanceForTheme(colorTheme));
     const [backgroundMode, setBackgroundMode] = useState<"lines" | "dots" | "blank">("lines");
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -78,6 +81,12 @@ export default function SharedCanvasPage() {
 
     useEffect(() => {
         let active = true;
+        const themeBeforeShare = useThemeStore.getState().theme;
+        let appliedShareTheme: typeof themeBeforeShare | null = null;
+        let themeChangedAfterApply = false;
+        const unsubscribeTheme = useThemeStore.subscribe((state, previous) => {
+            if (appliedShareTheme && state.theme !== previous.theme && state.theme !== appliedShareTheme) themeChangedAfterApply = true;
+        });
         setLoading(true);
         getPublicCanvasShare(token)
             .then(({ project }) => {
@@ -85,7 +94,11 @@ export default function SharedCanvasPage() {
                 setTitle(project.title || "共享画布");
                 setNodes((project.nodes || []).map(ensureMediaNodeMinimumSize));
                 setConnections(project.connections || []);
-                setBackgroundMode(project.backgroundMode || "lines");
+                const nextAppearance = project.appearance ? normalizeCanvasAppearance(project.appearance, themeBeforeShare) : canvasAppearanceForTheme(themeBeforeShare);
+                setAppearance(nextAppearance);
+                appliedShareTheme = canvasAppearanceBaseTheme(nextAppearance, themeBeforeShare);
+                useThemeStore.getState().setTheme(appliedShareTheme);
+                setBackgroundMode(project.backgroundMode || DEFAULT_CANVAS_BACKGROUND_MODE);
                 const initial = project.viewport || { x: 0, y: 0, k: 1 };
                 viewportRef.current = initial;
                 setViewport(initial);
@@ -98,6 +111,10 @@ export default function SharedCanvasPage() {
             });
         return () => {
             active = false;
+            unsubscribeTheme();
+            if (appliedShareTheme && !themeChangedAfterApply && useThemeStore.getState().theme === appliedShareTheme) {
+                useThemeStore.getState().setTheme(themeBeforeShare);
+            }
         };
     }, [token]);
 
@@ -257,7 +274,7 @@ export default function SharedCanvasPage() {
         );
 
     return (
-        <main className="relative h-screen overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
+        <main className="relative h-screen overflow-hidden" style={{ background: resolveCanvasAppearance(appearance, colorTheme).background, color: theme.node.text }}>
             <header className="pointer-events-none absolute inset-x-0 top-0 z-[var(--z-panel-floating)] flex h-16 items-center justify-between px-5">
                 <div className="pointer-events-auto flex min-w-0 items-center gap-3">
                     <Share2 className="size-4" style={{ color: theme.node.muted }} />
@@ -277,6 +294,7 @@ export default function SharedCanvasPage() {
             <InfiniteCanvas
                 containerRef={containerRef}
                 viewport={viewport}
+                appearance={appearance}
                 backgroundMode={backgroundMode}
                 onViewportChange={onViewportChange}
                 onViewportPreviewChange={(next) => {

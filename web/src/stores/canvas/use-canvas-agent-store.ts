@@ -76,7 +76,7 @@ function browserPreferenceStorage(): CanvasAgentPreferenceStorage | undefined {
 }
 
 export const useCanvasAgentStore = create<CanvasAgentStore>((set) => ({
-    width: typeof window === "undefined" ? 440 : Number(localStorage.getItem("canvas-agent-panel-width")) || 440,
+    width: Number(browserPreferenceStorage()?.getItem("canvas-agent-panel-width")) || 440,
     connected: false,
     enabled: readCanvasAgentEnabledPreference(),
     prompt: "",

@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { App, Button, Empty, Form, Image, Input, InputNumber, Segmented, Select, Tag } from "antd";
-import { Box, ChevronDown, ChevronLeft, ChevronRight, Download, Film, Image as ImageIcon, Layers3, List, Play, Plus, RefreshCcw, Save, SlidersHorizontal, Trash2, UsersRound, WandSparkles, X } from "lucide-react";
+import { App, Button, Empty, Form, Image, Input, InputNumber, Modal, Segmented, Select, Tag } from "antd";
+import { Box, ChevronDown, ChevronLeft, ChevronRight, Download, Film, Image as ImageIcon, Layers3, List, Maximize2, Play, Plus, RefreshCcw, Save, Search, SlidersHorizontal, Trash2, UsersRound, WandSparkles, X } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
 import { CanvasResourceMentionTextarea } from "@/components/canvas/canvas-resource-mention-textarea";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ModelPicker } from "@/components/model-picker";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationOptions } from "@/lib/model-capabilities";
 import { modelQuoteRequest } from "@/lib/model-pricing";
-import { modelCompatibilityError, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
+import { customShotTitle, formatShotOrdinal, normalizeDefaultShotTitle } from "@/lib/shot-label";
+import { modelCompatibilityError, resolveCompatibleModel, resolveModelVideoBooleanOptions, type ModelRequirements } from "@/lib/model-selection";
 import { formatVideoResolutionLabel } from "@/lib/video-generation-options";
+import { captureVideoPoster } from "@/lib/video-poster";
 import { submitBackendGenerationTask } from "@/services/api/generation-task";
 import { quoteLogicalModel } from "@/services/api/logical-models";
 import { type GenerationTask } from "@/services/api/task-center";
@@ -72,9 +75,10 @@ export default function WorkflowProductionWorkbench(props: Props) {
     const [form] = Form.useForm<ShotEditorValues>();
     const watchedDuration = Form.useWatch("durationSeconds", form);
     const watchedTitle = Form.useWatch("title", form);
-    const [leftTab, setLeftTab] = useState<"assets" | "episodes" | "shots">("assets");
+    const [leftTab, setLeftTab] = useState<"assets" | "episodes" | "shots">("episodes");
     const [previewTab, setPreviewTab] = useState<"latest" | "history">("latest");
     const [previewArtifactId, setPreviewArtifactId] = useState("");
+    const [imagePreviewArtifact, setImagePreviewArtifact] = useState<ShotArtifact | null>(null);
     const [editorDirty, setEditorDirty] = useState(false);
     const [submittingShotIds, setSubmittingShotIds] = useState<Set<string>>(() => new Set());
     const [taskClock, setTaskClock] = useState(() => Date.now());
@@ -149,6 +153,21 @@ export default function WorkflowProductionWorkbench(props: Props) {
     const activeProfile = useMemo(() => modelCapabilityConfigFor(effectiveConfig, routedModel), [effectiveConfig, routedModel]);
     const videoProfile = generationCapability === "video" ? activeProfile.video : undefined;
     const imageProfile = generationCapability === "image" ? activeProfile.image : undefined;
+    const videoBooleanOptions = useMemo(
+        () =>
+            generationCapability === "video"
+                ? resolveModelVideoBooleanOptions(
+                      effectiveConfig,
+                      routedModel,
+                      {},
+                      {
+                          videoGenerateAudio: effectiveConfig.videoGenerateAudio,
+                          videoWatermark: effectiveConfig.videoWatermark,
+                      },
+                  )
+                : undefined,
+        [effectiveConfig, generationCapability, routedModel],
+    );
     const generationConfig = useMemo(
         () => ({
             ...effectiveConfig,
@@ -159,8 +178,9 @@ export default function WorkflowProductionWorkbench(props: Props) {
             quality: imageQuality,
             vquality: resolution,
             videoSeconds: generationSeconds,
+            ...(videoBooleanOptions || {}),
         }),
-        [aspectRatio, effectiveConfig, generationCapability, generationSeconds, imageQuality, resolution, routedModel],
+        [aspectRatio, effectiveConfig, generationCapability, generationSeconds, imageQuality, resolution, routedModel, videoBooleanOptions],
     );
     const priceChannel = resolveModelChannel(generationConfig, routedModel);
     const configuredCredits = requestCreditCost({
@@ -227,7 +247,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
             generationCapability === "video" && currentModel ? Number(normalizeVideoValue(modelCapabilityConfigFor(effectiveConfig, currentModel).video!, { seconds: String(shotDurationSeconds) }).seconds) : shotDurationSeconds;
         const videoPrompt = ensureShotAssetMentionPrompt(revision?.videoPrompt || "", shotAssetReferenceContext.mentionReferences);
         form.setFieldsValue({
-            title: selectedShot?.title || "",
+            title: normalizeDefaultShotTitle(selectedShot?.title, Math.max(0, shotIndex)),
             plotDescription: revision?.plotDescription || selectedShot?.description || "",
             action: revision?.action || "",
             dialogue: revision?.dialogue || "",
@@ -241,6 +261,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
             continuityNotes: revision?.continuityNotes || "",
         });
         setPreviewArtifactId("");
+        setImagePreviewArtifact(null);
         setEditorDirty(!revision || videoPrompt !== revision.videoPrompt);
     }, [effectiveConfig, form, generationCapability, initialModel, revision?.id, selectedShot?.id, shotAssetReferenceContext.mentionReferences]);
 
@@ -461,9 +482,9 @@ export default function WorkflowProductionWorkbench(props: Props) {
                         value={leftTab}
                         onChange={(value) => setLeftTab(value as typeof leftTab)}
                         options={[
-                            { value: "assets", label: "资产" },
                             { value: "episodes", label: "章节" },
                             { value: "shots", label: "镜头" },
+                            { value: "assets", label: "资产" },
                         ]}
                     />
                     <div className="workflow-library-scroll thin-scrollbar">
@@ -476,18 +497,11 @@ export default function WorkflowProductionWorkbench(props: Props) {
                 <section className="workflow-shot-editor">
                     <header className="workflow-panel-header">
                         <div className="workflow-shot-heading">
-                            <span className="workflow-shot-number">SC.{String(shotIndex + 1).padStart(2, "0")}</span>
-                            <h2>{watchedTitle || selectedShot.title || "未命名镜头"}</h2>
+                            <span className="workflow-shot-number">{formatShotOrdinal(shotIndex)}</span>
+                            {customShotTitle(watchedTitle || selectedShot.title, shotIndex) ? <h2>{customShotTitle(watchedTitle || selectedShot.title, shotIndex)}</h2> : null}
                             <Tag className="!m-0" color={saveShot.isPending ? "blue" : editorDirty ? "orange" : revision ? "green" : undefined}>
                                 {saveShot.isPending ? "保存中" : editorDirty ? "有未保存修改" : revision ? "已保存" : "草稿"}
                             </Tag>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="mr-1 text-[var(--fs-micro)] text-foreground/45">
-                                {shotIndex + 1} / {shots.length}
-                            </span>
-                            <Button type="text" size="small" icon={<ChevronLeft className="size-4" />} disabled={shotIndex <= 0} onClick={() => selectRelativeShot(-1)} aria-label="上一个镜头" />
-                            <Button type="text" size="small" icon={<ChevronRight className="size-4" />} disabled={shotIndex >= shots.length - 1} onClick={() => selectRelativeShot(1)} aria-label="下一个镜头" />
                         </div>
                     </header>
                     <Form form={form} layout="vertical" className="workflow-shot-form" onValuesChange={() => setEditorDirty(true)} onFinish={(values) => saveShot.mutate(values)}>
@@ -682,7 +696,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                     </header>
                     <div className="workflow-preview-scroll thin-scrollbar">
                         {previewTab === "latest" ? (
-                            <LatestPreview artifact={previewArtifact} emptyText={stageCopy.empty} />
+                            <LatestPreview artifact={previewArtifact} emptyText={stageCopy.empty} onPreviewImage={setImagePreviewArtifact} />
                         ) : (
                             <ArtifactHistory
                                 artifacts={artifacts}
@@ -712,6 +726,25 @@ export default function WorkflowProductionWorkbench(props: Props) {
                     </div>
                 </aside>
             </div>
+
+            <Modal
+                open={Boolean(imagePreviewArtifact?.resourceId)}
+                title={imagePreviewArtifact?.type === "action_board" ? "动作预演预览" : "分镜图预览"}
+                footer={null}
+                centered
+                destroyOnHidden
+                width="min(960px, calc(100vw - 32px))"
+                onCancel={() => setImagePreviewArtifact(null)}
+                styles={{ body: { padding: 0 } }}
+            >
+                {imagePreviewArtifact?.resourceId ? (
+                    <img
+                        className={`workflow-image-preview-modal ${imagePreviewArtifact.type === "action_board" ? "grayscale" : ""}`}
+                        src={resourceFileUrl(imagePreviewArtifact.resourceId)}
+                        alt={imagePreviewArtifact.type === "action_board" ? "动作预演大图" : "分镜图大图"}
+                    />
+                ) : null}
+            </Modal>
 
             <ShotTimeline activeStage={activeStage} detail={detail} shots={shots} selectedShotId={selectedShot.id} submittingShotIds={submittingShotIds} onSelectShot={requestShotSelection} onAddShot={requestAddShot} addingShot={addingShot} />
         </div>
@@ -748,12 +781,15 @@ function WorkflowDisclosure({ icon, title, description, summary, className = "",
 
 function AssetLibrary({ detail, referenceByVersionId, changing, onToggle }: { detail: ProjectDetail; referenceByVersionId: Map<string, ShotAssetReference>; changing: boolean; onToggle: (asset: ProjectAsset, reference?: ShotAssetReference) => void }) {
     const [category, setCategory] = useState("all");
+    const [keyword, setKeyword] = useState("");
+    const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
     const [page, setPage] = useState(1);
     const pageSize = 30;
     const assetsQuery = useQuery({
-        queryKey: ["project", detail.project.id, "assets", "workflow-library", category, page, pageSize],
-        queryFn: () => listProjectAssetsPage(detail.project.id, { page, pageSize, category: category === "all" ? undefined : category }),
+        queryKey: ["project", detail.project.id, "assets", "workflow-library", category, debouncedKeyword, page, pageSize],
+        queryFn: () => listProjectAssetsPage(detail.project.id, { page, pageSize, category: category === "all" ? undefined : category, query: debouncedKeyword || undefined }),
     });
+    useEffect(() => setPage(1), [debouncedKeyword]);
     const assetsPage = assetsQuery.data?.assets || [];
     const groups = useMemo(() => {
         const map = new Map<string, ProjectAsset[]>();
@@ -764,6 +800,7 @@ function AssetLibrary({ detail, referenceByVersionId, changing, onToggle }: { de
     const pages = Math.max(1, Math.ceil(total / pageSize));
     return (
         <div className="workflow-asset-groups">
+            <Input allowClear size="small" className="mb-2 w-full" value={keyword} onChange={(event) => setKeyword(event.target.value)} prefix={<Search className="size-3.5 text-foreground/35" />} placeholder="搜索资产名称" aria-label="搜索镜头资产" />
             <Select
                 size="small"
                 className="mb-2 w-full"
@@ -807,7 +844,7 @@ function AssetLibrary({ detail, referenceByVersionId, changing, onToggle }: { de
                     </section>
                 ))
             ) : (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="项目还没有资产" />
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={debouncedKeyword ? "没有找到匹配资产" : "项目还没有资产"} />
             )}
             {total > pageSize ? (
                 <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-2 text-[var(--fs-micro)] text-foreground/45">
@@ -881,9 +918,9 @@ function ShotLibrary({ detail, shots, selectedShotId, onSelectShot }: { detail: 
                 const video = currentArtifact(detail, shot.id, "video");
                 return (
                     <button key={shot.id} type="button" className={shot.id === selectedShotId ? "is-active" : ""} onClick={() => onSelectShot(shot.id)}>
-                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <span>{formatShotOrdinal(index)}</span>
                         <span className="min-w-0 flex-1">
-                            <strong>{shot.title}</strong>
+                            <strong>{customShotTitle(shot.title, index) || "未命名"}</strong>
                             <small>{formatDuration(shot.durationMs)}</small>
                         </span>
                         <ArtifactStatus artifact={video} compact />
@@ -932,7 +969,7 @@ function BoundAssets({ detail, shotId, changing, onUnlink }: { detail: ProjectDe
     );
 }
 
-function LatestPreview({ artifact, emptyText }: { artifact?: ShotArtifact; emptyText: string }) {
+function LatestPreview({ artifact, emptyText, onPreviewImage }: { artifact?: ShotArtifact; emptyText: string; onPreviewImage: (artifact: ShotArtifact) => void }) {
     if (!artifact?.resourceId)
         return (
             <div className="workflow-media-empty">
@@ -943,8 +980,48 @@ function LatestPreview({ artifact, emptyText }: { artifact?: ShotArtifact; empty
             </div>
         );
     const src = resourceFileUrl(artifact.resourceId);
-    if (artifact.type === "video") return <video className="workflow-preview-media" src={src} controls preload="metadata" />;
-    return <img className={`workflow-preview-media ${artifact.type === "action_board" ? "grayscale" : ""}`} src={src} alt="镜头生成预览" loading="eager" />;
+    if (artifact.type === "video") return <VideoArtifactPreview src={src} title="镜头视频" />;
+    return (
+        <button type="button" className="workflow-preview-media-button" onClick={() => onPreviewImage(artifact)} aria-label={artifact.type === "action_board" ? "点击预览动作预演" : "点击预览分镜图"}>
+            <img className={`workflow-preview-media ${artifact.type === "action_board" ? "grayscale" : ""}`} src={src} alt="镜头生成预览" loading="eager" />
+            <span className="workflow-preview-expand" aria-hidden="true">
+                <Maximize2 className="size-4" />
+            </span>
+        </button>
+    );
+}
+
+function VideoArtifactPreview({ src, title }: { src: string; title: string }) {
+    const [posterUrl, setPosterUrl] = useState("");
+    const [playing, setPlaying] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+        let objectUrl = "";
+        setPosterUrl("");
+        setPlaying(false);
+        void captureVideoPoster(src, { maxWidth: 960 })
+            .then((captured) => {
+                if (!active || !captured.poster) return;
+                objectUrl = URL.createObjectURL(captured.poster);
+                setPosterUrl(objectUrl);
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
+    }, [src]);
+
+    if (playing) return <video className="workflow-preview-media" src={src} poster={posterUrl || undefined} controls autoPlay playsInline preload="metadata" aria-label={title} />;
+    return (
+        <button type="button" className="workflow-preview-media-button workflow-video-poster" onClick={() => setPlaying(true)} aria-label={`点击播放${title}`}>
+            {posterUrl ? <img className="workflow-preview-media" src={posterUrl} alt={`${title}首帧`} /> : <video className="workflow-preview-media" src={src} muted playsInline preload="auto" aria-hidden="true" />}
+            <span className="workflow-video-play" aria-hidden="true">
+                <Play className="size-6" fill="currentColor" />
+            </span>
+        </button>
+    );
 }
 
 function ArtifactHistory({ artifacts, activeId, onSelect, compact = false }: { artifacts: ShotArtifact[]; activeId?: string; onSelect: (artifact: ShotArtifact) => void; compact?: boolean }) {
@@ -1079,10 +1156,10 @@ function TimelineShot({
             </span>
             <span className="workflow-timeline-copy">
                 <span className="workflow-timeline-heading">
-                    <strong>SC.{String(index + 1).padStart(2, "0")}</strong>
+                    <strong>{formatShotOrdinal(index)}</strong>
                     <b>{formatDuration(shot.durationMs)}</b>
                 </span>
-                <em className="workflow-timeline-title">{shot.title}</em>
+                {customShotTitle(shot.title, index) ? <em className="workflow-timeline-title">{customShotTitle(shot.title, index)}</em> : null}
                 <small className="workflow-timeline-meta">{cameraMeta}</small>
                 <span className="workflow-timeline-status">
                     <span>

@@ -34,7 +34,7 @@ export function toResponseTool(tool: ResponseFunctionTool): ResponseApiToolDefin
 }
 
 export function toClaudeBody(config: AiConfig, messages: ResponseInputMessage[], tools: ResponseFunctionTool[] = []) {
-    const system = [config.systemPrompt.trim(), ...messages.flatMap((message) => !(("type" in message)) && message.role === "system" ? [String(message.content || "")] : [])].filter(Boolean).join("\n\n");
+    const system = [config.systemPrompt.trim(), ...messages.flatMap((message) => (!("type" in message) && message.role === "system" ? [String(message.content || "")] : []))].filter(Boolean).join("\n\n");
     const bodyMessages: Array<Record<string, unknown>> = [];
     for (const message of messages) {
         if ("type" in message) {
@@ -101,8 +101,8 @@ export function toChatCompletionToolChoice(toolChoice: ToolChoice) {
     return typeof toolChoice === "object" ? { type: "function", function: { name: toolChoice.name } } : toolChoice;
 }
 
-export function buildBackendToolRequests(messages: ResponseInputMessage[], tools: ResponseFunctionTool[], toolChoice: ToolChoice): BackendToolRequests {
-    return {
+export function buildBackendToolRequests(messages: ResponseInputMessage[], tools: ResponseFunctionTool[], toolChoice: ToolChoice, config?: AiConfig): BackendToolRequests {
+    const requests: BackendToolRequests = {
         responses: {
             input: toResponseInput(messages),
             tools: tools.map(toResponseTool),
@@ -116,6 +116,14 @@ export function buildBackendToolRequests(messages: ResponseInputMessage[], tools
             parallel_tool_calls: false,
         },
     };
+    if (config) {
+        requests.claude = {
+            ...toClaudeBody(config, messages, tools),
+            tool_choice: typeof toolChoice === "object" ? { type: "tool", name: toolChoice.name } : { type: toolChoice === "required" ? "any" : "auto" },
+        };
+        requests.gemini = toGeminiBody(config, messages, toGeminiToolOptions(tools, toolChoice));
+    }
+    return requests;
 }
 
 export function toGeminiBody(config: AiConfig, messages: ResponseInputMessage[], extra?: Record<string, unknown>) {

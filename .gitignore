@@ -15,6 +15,10 @@ docs/*
 !docs/content/docs/backend/backend-database.mdx
 !docs/content/docs/progress/
 !docs/content/docs/progress/pending-test.mdx
+# Keep the new plugin design spec versioned without unignoring generated docs.
+!docs/content/docs/plugins/
+docs/content/docs/plugins/*
+!docs/content/docs/plugins/ai-art-critique.mdx
 .env*
 !.env.example
 data/
@@ -84,3 +88,4 @@ test-video.json
 web/package-lock.json
 .superdesign
 .playwright-cli/
+/project-memory/

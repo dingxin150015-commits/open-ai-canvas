@@ -4,7 +4,8 @@
 
 ## Git 与远程
 
-- 2026-09-04 用户批准把下一轮官方增量目标固定为 `v1.2.5@f8e87bcc4ce3e6f7eae7a89dc8b9231801116072`，采用“双轨来源、单树交付”。阶段 0–1 已把历史检查点和新 `origin/codex/dingxin-stable` 安全 fast-forward 到 `44e8c10`；阶段 2 完整对象审计确认官方增量 66 提交/506 文件、双方重叠 89 路径、模拟 47 个显式冲突/149 区块。当前分支 `codex/upstream-v1.2.5-20260904@44e8c10` 尚未 push、尚未打开 merge；阶段 0–4 可连续执行，阶段 4 后必须停止，阶段 5–9和Astravia仍未授权。详见 `UPSTREAM_V125_PLAN_20260904.md` 与 `UPSTREAM_V125_AUDIT_20260904.md`。
+- 2026-09-04 固定 `v1.2.5` 阶段 0–4 已执行到批准停止点。历史检查点和 `origin/codex/dingxin-stable` 均为 `44e8c10`；本地集成分支 `codex/upstream-v1.2.5-20260904` 的 `HEAD=39c7e62`、`MERGE_HEAD=f8e87bc`。真实 merge 为 49 个未合并路径/139 个文本区块，现已按五组语义解决并加入 index，未解决为 0，版本暂定 `v1.2.5+dingxin.1`。当前状态 `merge_open_resolved_unvalidated`：阶段 5–9、候选 push、stable 晋升、部署和Astravia仍未授权。
+- 2026-09-05 只读官方能力吸收审计确认417个upstream-only路径逐字节一致、229个官方新增路径全部存在，主要官方功能族结构入口齐全；但 Create 文本链路仍导入官方已删除的 `backendModelRuntimeRequired` 并保留旧 `requestImageQuestion` 分流，是阶段 5 前置阻断项。Host Updater默认仍指向官方仓库，fork适配前不可启用。
 - 当前分支：`codex/upstream-20260828-ab89c05`。fork固定 `4ba9694` 检查点为 `e02cee1`；本地增加部署标识提交 `c3f5479` 和路线B记录提交 `15342d5`，均未推送，UI版本为 `v1.1.4+local.4ba.e02cee1`。路线B已完成私有恢复点、候选镜像、两次克隆卷迁移幂等和真实保留卷升级；当前运行Backend `8182cc0a`、Web `522109d7`，均healthy/restart0/OOMfalse，真实卷仍为 `open-ai-canvas_backend-data`。升级后数据库完整性ok、外键0、72张表，业务计数保持用户/渠道/模型/任务/资源/素材/画布1/1/320/3/5/5/1，skills/versions/files为33，密钥和迁移标记不变。2026-09-04 用户在登录态Microsoft Edge完成11张截图的人工只读冒烟，版本/会话、稳定首页、项目/章节、空资产分镜、5项素材、3条任务、Skill详情、后台和DevTools基础健康通过，状态为 `runtime_candidate_edge_smoke_passed_limited`。真实资产绑定分镜、多镜头生成/恢复、Provider、精确计费、OSS新写入和强写路径仍未验证；官方实时新尾差仍未合并。
 - 阶段 13 的统一错误链路、请求关联和脱敏日志已固化为本地提交 `f39512a`；尚未 push、未创建 PR、未触发远程 CI。
 - 阶段 14 的插件签名握手、长任务超时和 Compose 开关合同已固化为本地提交 `8946917`；尚未 push、未创建 PR、未触发远程 CI。
@@ -256,3 +257,14 @@
 - 内部账务已 settled：数量 2 秒、实际 2 积分、预留归零、余额 98。阿里云 OSS Resource `f6da…e3b0` 为 ready、video/mp4、805,526 bytes、Endpoint `oss-cn-wulanchabu.aliyuncs.com`；Asset 已 confirmed 并使用 `resource:` 存储键。服务日志记录资源文件 Range 读取 206，证明浏览器已通过资源接口读取对象。等待用户最终确认实际播放、无声和无水印。
 - Edge 最终视觉验证通过：视频可正常播放，播放器显示 0:02；用户确认无声音、无水印，截图无可见水印。下一步仅恢复模型停用/未定价并创建调用后恢复点，不删除任务、账务、Resource、Asset 或 OSS 对象。
 - 阶段 8 已完成：Wan 3.0 模型和唯一临时价格档已恢复 disabled/unpriced、单价 0；成功任务、settled 账务、ready OSS Resource 和 confirmed Asset 保留。调用后 `BKP-20260826-201444-STAGE8-POSTCALL` 已完成完整性、外键、独立恢复、OSS 密文、运行审计、ACL 和哈希验证。
+
+## 2026-09-05：v1.2.5 阶段 5
+
+- 固定合并仍打开在 `MERGE_HEAD=f8e87bcc...`，尚无 merge commit、push、PR、部署或 Edge 验收。
+- Web 类型、默认全套测试、补充专项和生产构建通过；Backend 隔离 Linux CGO 全量通过；Compose/PowerShell 静态门禁通过。
+- Canvas Agent 在 Node 22 + Bun 1.4 Linux 隔离环境完成 328 项测试（322 pass、6 skip、0 fail、0 cancelled）和 TypeScript 构建；Windows 本机受限进程树宿主不再作为最终结论。
+- Backend/Web 候选镜像仅以独立标签存在；真实运行镜像和 `open-ai-canvas_backend-data` 未替换。
+- `BKP-20260905-143709-STAGE5-V125` 已验证保护；克隆迁移 72→80 表、两次无网络 healthy，业务计数和密钥合同不变。
+- Host Updater 仍指向官方仓库，fork 源适配前禁止执行更新。
+- 阶段 5 最终 staged-bytes：517 文件、unmerged 0、unstaged 0、本次新增冲突标记 0、敏感路径 0、高置信 Secret 新增命中 0，cached diff check 通过。状态为 `stage5_complete_ready_for_stage6_approval`。
+- 用户已批准阶段 6–7 连续执行。画布颜色保留为最终 Microsoft Edge 独立视觉验收项：当前候选沿用本地底板/柔和网格，但明确保留切换到官方 v1.2.5 默认色与高强度网格方案的空间。

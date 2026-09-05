@@ -25,7 +25,7 @@ function slice(source: string, from: string, to: string) {
 
 describe("新建场景必须显式选模板", () => {
     test("createDirectorShot 第一个参数是 templateId，没有默认值", () => {
-        expect(hook).toContain("const createDirectorShot = useCallback((templateId: DirectorTemplateId, position?: Position) => {");
+        expect(hook).toMatch(/const createDirectorShot = useCallback\(\s*\(templateId: DirectorTemplateId, position\?: Position\) => \{/);
         // 有默认模板等于又回到「无条件塞演员」。
         expect(hook).not.toContain("templateId: DirectorTemplateId = ");
     });
@@ -83,7 +83,8 @@ describe("模式接线", () => {
     });
 
     test("时间轴只在 capabilities.timeline 为真时渲染", () => {
-        expect(workbench).toContain("{capabilities.timeline ? <DirectorSequencer");
+        expect(workbench).toContain("{capabilities.timeline ? (");
+        expect(workbench).toContain("<DirectorSequencer");
     });
 
     test("动画模式把 Transform 轨迹接入视口，隐藏演员和零长度轨迹不显示", () => {
@@ -95,25 +96,28 @@ describe("模式接线", () => {
     });
 
     test("骨骼/姿势入口只对演员开放，且由 bones 把关", () => {
-        expect(workbench).toContain('{capabilities.bones && (object.kind === "actor" || object.primitive === "character") ? <>');
+        expect(workbench).toContain('{capabilities.bones && (object.kind === "actor" || object.primitive === "character") ? (');
         // motionClips 不得再作为放行条件：带动画的普通模型不是演员。
         expect(workbench).not.toContain('object.primitive === "character" || motionClips.length) ? <>');
     });
 
     test("姿态模式提供全身与当前骨骼重置，不删除动画轨道", () => {
         const inspector = slice(workbench, "function ObjectInspector(", "function LightInspector(");
-        expect(inspector).toContain('onClick={() => applyPose("stand")}>重置姿态</Button>');
+        expect(inspector).toContain('onClick={() => applyPose("stand")}');
+        expect(inspector).toContain("重置姿态");
         expect(inspector).toContain("delete boneOverrides[selectedBoneId]");
-        expect(inspector).toContain(">重置当前骨骼</Button>");
+        expect(inspector).toContain("onClick={resetSelectedBone}");
+        expect(inspector).toContain("重置当前骨骼");
         expect(inspector).not.toContain("boneTracks: []");
     });
 
     test("动作片段与骨骼入口解耦：任何带 Clip 的对象都能调播放速度/循环", () => {
-        expect(workbench).toContain('{motionClips.length ? <><Field label="动作片段">');
+        expect(workbench).toContain("{motionClips.length ? (");
+        expect(workbench).toContain('<Field label="动作片段">');
     });
 
     test("关键帧入口由 keyframes 把关", () => {
-        expect(workbench).toContain("{capabilities.keyframes ? <>");
+        expect(workbench).toContain("{capabilities.keyframes ? (");
     });
 
     test("渲染视图下拉按当前模式过滤，而不是写死五项", () => {
@@ -169,8 +173,8 @@ describe("模式接线", () => {
     test("draft/history/save 的生命周期 effect 一律不依赖 mode", () => {
         // 逐个锁住依赖数组：任一处混入 mode，切模式就会掉草稿或掉历史。
         expect(workbench).toContain("}, [message, modal, open, scene, writeDraft]);");
-        expect(workbench).toContain("}, [mirrorDraft, stagedTransaction]);");
-        expect(workbench).toContain("}, [mirrorDraft]);");
+        expect(workbench).toContain("[mirrorDraft, stagedTransaction]");
+        expect(workbench).toContain("[mirrorDraft]");
         // 快捷键监听只随 open 装卸，不随 mode 反复重挂。
         expect(workbench).toContain("}, [open]);");
     });

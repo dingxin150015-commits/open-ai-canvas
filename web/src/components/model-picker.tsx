@@ -4,7 +4,7 @@ import { Popover } from "antd";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { modelCapabilityConfigFor, videoDurationOptions } from "@/lib/model-capabilities";
-import { modelQuoteRequest, normalizeTierResolution, priceTiersForCurrentSelection } from "@/lib/model-pricing";
+import { formatPriceRange, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
 import { compatibleModelInGroup, configuredModelDisplayName, groupModelsByDisplayName, modelCompatibilityError, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
 import { cn } from "@/lib/utils";
 import { modelDisplayName, modelIcon, modelOptionName, PUBLIC_MODEL_CATALOG_ID, resolveModelChannel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
@@ -24,6 +24,7 @@ type ModelPickerProps = {
     placeholder?: string;
     onMissingConfig?: () => void;
     showSelectedPrice?: boolean;
+    showOptionPrices?: boolean;
     variant?: "default" | "creation";
     requirements?: ModelRequirements;
     showConfiguredModelName?: boolean;
@@ -40,6 +41,7 @@ export function ModelPicker({
     placeholder = "选择模型",
     onMissingConfig,
     showSelectedPrice = true,
+    showOptionPrices = showSelectedPrice,
     variant = "default",
     requirements,
     showConfiguredModelName = false,
@@ -226,7 +228,7 @@ export function ModelPicker({
                                             theme={theme}
                                             creationVariant={creationVariant}
                                             showConfiguredModelName={showConfiguredModelName}
-                                            showPrice={creditsEnabled}
+                                            showPrice={showOptionPrices && creditsEnabled}
                                             disabledReason={disabledReason}
                                         />
                                         {selected ? <Check className="canvas-model-picker-option-check" style={{ color: theme.node.activeStroke }} /> : null}
@@ -431,31 +433,13 @@ function channelTierPriceSummary(
     visibleTiers: NonNullable<NonNullable<AiConfig["channels"][number]["modelCosts"]>[number]["logicalPriceTiers"]>,
     allTiers: NonNullable<NonNullable<AiConfig["channels"][number]["modelCosts"]>[number]["logicalPriceTiers"]>,
 ): Extract<ModelMenuPrice, { kind: "tiers" }> {
-    const explicitlyFree =
-        visibleTiers.length > 0 &&
-        visibleTiers.every((tier) => (tier.billingMode === "token" ? [tier.inputTokenPriceMicrocredits, tier.outputTokenPriceMicrocredits, tier.cachedTokenPriceMicrocredits].every((value) => value === 0) : tier.unitPriceMicrocredits === 0));
-    const fixedRequestValues = visibleTiers
-        .filter((tier) => tier.billingMode === "fixed_request")
-        .map((tier) => tier.unitPriceMicrocredits / 1_000_000)
-        .filter((value) => value > 0);
-    const perSecondValues = visibleTiers
-        .filter((tier) => tier.billingMode === "per_second")
-        .map((tier) => tier.unitPriceMicrocredits / 1_000_000)
-        .filter((value) => value > 0);
-    const hasTokenTier = visibleTiers.some((tier) => tier.billingMode === "token");
-    const label = explicitlyFree ? "免费" : fixedRequestValues.length ? formatPriceRange(fixedRequestValues, "积分") : perSecondValues.length ? formatPriceRange(perSecondValues, "积分/秒") : hasTokenTier ? "按量预估" : "未配置";
+    const label = priceTierSummaryLabel(visibleTiers);
     return {
         kind: "tiers",
         label,
         compactLabel: label,
         title: `系统规格价格：${allTiers.map((tier) => `${tierSpecificationLabel(tier)} ${tierPriceLabel(tier)}`).join("；")}`,
     };
-}
-
-function formatPriceRange(values: number[], suffix: string) {
-    const unique = Array.from(new Set(values)).sort((left, right) => left - right);
-    const format = (value: number) => value.toLocaleString("zh-CN", { maximumFractionDigits: 3 });
-    return unique.length === 1 ? `${format(unique[0])} ${suffix}` : `${format(unique[0])}-${format(unique[unique.length - 1])} ${suffix}`;
 }
 
 function tierResolutionLabel(value: string) {

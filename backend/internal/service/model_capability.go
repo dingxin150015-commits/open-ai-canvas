@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"infinite-canvas/backend/internal/model"
 )
@@ -68,6 +69,7 @@ type ParameterSupport struct {
 type VideoCapabilityConfig struct {
 	References        VideoReferenceConfig `json:"references"`
 	Duration          VideoDurationConfig  `json:"duration"`
+	DurationSupported *bool                `json:"durationSupported,omitempty"`
 	Ratios            []string             `json:"ratios"`
 	DefaultRatio      string               `json:"defaultRatio"`
 	Resolutions       []string             `json:"resolutions"`
@@ -112,6 +114,10 @@ type VideoBooleanConfig struct {
 
 func DefaultModelCapabilityConfig(protocol string) *ModelCapabilityConfig {
 	return DefaultModelCapabilityConfigForModel(protocol, "")
+}
+
+func videoDurationSupported(value *VideoCapabilityConfig) bool {
+	return value == nil || value.DurationSupported == nil || *value.DurationSupported
 }
 
 func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapabilityConfig {
@@ -802,6 +808,9 @@ func (s *Service) ValidateTaskCapability(input map[string]any) error {
 		return nil
 	}
 	if isWorkflowProviderInterface(taskInput.Config.InterfaceType) {
+		if err := validateWorkflowProviderPromptLength(taskInput); err != nil {
+			return err
+		}
 		return validateWorkflowProviderConfig(taskInput.Mode, taskInput.Config)
 	}
 	// 普通音频模型沿用主线的能力校验路径；当前专用能力表只覆盖图片和视频。
@@ -880,6 +889,12 @@ func applyFixedVideoResolution(input *canvasGenerationInput, profile *VideoCapab
 }
 
 func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInput) error {
+	if profile == nil {
+		return BadAuthRequest("当前视频模型能力参数无效")
+	}
+	if err := validateModelPromptLength("视频", input.Prompt, profile.References.PromptMaxChars); err != nil {
+		return err
+	}
 	visualCount := len(input.ReferenceImages) + len(input.ReferenceVideos)
 	if profile.References.MaxVisuals > 0 && visualCount > profile.References.MaxVisuals {
 		return BadAuthRequest(fmt.Sprintf("当前视频模型最多支持 %d 个图片/视频视觉素材", profile.References.MaxVisuals))
@@ -1016,6 +1031,25 @@ func validateImageTask(profile *ImageCapabilityConfig, input canvasGenerationInp
 		return BadAuthRequest(fmt.Sprintf("当前图片模型单次最多生成 %d 张", profile.MaxOutputs))
 	}
 	return nil
+}
+
+func validateWorkflowProviderPromptLength(input canvasGenerationInput) error {
+	profile := input.Config.CapabilityConfig
+	if input.Mode != "video" || profile == nil || profile.Video == nil {
+		return nil
+	}
+	return validateModelPromptLength("视频", input.Prompt, profile.Video.References.PromptMaxChars)
+}
+
+func validateModelPromptLength(label string, prompt string, maxChars int) error {
+	if maxChars <= 0 {
+		return nil
+	}
+	actualChars := utf8.RuneCountInString(prompt)
+	if actualChars <= maxChars {
+		return nil
+	}
+	return BadAuthRequest(fmt.Sprintf("当前%s模型提示词最多 %d 个字符，完整提示词为 %d 个字符。系统不会自动截断，请精简当前输入、连线内容或技能上下文后重试", label, maxChars, actualChars))
 }
 
 func validateGPTImage2CustomSize(value string) error {

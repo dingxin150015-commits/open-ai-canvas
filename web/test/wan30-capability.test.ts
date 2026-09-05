@@ -30,7 +30,7 @@ describe("Wan 3.0 video capability", () => {
     });
 
     test("routes mixed references to reference mode", () => {
-        expect(inferVideoOperation({ textCount: 0, imageCount: 1, videoCount: 1, audioCount: 1, characterCount: 0 })).toBe("audio_to_video");
+        expect(inferVideoOperation({ textCount: 0, imageCount: 1, videoCount: 1, audioCount: 1, characterCount: 0 })).toBe("reference_to_video");
         expect(inferVideoOperation({ textCount: 0, imageCount: 1, videoCount: 1, audioCount: 0, characterCount: 0 })).toBe("reference_to_video");
         expect(inferVideoOperation({ textCount: 0, imageCount: 1, videoCount: 0, audioCount: 0, characterCount: 0 })).toBe("image_to_video");
     });

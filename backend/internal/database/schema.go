@@ -34,6 +34,12 @@ func Models() []any {
 		&model.CreditAccount{},
 		&model.CreditLedgerEntry{},
 		&model.BillingOrder{},
+		&model.TopupProduct{},
+		&model.PaymentProviderConfig{},
+		&model.PaymentOrder{},
+		&model.PaymentNotification{},
+		&model.PaymentReconciliationRun{},
+		&model.PaymentReconciliationItem{},
 		&model.RedeemBatch{},
 		&model.RedeemCode{},
 		&model.AdminAuditEvent{},
@@ -53,6 +59,7 @@ func Models() []any {
 		&model.ResourceDeletionJob{},
 		&model.AnnouncementImageDraft{},
 		&model.Asset{},
+		&model.AssetFolder{},
 		&model.ProjectAssetLink{},
 		&model.ProjectAssetFolder{},
 		&model.ProjectAssetCandidate{},
@@ -91,7 +98,7 @@ func Models() []any {
 	}
 }
 
-func MigrateSchema(db *gorm.DB) error {
+func migrateSchemaV1(db *gorm.DB) error {
 	// 旧表只保存 Updream 目录状态，与本地技能主键没有可迁移关系；首次升级时按产品要求清空重建。
 	if db.Migrator().HasColumn(&model.UserSkillState{}, "skill_dir") && !db.Migrator().HasColumn(&model.UserSkillState{}, "skill_id") {
 		if err := db.Migrator().DropTable(&model.UserSkillState{}); err != nil {

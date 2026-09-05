@@ -2,7 +2,7 @@ import { App, Button, Input, Modal, Tag } from "antd";
 import { CircleAlert, ExternalLink, Import, LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { buildLibTVImagePreviewUrl, formatLibTVBatchTime, parseLibTVProjectUUID } from "@/lib/canvas/libtv-import";
+import { buildLibTVImagePreviewUrl, buildLibTVVideoPreviewUrl, buildLibTVVideoSourceUrl, formatLibTVBatchTime, parseLibTVProjectUUID } from "@/lib/canvas/libtv-import";
 import { importLibTVCanvas, type LibTVImportResult } from "@/services/api/libtv";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type ViewportTransform } from "@/types/canvas";
 
@@ -30,8 +30,8 @@ function buildCanvasNodes(result: LibTVImportResult, viewport: ViewportTransform
         width: node.width,
         height: node.height,
         metadata: {
-            content: node.content,
-            previewContent: node.type === "image" ? buildLibTVImagePreviewUrl(node.content) : undefined,
+            content: node.type === "video" ? buildLibTVVideoSourceUrl(node.content) : node.content,
+            previewContent: node.type === "image" ? buildLibTVImagePreviewUrl(node.content) : buildLibTVVideoPreviewUrl(node.content) || undefined,
             prompt: node.prompt,
             model: node.model,
             status: node.status || "idle",
@@ -145,7 +145,9 @@ export function LibTVImportDialog({ open, projectId, viewport, viewportSize, onC
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                     <div className="text-sm font-semibold">{result.projectName || "LibTV 画布"}</div>
-                                    <div className="mt-1 text-sm text-foreground/60">可导入 {result.importedNodeCount} 个节点 · {result.importedConnectionCount} 条连线</div>
+                                    <div className="mt-1 text-sm text-foreground/60">
+                                        可导入 {result.importedNodeCount} 个节点 · {result.importedConnectionCount} 条连线
+                                    </div>
                                 </div>
                                 <Tag color="blue">批次：{formatLibTVBatchTime(result.batchCreatedAt)}</Tag>
                             </div>

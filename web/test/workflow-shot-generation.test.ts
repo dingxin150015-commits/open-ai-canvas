@@ -6,6 +6,26 @@ import type { GenerationTask } from "../src/services/api/task-center";
 import type { ProjectDetail } from "../src/services/api/projects";
 import { buildShotAssetReferenceContext, resolveShotAssetMentionPrompt } from "../src/pages/projects/detail/workflow-shot-references";
 
+const backendVideoConfig = {
+    ...defaultConfig,
+    model: "test::MiniMax-H3",
+    videoModel: "test::MiniMax-H3",
+    models: ["test::MiniMax-H3"],
+    videoModels: ["test::MiniMax-H3"],
+    channels: [
+        {
+            id: "test",
+            name: "测试视频渠道",
+            baseUrl: "https://api.example.com",
+            apiKey: "test-key",
+            apiFormat: "openai" as const,
+            interfaceType: "newapi-channel-2" as const,
+            models: ["MiniMax-H3"],
+            scope: "user" as const,
+        },
+    ],
+};
+
 test("production workbench does not silently drop bound voice samples before backend validation", async () => {
     const source = await Bun.file(new URL("../src/pages/projects/detail/workflow-production-workbench.tsx", import.meta.url)).text();
 
@@ -98,7 +118,7 @@ test("shot generation submits historical character image, current voice and asse
             projectId: "project-1",
             mode: "video",
             prompt,
-            config: { ...defaultConfig, model: "MiniMax-H3", videoModel: "MiniMax-H3" },
+            config: backendVideoConfig,
             referenceImages: context.referenceImages,
             referenceAudios: context.referenceAudios,
             metadata: { shotId: "shot-1", videoEditOperation: "reference_to_video" },
@@ -149,7 +169,7 @@ test("background generation submission returns after task creation without waiti
             projectId: "project-1",
             mode: "video",
             prompt: "角色表演",
-            config: { ...defaultConfig, model: "MiniMax-H3", videoModel: "MiniMax-H3" },
+            config: backendVideoConfig,
             metadata: { shotId: "shot-1", videoEditOperation: "reference_to_video" },
         },
         dependencies,

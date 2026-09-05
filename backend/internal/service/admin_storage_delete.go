@@ -83,6 +83,15 @@ func (s *Service) DeleteAdminResources(actor *model.User, req AdminResourceDelet
 		blocked.References = appendUniqueAdminResourceReference(blocked.References, AdminResourceReferenceView{Kind: reference.Kind, ID: reference.ID, Title: reference.Title})
 		blockedByID[reference.ResourceID] = blocked
 	}
+	for resourceID, references := range s.appearanceResourceReferences(resourceIDs) {
+		for _, reference := range references {
+			blocked := blockedByID[resourceID]
+			blocked.ID = resourceID
+			blocked.Reason = "资源仍被业务数据引用"
+			blocked.References = appendUniqueAdminResourceReference(blocked.References, reference)
+			blockedByID[resourceID] = blocked
+		}
+	}
 
 	deletable := make([]model.Resource, 0, len(resources))
 	deletableIDs := make([]string, 0, len(resources))
@@ -190,6 +199,11 @@ func adminResourceReferences(snapshot repository.ResourceReferenceSnapshot, reso
 	result := make(map[string][]AdminResourceReferenceView)
 	seen := make(map[string]map[string]struct{})
 	for _, reference := range snapshot.Direct {
+		// 公告图片草稿是待清理资源的临时所有权记录；删除事务会和资源一起移除它。
+		// 已发布公告仍由独立的 AnnouncementResourceReferences 门禁阻止删除。
+		if reference.Kind == "公告草稿" {
+			continue
+		}
 		appendAdminResourceReference(result, seen, reference.ResourceID, AdminResourceReferenceView{Kind: reference.Kind, ID: reference.ID, Title: reference.Title})
 	}
 	for _, resource := range resources {

@@ -21,7 +21,10 @@ export function registerNodeDefinitions(defs: CanvasNodeDefinition[], ownerId = 
 
 /** Registers schema-driven canvas nodes from the unified plugin manifest. */
 export function registerPluginCanvasNodes(pluginId: string, nodes: PluginCanvasNodeContribution[]) {
-    registerNodeDefinitions(nodes.map((node) => canvasNodeDefinitionFromPlugin(pluginId, node)), pluginId);
+    registerNodeDefinitions(
+        nodes.map((node) => canvasNodeDefinitionFromPlugin(pluginId, node)),
+        pluginId,
+    );
 }
 
 /**
@@ -95,4 +98,8 @@ export function getNodeGenerationMode(node: CanvasNodeData) {
 /** 该节点作为上游输入被计数时的类别，不参与计数返回 undefined */
 export function getNodeInputKind(type: CanvasNodeTypeId) {
     return definitions.get(type)?.inputKind;
+}
+
+export function getNodeAcceptedInputKind(type: CanvasNodeTypeId) {
+    return definitions.get(type)?.acceptsInputKind;
 }

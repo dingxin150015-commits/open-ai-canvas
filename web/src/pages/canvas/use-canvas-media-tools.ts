@@ -123,6 +123,47 @@ export function useCanvasMediaTools({
         [message, nodesRef],
     );
 
+    const openPortraitTextureEditor = useCallback(
+        (node: CanvasNodeData) => {
+            if (node.type !== CanvasNodeType.Image || !node.metadata?.content) {
+                message.warning("图片节点为空，无法调节人物质感");
+                return;
+            }
+            const portraitTextureSettings = { ...DEFAULT_PORTRAIT_TEXTURE_SETTINGS, ...node.metadata?.portraitTexture };
+            const composerContent = node.metadata?.composerContent?.trim() || node.metadata?.prompt?.trim() || "@图片1";
+            setHoveredNodeId(null);
+            setToolbarNodeId(null);
+            setNodes((current) => current.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, prompt: composerContent, composerContent, portraitTexture: portraitTextureSettings } } : item)));
+            setSelectedNodeIds(new Set([node.id]));
+            setSelectedConnectionId(null);
+            setDialogNodeId(node.id);
+        },
+        [message, setDialogNodeId, setHoveredNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds, setToolbarNodeId],
+    );
+    const persistMediaNodes = useCallback(
+        async (mediaNodes: CanvasNodeData[]) => {
+            const assetIds = new Map<string, string>();
+            for (const mediaNode of mediaNodes) {
+                try {
+                    const result = await ensureCanvasNodeAsset({ canvasId: projectId, domainProjectId, node: mediaNode, source: "canvas-manual" });
+                    assetIds.set(mediaNode.id, result.assetId);
+                } catch (error) {
+                    message.warning(`媒体节点已创建，但素材库写入失败：${error instanceof Error ? error.message : "未知错误"}`);
+                }
+            }
+            if (assetIds.size > 0) {
+                setNodes((current) =>
+                    current.map((item) => {
+                        const assetId = assetIds.get(item.id);
+                        return assetId ? { ...item, metadata: { ...item.metadata, assetId } } : item;
+                    }),
+                );
+            }
+            return assetIds;
+        },
+        [domainProjectId, message, projectId, setNodes],
+    );
+
     const createImageReversePromptNodes = useCallback(
         (node: CanvasNodeData) => {
             if (node.type !== CanvasNodeType.Image || !node.metadata?.content) {
@@ -161,24 +202,6 @@ export function useCanvasMediaTools({
         [effectiveConfig.model, effectiveConfig.textModel, message, setConnections, setContextMenu, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds],
     );
 
-    const openPortraitTextureEditor = useCallback(
-        (node: CanvasNodeData) => {
-            if (node.type !== CanvasNodeType.Image || !node.metadata?.content) {
-                message.warning("图片节点为空，无法调节人物质感");
-                return;
-            }
-            const portraitTextureSettings = { ...DEFAULT_PORTRAIT_TEXTURE_SETTINGS, ...node.metadata?.portraitTexture };
-            const composerContent = node.metadata?.composerContent?.trim() || node.metadata?.prompt?.trim() || "@图片1";
-            setHoveredNodeId(null);
-            setToolbarNodeId(null);
-            setNodes((current) => current.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, prompt: composerContent, composerContent, portraitTexture: portraitTextureSettings } } : item)));
-            setSelectedNodeIds(new Set([node.id]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(node.id);
-        },
-        [message, setDialogNodeId, setHoveredNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds, setToolbarNodeId],
-    );
-
     const cropImageNode = useCallback(
         async (node: CanvasNodeData, crop: CanvasImageCropRect) => {
             if (!node.metadata?.content) return;
@@ -200,8 +223,9 @@ export function useCanvasMediaTools({
             setSelectedNodeIds(new Set([childId]));
             setDialogNodeId(childId);
             setCropNodeId(null);
+            await persistMediaNodes([child]);
         },
-        [setConnections, setDialogNodeId, setNodes, setSelectedNodeIds],
+        [persistMediaNodes, setConnections, setDialogNodeId, setNodes, setSelectedNodeIds],
     );
 
     const saveAnnotatedImageNode = useCallback(
@@ -224,9 +248,10 @@ export function useCanvasMediaTools({
             setSelectedConnectionId(null);
             setDialogNodeId(null);
             setAnnotationNodeId(null);
+            await persistMediaNodes([child]);
             message.success("标注图片已保存为新节点");
         },
-        [message, setConnections, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds],
+        [message, persistMediaNodes, setConnections, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds],
     );
 
     const openVideoFrameExtractor = useCallback(
@@ -661,7 +686,11 @@ export function useCanvasMediaTools({
                 if (!image?.dataUrl) throw new Error("后端任务没有返回图片");
                 const uploaded = await uploadImage(image.dataUrl);
                 const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
-                setNodes((current) => current.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: effectivePrompt, ...generationMetadata } } : item)));
+                const currentNode = nodesRef.current.find((item) => item.id === childId);
+                if (!currentNode) throw new Error("局部编辑节点已被删除");
+                const finalizedNode = { ...currentNode, width: size.width, height: size.height, metadata: { ...currentNode.metadata, ...imageMetadata(uploaded), prompt: effectivePrompt, ...generationMetadata } };
+                setNodes((current) => current.map((item) => (item.id === childId ? finalizedNode : item)));
+                await persistMediaNodes([finalizedNode]);
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const details = generationErrorMessage(error);
@@ -678,6 +707,8 @@ export function useCanvasMediaTools({
             finishGenerationRequest,
             isAiConfigReady,
             message,
+            nodesRef,
+            persistMediaNodes,
             projectId,
             resolveImageEditStyle,
             setConnections,
@@ -711,8 +742,9 @@ export function useCanvasMediaTools({
             setConnections((current) => [...current, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
             setSelectedNodeIds(new Set([childId]));
             setDialogNodeId(childId);
+            await persistMediaNodes([child]);
         },
-        [setConnections, setDialogNodeId, setNodes, setSelectedNodeIds],
+        [persistMediaNodes, setConnections, setDialogNodeId, setNodes, setSelectedNodeIds],
     );
 
     const generateAngleNode = useCallback(
@@ -767,7 +799,11 @@ export function useCanvasMediaTools({
                 if (!image?.dataUrl) throw new Error("后端任务没有返回图片");
                 const uploaded = await uploadImage(image.dataUrl);
                 const size = fitNodeSize(uploaded.width, uploaded.height, imageSpec.width, imageSpec.height);
-                setNodes((current) => current.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: effectivePrompt, ...generationMetadata } } : item)));
+                const currentNode = nodesRef.current.find((item) => item.id === childId);
+                if (!currentNode) throw new Error("视角生成节点已被删除");
+                const finalizedNode = { ...currentNode, width: size.width, height: size.height, metadata: { ...currentNode.metadata, ...imageMetadata(uploaded), prompt: effectivePrompt, ...generationMetadata } };
+                setNodes((current) => current.map((item) => (item.id === childId ? finalizedNode : item)));
+                await persistMediaNodes([finalizedNode]);
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const details = generationErrorMessage(error);
@@ -777,7 +813,22 @@ export function useCanvasMediaTools({
                 setRunningNodeId(null);
             }
         },
-        [bindGenerationTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, projectId, resolveImageEditStyle, setConnections, setDialogNodeId, setNodes, setRunningNodeId, setSelectedNodeIds, startGenerationRequest],
+        [
+            bindGenerationTask,
+            effectiveConfig,
+            finishGenerationRequest,
+            isAiConfigReady,
+            nodesRef,
+            persistMediaNodes,
+            projectId,
+            resolveImageEditStyle,
+            setConnections,
+            setDialogNodeId,
+            setNodes,
+            setRunningNodeId,
+            setSelectedNodeIds,
+            startGenerationRequest,
+        ],
     );
 
     const generateEmotionNode = useCallback(
@@ -869,9 +920,11 @@ export function useCanvasMediaTools({
                 const composited = await compositeEmotionImage(node.metadata.content, image.dataUrl, payload.editRegion, payload.faceBox);
                 const uploaded = await uploadImage(composited);
                 const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
-                setNodes((current) =>
-                    current.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: providerPrompt, ...generationMetadata, emotionEdit } } : item)),
-                );
+                const currentNode = nodesRef.current.find((item) => item.id === childId);
+                if (!currentNode) throw new Error("表情编辑节点已被删除");
+                const finalizedNode = { ...currentNode, width: size.width, height: size.height, metadata: { ...currentNode.metadata, ...imageMetadata(uploaded), prompt: providerPrompt, ...generationMetadata, emotionEdit } };
+                setNodes((current) => current.map((item) => (item.id === childId ? finalizedNode : item)));
+                await persistMediaNodes([finalizedNode]);
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const details = generationErrorMessage(error);
@@ -888,6 +941,8 @@ export function useCanvasMediaTools({
             finishGenerationRequest,
             isAiConfigReady,
             message,
+            nodesRef,
+            persistMediaNodes,
             projectId,
             resolveImageEditStyle,
             setConnections,

@@ -1134,6 +1134,11 @@
         box-shadow: 0 8px 24px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
     }
 
+    .brand-logo-frame[data-logo-frame-enabled="false"] > :is(img, svg) {
+        width: 100%;
+        height: 100%;
+    }
+
     /* 工作区保留滚轮与触控板滚动，只隐藏会形成额外竖向分割的浏览器轨道。 */
     .app-spatial-workspace .app-workspace-scroll {
         scrollbar-width: none;
@@ -4913,6 +4918,23 @@
     }
     .canvas-folder-preview .canvas-project-preview-canvas {
         background: var(--canvas-cover-surface);
+    }
+    .canvas-folder-opening {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        background: color-mix(in srgb, var(--background) 78%, transparent);
+        color: var(--foreground);
+        font-size: var(--fs-caption);
+        font-weight: 600;
+        backdrop-filter: blur(3px);
+    }
+    .canvas-folder-card.is-opening {
+        pointer-events: none;
     }
 
     .canvas-folder-body {
@@ -10986,6 +11008,8 @@
         left: 0;
         height: 30px;
         content: "";
+        /* Keep the hover bridge from covering the node's external title. */
+        pointer-events: none;
     }
 
     .canvas-floating-dock {
@@ -13401,6 +13425,13 @@
         transition: none !important;
     }
 
+    /* 平移时优先保证世界层合成，暂时关闭每个媒体卡片的滤镜和阴影绘制。 */
+    [data-canvas-viewport-interacting="true"] :where(.canvas-node-shell, .canvas-frame-shell, .canvas-folder-preview, .canvas-folder-front, .aceternity-comet-card) {
+        box-shadow: none !important;
+        filter: none !important;
+        backdrop-filter: none !important;
+    }
+
     /* 静止期用最终倍率重新排版 DOM，避免 Windows Chromium 复用交互期的低分辨率合成纹理。 */
     .canvas-world-layer {
         transform: translate(var(--canvas-live-x), var(--canvas-live-y)) scale(var(--canvas-live-scale-ratio));
@@ -13408,7 +13439,9 @@
     }
 
     .canvas-world-raster-layer {
-        zoom: var(--canvas-committed-scale);
+        /* 使用标准 transform，避免搜狗 Chromium 对 zoom 下绝对定位的偏移。 */
+        transform: scale(var(--canvas-committed-scale));
+        transform-origin: 0 0;
     }
 
     [data-canvas-viewport-interacting="true"] .canvas-world-layer {
@@ -15213,7 +15246,7 @@ html:not(.dark) .app-workspace-shell.is-creation-workspace .app-workspace-stage 
     min-width: 0;
     flex: 1 1 auto;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-3);
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -15224,22 +15257,34 @@ html:not(.dark) .app-workspace-shell.is-creation-workspace .app-workspace-stage 
 .creation-home .creation-reference-panel-actions button {
     min-height: var(--space-7);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: 0;
     background: transparent;
     color: var(--creation-muted);
-    padding: 0 var(--space-3);
+    padding: 0 2px;
     font-size: var(--fs-caption);
     line-height: 1;
     white-space: nowrap;
     transition:
-        background-color var(--motion-dur-fast-calc) ease,
-        color var(--motion-dur-fast-calc) ease;
+        color var(--motion-dur-fast-calc) ease,
+        opacity var(--motion-dur-fast-calc) ease;
 }
 .creation-home .creation-reference-filter-tabs button:hover,
 .creation-home .creation-reference-filter-tabs button.is-active,
 .creation-home .creation-reference-panel-actions button:hover:not(:disabled) {
-    background: var(--creation-surface-hover);
     color: var(--creation-text);
+}
+.creation-home .creation-reference-filter-tabs button {
+    position: relative;
+}
+.creation-home .creation-reference-filter-tabs button.is-active::after {
+    position: absolute;
+    right: 2px;
+    bottom: -1px;
+    left: 2px;
+    height: 2px;
+    border-radius: var(--r-full);
+    background: var(--creation-text);
+    content: "";
 }
 .creation-home .creation-reference-filter-tabs button:focus-visible,
 .creation-home .creation-reference-panel-actions button:focus-visible,
@@ -15423,7 +15468,7 @@ html:not(.dark) .app-workspace-shell.is-creation-workspace .app-workspace-stage 
 .creation-home .creation-reference-card-preview:hover video {
     transform: scale(1.04);
 }
-.creation-home .creation-reference-card-preview > span {
+.creation-home .creation-reference-card-preview > span:not(.cached-resource-image-shell) {
     position: absolute;
     right: var(--space-1);
     bottom: var(--space-1);
@@ -15437,9 +15482,16 @@ html:not(.dark) .app-workspace-shell.is-creation-workspace .app-workspace-stage 
     opacity: 0;
     transition: opacity var(--motion-dur-fast-calc) ease;
 }
-.creation-home .creation-reference-card-preview:hover > span,
-.creation-home .creation-reference-card-preview:focus-visible > span {
+.creation-home .creation-reference-card-preview:hover > span:not(.cached-resource-image-shell),
+.creation-home .creation-reference-card-preview:focus-visible > span:not(.cached-resource-image-shell) {
     opacity: 1;
+}
+.creation-home .creation-reference-card-preview > .cached-resource-image-shell {
+    position: static;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
 }
 .creation-home .creation-reference-card-preview:focus-visible {
     outline: var(--stroke-2) solid var(--control-focus-ring);
@@ -15873,6 +15925,23 @@ html:not(.dark) .creation-home .creation-chat-composer .creation-model-picker.ca
     background: rgba(28, 32, 37, 0.06) !important;
 }
 
+.creation-home .creation-chat-controls > .voice-recording-inline {
+    width: min(236px, calc(100vw - 120px));
+    max-width: 236px;
+    flex: 0 1 236px;
+    min-height: 30px;
+    height: 30px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 7px;
+    background: transparent !important;
+    padding: 0 2px;
+}
+.creation-home .creation-chat-controls > .voice-recording-inline > svg {
+    flex: 0 1 160px;
+    max-width: 160px;
+}
+
 .creation-chat-intro h1 > .creation-intro-emphasis {
     display: inline-block;
     margin: 0 4px;
@@ -15942,6 +16011,20 @@ html:not(.dark) .creation-home .creation-chat-composer .creation-model-picker.ca
     border-radius: 4px;
     object-fit: cover;
 }
+.creation-user-message-reference .cached-resource-image-shell {
+    display: block;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    overflow: hidden;
+    border-radius: 4px;
+}
+.creation-user-message-reference .cached-resource-image-shell > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
 .creation-user-message-reference svg {
     width: 12px;
     height: 12px;
@@ -15965,6 +16048,17 @@ html:not(.dark) .creation-user-message-reference {
     border-radius: 7px;
     background: transparent;
     padding: 0;
+}
+.creation-user-message-attachments button > .cached-resource-image-shell {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.creation-user-message-attachments button > .cached-resource-image-shell > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 .creation-user-message-attachments button:focus-visible {
     outline: 2px solid var(--creation-text);
@@ -22526,12 +22620,22 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
     }
 }
 
-/* 空态布局收敛：banner 与下方对话列同宽，整组垂直居中；用首/末子项 auto margin 居中，
-   内容超高时自动 margin 归零、回到顶部对齐，避免 justify-content:center 在滚动容器里的裁切问题。 */
+/* 空态布局收敛：保持图片区、文案和输入区的文档流顺序，内容超高时由主区滚动承载。 */
+.creation-home .creation-empty-workspace {
+    justify-content: flex-start;
+}
+
+.creation-home .creation-empty-workspace > .creation-empty-art,
+.creation-home .creation-empty-workspace > .creation-chat-intro,
+.creation-home .creation-empty-workspace > .creation-empty-composer,
+.creation-home .creation-empty-workspace > .creation-empty-suggest {
+    flex: 0 0 auto;
+}
+
 .creation-empty-workspace > .creation-empty-art {
     width: min(820px, calc(100% - 28px));
     height: 200px;
-    margin: auto auto 20px;
+    margin: 0 auto 20px;
 }
 
 .creation-empty-workspace .creation-empty-art-frame.is-back {
@@ -22548,12 +22652,11 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
 }
 
 .creation-empty-workspace .creation-chat-intro {
-    margin-top: 24px;
-    margin-bottom: 18px;
+    margin: 0 auto 18px;
 }
 
 .creation-empty-workspace > .creation-empty-suggest {
-    margin: 26px auto auto;
+    margin: 26px auto 0;
 }
 
 @media (max-width: 800px) {
@@ -22574,7 +22677,7 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
         height: 122px;
     }
     .creation-empty-workspace .creation-chat-intro {
-        margin-top: 18px;
+        margin-top: 0;
         margin-bottom: 14px;
     }
     .creation-empty-workspace > .creation-empty-suggest {
@@ -22776,6 +22879,43 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
     background: color-mix(in srgb, var(--control-selected-fg) 18%, transparent);
     color: var(--control-selected-fg);
 }
+.assets-filter-item.is-active {
+    background: var(--control-selected-bg);
+    color: var(--control-selected-fg);
+    font-weight: 560;
+}
+.assets-filter-item.is-active:hover {
+    background: var(--control-selected-hover-bg);
+    color: var(--control-selected-fg);
+}
+.assets-filter-item.is-active .assets-filter-count {
+    background: color-mix(in srgb, var(--control-selected-fg) 18%, transparent);
+    color: var(--control-selected-fg);
+}
+.assets-folder-row {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 2px;
+}
+.assets-folder-add,
+.assets-folder-more {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: color-mix(in srgb, var(--foreground) 42%, transparent);
+    cursor: pointer;
+}
+.assets-folder-add:hover,
+.assets-folder-more:hover {
+    background: color-mix(in srgb, var(--foreground) 7%, transparent);
+    color: var(--foreground);
+}
 @media (min-width: 1024px) {
     .assets-filter-item {
         width: 100%;
@@ -22804,7 +22944,8 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
 .assets-cover-media {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    background: color-mix(in srgb, var(--foreground) 5%, transparent);
 }
 .assets-cover-fallback {
     display: grid;
@@ -23349,6 +23490,112 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
     object-fit: contain;
     background: #050505;
 }
+.asset-zoom-viewer {
+    position: relative;
+    display: flex;
+    min-height: 420px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #050505;
+    touch-action: none;
+}
+.asset-zoom-image {
+    max-height: 70vh;
+    transform-origin: center;
+    transition: transform 120ms ease-out;
+    user-select: none;
+}
+.asset-zoom-controls {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--r-md);
+    background: rgba(15, 15, 15, 0.76);
+    backdrop-filter: blur(8px);
+}
+.asset-zoom-controls button {
+    display: grid;
+    min-width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.86);
+    cursor: pointer;
+    font-size: 11px;
+}
+.asset-zoom-controls button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+.batch-upload-dropzone {
+    display: flex;
+    min-height: 132px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    border: 1px dashed color-mix(in srgb, var(--foreground) 18%, transparent);
+    border-radius: var(--r-lg);
+    background: color-mix(in srgb, var(--foreground) 3%, transparent);
+    color: color-mix(in srgb, var(--foreground) 52%, transparent);
+    cursor: pointer;
+}
+.batch-upload-dropzone:hover {
+    border-color: var(--workspace-accent);
+    background: color-mix(in srgb, var(--workspace-accent) 6%, transparent);
+    color: var(--foreground);
+}
+.batch-upload-dropzone strong {
+    color: var(--foreground);
+    font-size: var(--fs-body);
+}
+.batch-upload-dropzone span {
+    font-size: var(--fs-label);
+}
+.batch-upload-list {
+    max-height: 260px;
+    overflow: auto;
+    border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+    border-radius: var(--r-lg);
+}
+.batch-upload-item {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+    font-size: var(--fs-label);
+}
+.batch-upload-item:last-child {
+    border-bottom: 0;
+}
+.batch-upload-remove {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: color-mix(in srgb, var(--foreground) 38%, transparent);
+    cursor: pointer;
+}
+.batch-upload-remove:hover {
+    background: color-mix(in srgb, var(--foreground) 8%, transparent);
+    color: var(--foreground);
+}
 .asset-archive-preview-note {
     max-height: 400px;
     overflow: auto;
@@ -23510,7 +23757,7 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
 
 /* 3. 素材网格以 6 列为桌面基准；首格是新增素材，因此每页 35 项时正好组成 6×6 完整网格。 */
 .assets-library-page .assets-library-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--assets-grid-columns, 8), minmax(0, 1fr));
     gap: 18px 14px;
 }
 .assets-library-page .library-create-title {
@@ -23523,12 +23770,12 @@ html:not(.dark) .creation-home .storyboard-workbench-bar-action:hover {
 }
 @media (max-width: 1200px) and (min-width: 900px) {
     .assets-library-page .assets-library-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
     }
 }
 @media (max-width: 899px) and (min-width: 640px) {
     .assets-library-page .assets-library-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }
 

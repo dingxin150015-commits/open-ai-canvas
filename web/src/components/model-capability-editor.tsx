@@ -18,6 +18,22 @@ const operationOptions = [
     { label: "音频生视频", value: "audio_to_video" },
 ];
 
+function formatImageSizeTagLabel(size: string): string {
+    const raw = size.trim();
+    if (raw === "1:1") return "1:1 (方图)";
+    if (raw === "16:9") return "16:9 (横屏)";
+    if (raw === "9:16") return "9:16 (竖屏)";
+    if (raw === "1024x1024") return "1024x1024 (1:1)";
+    if (raw === "2048x2048") return "2048x2048 (2K 方)";
+    if (raw === "3840x2160") return "3840x2160 (4K 横屏)";
+    if (raw === "2160x3840") return "2160x3840 (4K 竖屏)";
+    return raw;
+}
+
+function imageSizeOptions(values: string[]) {
+    return values.map((v) => ({ label: formatImageSizeTagLabel(v), value: v }));
+}
+
 type Props = {
     value?: ModelCapabilityConfig;
     onChange?: (value: ModelCapabilityConfig) => void;
@@ -477,6 +493,7 @@ function ImageCapabilityEditor({ value, onChange, protocol, model, disabled, sec
                                         className="admin-capability-tags w-full"
                                         disabled={disabled}
                                         value={profile.size.values}
+                                        options={imageSizeOptions(profile.size.values)}
                                         tokenSeparators={[","]}
                                         placeholder="例如 1:1、1024x1024"
                                         onChange={(values) => updateSize({ values, default: values.includes(profile.size.default) || profile.size.allowCustom ? profile.size.default : values[0] || "auto" })}
@@ -506,6 +523,7 @@ function ImageCapabilityEditor({ value, onChange, protocol, model, disabled, sec
                                         disabled={disabled}
                                         value={profile.quality.values}
                                         tokenSeparators={[","]}
+                                        placeholder="例如 auto, low, medium, high, 1k, 2k, 4k"
                                         onChange={(values) => updateQuality({ values, default: values.includes(profile.quality.default) ? profile.quality.default : values[0] || "auto" })}
                                     />
                                 </Field>
@@ -578,6 +596,7 @@ function ImageCapabilityEditor({ value, onChange, protocol, model, disabled, sec
                                     className="admin-capability-tags w-full"
                                     disabled={disabled}
                                     value={profile.size.values}
+                                    options={imageSizeOptions(profile.size.values)}
                                     tokenSeparators={[","]}
                                     placeholder="例如 1:1、1024x1024"
                                     onChange={(values) => updateSize({ values, default: values.includes(profile.size.default) || profile.size.allowCustom ? profile.size.default : values[0] || "auto" })}
@@ -611,6 +630,7 @@ function ImageCapabilityEditor({ value, onChange, protocol, model, disabled, sec
                                 disabled={disabled}
                                 value={profile.quality.values}
                                 tokenSeparators={[","]}
+                                placeholder="例如 auto, low, medium, high, 1k, 2k, 4k"
                                 onChange={(values) => updateQuality({ values, default: values.includes(profile.quality.default) ? profile.quality.default : values[0] || "auto" })}
                             />
                         </Field>

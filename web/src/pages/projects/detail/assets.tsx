@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useMutationState, useQuery } from "@tanstack/react-query";
 import { App, Button, Dropdown, Form, Input, Modal, Popconfirm, Tabs, type FormInstance } from "antd";
-import { Box, Check, ChevronDown, Download, FileText, FolderOpen, FolderPlus, Image as ImageIcon, Link2, MoreHorizontal, MoveRight, Music2, Pencil, Plus, RefreshCw, Sparkles, Trash2, Upload, UserRound, Video, VolumeX } from "lucide-react";
+import { Box, Check, ChevronDown, Download, FileText, FolderOpen, FolderPlus, Image as ImageIcon, Link2, MoreHorizontal, MoveRight, Music2, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Upload, UserRound, Video, VolumeX } from "lucide-react";
 
 import { WorkspaceState } from "@/components/layout/workspace-state";
 import { PaginationBar } from "@/components/layout/workspace-page";
@@ -10,10 +10,12 @@ import { CachedResourceImage } from "@/components/cached-resource-image";
 import { AssetLibraryCard, AssetLibraryCardMedia } from "@/components/assets/asset-library-card";
 import { AssetLibraryPickerModal, type AssetLibraryPickerItem } from "@/components/assets/asset-library-picker-modal";
 import { useExternalAssetSources } from "@/hooks/use-external-asset-sources";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { CanvasFolderPreview } from "@/components/canvas/canvas-folder-preview";
 import { CANVAS_FOLDER_THEME_OPTIONS, resolveCanvasFolderTheme } from "@/lib/canvas/canvas-folder-theme";
 import { resolveProjectCanvasStyle } from "@/components/canvas/canvas-style-picker-modal";
 import { CHARACTER_VOICE_FORMAT_LABEL, CHARACTER_VOICE_UPLOAD_ACCEPT, characterVoiceFormatName, characterVoiceTitleFromFileName, isSupportedCharacterVoiceFile } from "@/lib/character-voice-formats";
+import { ASSET_CATEGORIES, defaultAssetCategoryForKind, normalizeAssetCategory } from "@/lib/asset-category";
 import { resourceFileUrl, resourceIdFromStorageKey } from "@/services/api/resources";
 import { uploadMediaFile } from "@/services/file-storage";
 import {
@@ -49,7 +51,7 @@ import { linkSelectedProjectAssets } from "./project-asset-linking";
 import { generateCharacterTurnaround } from "./project-character-media";
 import { categoryLabels, categoryLabel, mediaLabel, StatusPill, formatTime, textValue, type ProjectDetailViewProps } from "./shared";
 
-const categories = ["all", "character", "environment", "wardrobe", "prop", "weapon", "style", "other"];
+const categories = ["all", ...ASSET_CATEGORIES];
 const ALL_FOLDERS = "__all_folders__";
 const pickerCategoryLabels = { all: "全部素材", ...categoryLabels };
 const characterFields = [
@@ -81,6 +83,8 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(40);
     const [candidatePage, setCandidatePage] = useState(1);
+    const [keyword, setKeyword] = useState("");
+    const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
     const candidatePageSize = 24;
     const [folderEditor, setFolderEditor] = useState<{ folder?: ProjectAssetFolder; parentId: string } | null>(null);
     const [folderName, setFolderName] = useState("");
@@ -96,20 +100,21 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
     const [form] = Form.useForm<CharacterForm>();
 
     const assetsQuery = useQuery({
-        queryKey: ["project", detail.project.id, "assets", page, pageSize, category, folderId],
+        queryKey: ["project", detail.project.id, "assets", page, pageSize, category, folderId, debouncedKeyword],
         queryFn: () =>
             listProjectAssetsPage(detail.project.id, {
                 page,
                 pageSize,
                 category: category === "all" ? undefined : category,
                 folderId: folderId === ALL_FOLDERS ? undefined : folderId,
+                query: debouncedKeyword || undefined,
             }),
     });
     const foldersQuery = useQuery({ queryKey: ["project", detail.project.id, "asset-folders"], queryFn: () => listProjectAssetFolders(detail.project.id) });
     const showPendingCandidates = folderId === ALL_FOLDERS && (category === "all" || category === "character");
     const candidatesQuery = useQuery({
-        queryKey: ["project", detail.project.id, "asset-candidates", candidatePage, candidatePageSize, "character", "pending_confirmation"],
-        queryFn: () => listProjectAssetCandidates(detail.project.id, { page: candidatePage, pageSize: candidatePageSize, category: "character", status: "pending_confirmation" }),
+        queryKey: ["project", detail.project.id, "asset-candidates", candidatePage, candidatePageSize, "character", "pending_confirmation", debouncedKeyword],
+        queryFn: () => listProjectAssetCandidates(detail.project.id, { page: candidatePage, pageSize: candidatePageSize, category: "character", status: "pending_confirmation", query: debouncedKeyword || undefined }),
     });
     const assets = assetsQuery.data?.assets || [];
     const assetFolders = foldersQuery.data?.folders || [];
@@ -130,6 +135,10 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
         const lastPage = Math.max(1, Math.ceil(candidatesQuery.data.total / candidatePageSize));
         if (candidatePage > lastPage) setCandidatePage(lastPage);
     }, [candidatePage, candidatesQuery.data]);
+    useEffect(() => {
+        setPage(1);
+        setCandidatePage(1);
+    }, [debouncedKeyword]);
 
     const selectFolder = (nextFolderId: string) => {
         setFolderId(nextFolderId);
@@ -150,7 +159,7 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
             ...availableAssets.map((asset) => ({
                 id: asset.id,
                 title: asset.title,
-                category: asset.kind === "entity" ? "character" : asset.category || "other",
+                category: normalizeAssetCategory(asset.category, defaultAssetCategoryForKind(asset.kind)),
                 kindLabel: mediaLabel(asset.kind),
                 asset,
                 description: asset.note,
@@ -165,7 +174,7 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
             ...imageAssets.map((asset) => ({
                 id: asset.id,
                 title: asset.title,
-                category: asset.category || "other",
+                category: normalizeAssetCategory(asset.category, defaultAssetCategoryForKind(asset.kind)),
                 kindLabel: "图片",
                 asset,
                 searchText: (asset.tags || []).join(" "),
@@ -229,7 +238,7 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
                     const assetId = addAsset(imported);
                     return linkProjectAsset(detail.project.id, {
                         assetId,
-                        category: imported.kind === "entity" ? "character" : imported.category || "other",
+                        category: normalizeAssetCategory(imported.category, defaultAssetCategoryForKind(imported.kind)),
                         folderId: nextFolderId,
                     });
                 }
@@ -237,7 +246,7 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
                 if (!selected) throw new Error("所选素材已不存在，请重新选择");
                 return linkProjectAsset(detail.project.id, {
                     assetId: selected.id,
-                    category: selected.kind === "entity" ? "character" : selected.category || "other",
+                    category: normalizeAssetCategory(selected.category, defaultAssetCategoryForKind(selected.kind)),
                     folderId: nextFolderId,
                 });
             });
@@ -258,9 +267,9 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
     const versionMutation = useMutation({ mutationFn: (id: string) => createProjectAssetVersion(detail.project.id, id, {}), onSuccess: () => done("已创建新版本"), onError: failed("版本创建失败") });
     const unlinkMutation = useMutation({ mutationFn: (id: string) => unlinkProjectAsset(detail.project.id, id), onSuccess: () => done("资产已移出项目"), onError: failed("资产移除失败") });
     const categoryMutation = useMutation({
-        mutationFn: ({ id, next }: { id: string; next: string }) => updateProjectAssetCategory(detail.project.id, id, next),
+        mutationFn: ({ id, next }: { id: string; next: AssetCategory }) => updateProjectAssetCategory(detail.project.id, id, next),
         onSuccess: ({ asset }) => {
-            updatePersonalAsset(asset.id, { category: asset.category as AssetCategory });
+            updatePersonalAsset(asset.id, { category: asset.category });
             done("资产分类已更新");
         },
         onError: failed("资产分类更新失败"),
@@ -525,11 +534,14 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
                                 ))
                             )}
                         </div>
-                        {folderId !== ALL_FOLDERS ? (
-                            <Button type="text" size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => openFolderEditor(undefined, folderId)}>
-                                新建子文件夹
-                            </Button>
-                        ) : null}
+                        <div className="flex items-center gap-2">
+                            <Input allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} prefix={<Search className="size-3.5 text-foreground/35" />} placeholder="搜索资产名称" aria-label="搜索项目资产" className="w-52" />
+                            {folderId !== ALL_FOLDERS ? (
+                                <Button type="text" size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => openFolderEditor(undefined, folderId)}>
+                                    新建子文件夹
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
                     {childFolders.length ? (
                         <div className="project-asset-folder-grid mb-5">
@@ -622,7 +634,7 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
                         <span>{assetsQuery.data?.total || 0} 项已确认</span>
                     </div>
                     {assetsQuery.isLoading ? (
-                        <WorkspaceState icon="assets" compact title="正在读取资产" description="按当前目录和分类加载这一页。" />
+                        <WorkspaceState icon="assets" compact title="正在读取资产" description="按当前目录、分类和关键词加载这一页。" />
                     ) : visibleAssets.length ? (
                         <>
                             <div className="project-assets-grid assets-library-grid">
@@ -676,7 +688,12 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
                             />
                         </>
                     ) : childFolders.length || (showPendingCandidates && pendingCandidates.length) ? null : (
-                        <WorkspaceState icon="assets" compact title="这个文件夹还没有内容" description="可以新建子文件夹、引用个人素材，或把画布产物归档到这里。" />
+                        <WorkspaceState
+                            icon="assets"
+                            compact
+                            title={debouncedKeyword ? "没有找到匹配资产" : "这个文件夹还没有内容"}
+                            description={debouncedKeyword ? "换一个关键词，或调整左侧分类与目录筛选。" : "可以新建子文件夹、引用个人素材，或把画布产物归档到这里。"}
+                        />
                     )}
                 </div>
             </div>
@@ -1154,7 +1171,7 @@ function MediaAssetCard({
     folderItems: Array<{ key: string; label: string }>;
     onOpen: () => void;
     onMove: (folderId: string) => void;
-    onCategoryChange: (category: string) => void;
+    onCategoryChange: (category: AssetCategory) => void;
     onVersion: () => void;
     onRemove: () => void;
     loading: boolean;
@@ -1183,7 +1200,7 @@ function MediaAssetCard({
                             items: Object.entries(categoryLabels)
                                 .filter(([value]) => value !== "character")
                                 .map(([value, label]) => ({ key: value, label })),
-                            onClick: ({ key }) => onCategoryChange(key),
+                            onClick: ({ key }) => onCategoryChange(normalizeAssetCategory(key)),
                         }}
                     >
                         <button type="button" disabled={loading} className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[var(--fs-tiny)] text-foreground/50 hover:bg-surface-hover">

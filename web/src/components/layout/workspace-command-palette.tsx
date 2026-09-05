@@ -27,8 +27,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
             return { id: slug, title: tool?.label ?? slug, icon: tool?.icon ?? Home, to };
         };
         return [
-            { id: "home", title: "首页", icon: Home, to: "/home" },
-            toolEntry("create", "/create"),
+            { id: "home", title: "首页", icon: Home, to: "/" },
             ...(features.shortDramaEnabled ? [toolEntry("projects", "/projects")] : []),
             toolEntry("canvas", "/canvas"),
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),
@@ -94,25 +93,14 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
                 <div className="p-3 pb-2">
                     <div className="flex h-10 items-center gap-2 rounded-[var(--r-md)] border border-[var(--workspace-border)] bg-foreground/5 px-3 transition-colors hover:border-[var(--workspace-border-strong)] focus-within:border-[var(--workspace-border-strong)] focus-within:bg-foreground/[.06]">
                         <Search className="size-4 shrink-0 text-foreground/45" strokeWidth={1.6} />
-                        <input
-                            ref={inputRef}
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            className="min-w-0 flex-1 bg-transparent text-[var(--fs-body)] outline-none placeholder:text-foreground/45"
-                            placeholder="搜索页面或操作…"
-                        />
+                        <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[var(--fs-body)] outline-none placeholder:text-foreground/45" placeholder="搜索页面或操作…" />
                         <kbd
                             onClick={onClose}
                             className="hidden h-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-[var(--workspace-border)] bg-background/60 px-1.5 font-mono text-[var(--fs-tiny)] font-medium text-foreground/60 transition-colors hover:bg-surface-hover hover:text-foreground sm:inline-flex"
                         >
                             ⌘K
                         </kbd>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="ml-0.5 shrink-0 rounded-md p-1 text-foreground/50 transition-colors hover:bg-surface-hover hover:text-foreground"
-                            aria-label="关闭搜索"
-                        >
+                        <button type="button" onClick={onClose} className="ml-0.5 shrink-0 rounded-md p-1 text-foreground/50 transition-colors hover:bg-surface-hover hover:text-foreground" aria-label="关闭搜索">
                             <X className="size-4" strokeWidth={1.6} />
                         </button>
                     </div>

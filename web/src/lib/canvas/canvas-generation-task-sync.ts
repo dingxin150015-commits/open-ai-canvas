@@ -66,6 +66,17 @@ export function videoMetadata(video: UploadedFile): CanvasNodeMetadata {
         bytes: video.bytes,
         mimeType: video.mimeType || "video/mp4",
         durationMs: video.durationMs,
+        hasAudio: video.hasAudio,
+        videoPreview: video.preview
+            ? {
+                  content: video.preview.url,
+                  storageKey: video.preview.storageKey,
+                  width: video.preview.width,
+                  height: video.preview.height,
+                  bytes: video.preview.bytes,
+                  mimeType: video.preview.mimeType,
+              }
+            : undefined,
         errorDetails: undefined,
         generationErrorCode: undefined,
         resourceReloadAvailable: undefined,
@@ -180,7 +191,18 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
     return {
         ...node,
         type: CanvasNodeType.Text,
-        metadata: { ...node.metadata, content: result.text, richText: undefined, prompt, ...completedTaskMetadata(task), status: "success", errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined },
+        metadata: {
+            ...node.metadata,
+            content: result.text,
+            richText: undefined,
+            prompt,
+            ...completedTaskMetadata(task),
+            status: "success",
+            errorDetails: undefined,
+            generationErrorCode: undefined,
+            resourceReloadAvailable: undefined,
+            failedPromptFingerprint: undefined,
+        },
     };
 }
 
