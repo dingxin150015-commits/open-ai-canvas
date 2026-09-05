@@ -465,3 +465,4 @@
 - 建立独立候选镜像和 verified/protected 恢复点；独立卷连续两次完成 72→80 表迁移，业务计数与 OSS 密钥合同保持；真实环境未部署。
 - 最终复核为 517 个 staged 文件、unmerged/unstaged/新增冲突标记/敏感路径/高置信 Secret 命中均为 0，cached diff check 通过；清理临时 remerge worktree 和两个无卷诊断容器，保留候选镜像、私有恢复点和克隆卷。
 - 用户随后批准阶段 6 本地 merge commit 与阶段 7 fork 候选推送连续执行；画布颜色进入最终 Edge 独立视觉验收，当前本地 token 仅作为候选，保留改用官方默认方案的空间。
+- 阶段 6 创建 `b6cff796d81361b1e98fd8a83f3f340d340a63e1`；该提交有且仅有本地 `39c7e62` 与官方 `f8e87bc` 两个父提交，工作树随后干净，进入阶段 7 候选 push。

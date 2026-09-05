@@ -268,3 +268,4 @@
 - Host Updater 仍指向官方仓库，fork 源适配前禁止执行更新。
 - 阶段 5 最终 staged-bytes：517 文件、unmerged 0、unstaged 0、本次新增冲突标记 0、敏感路径 0、高置信 Secret 新增命中 0，cached diff check 通过。状态为 `stage5_complete_ready_for_stage6_approval`。
 - 用户已批准阶段 6–7 连续执行。画布颜色保留为最终 Microsoft Edge 独立视觉验收项：当前候选沿用本地底板/柔和网格，但明确保留切换到官方 v1.2.5 默认色与高强度网格方案的空间。
+- 阶段 6 已创建双父 merge commit `b6cff796d81361b1e98fd8a83f3f340d340a63e1`，父提交为本地 `39c7e62` 与官方固定 `f8e87bc`；阶段 7 fork 候选推送进行中。

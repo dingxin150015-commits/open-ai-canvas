@@ -128,3 +128,9 @@
 - 2026-09-05 用户批准阶段 6 本地 merge commit 与阶段 7 fork 候选分支推送连续执行；授权不包含 `origin/main`、稳定分支晋升、部署、Edge 控制或 Provider 调用。
 - 当前候选继续保留本地 `workspaceBackground` 和柔和网格 token，但该选择不是永久封死。最终 Microsoft Edge 视觉验收必须将画布颜色列为独立验收项，比较本地方案与官方 v1.2.5 的 `#f0f0f0/#000000 + 80% 网格` 方向。
 - 若最终选择官方方案，应仅调整画布语义 token/默认外观来源与对应测试，不回退官方已吸收的自定义外观、项目持久化和账号级默认功能；不得在部署前凭静态测试代替视觉决定。
+
+### 阶段 6 结果
+
+- 已创建本地 merge commit `b6cff796d81361b1e98fd8a83f3f340d340a63e1`，提交说明为 `chore(upstream): 官方版本 - 集成 v1.2.5`。
+- 两个父提交精确为 `39c7e626cdf58c7f901cdfaa7f138041e44d1459` 和 `f8e87bcc4ce3e6f7eae7a89dc8b9231801116072`；官方固定提交是新 HEAD 的祖先。
+- merge commit 后工作树干净，阶段 7 只允许推送 `origin/codex/upstream-v1.2.5-20260904`，不允许 force、更新 `origin/main`、稳定分支晋升或部署。
