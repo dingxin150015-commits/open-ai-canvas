@@ -270,3 +270,6 @@
 - 用户已批准阶段 6–7 连续执行。画布颜色保留为最终 Microsoft Edge 独立视觉验收项：当前候选沿用本地底板/柔和网格，但明确保留切换到官方 v1.2.5 默认色与高强度网格方案的空间。
 - 阶段 6 已创建双父 merge commit `b6cff796d81361b1e98fd8a83f3f340d340a63e1`，父提交为本地 `39c7e62` 与官方固定 `f8e87bc`；阶段 7 fork 候选推送进行中。
 - 阶段 7 已将候选分支非 force 推送到 `origin/codex/upstream-v1.2.5-20260904`；首次检查点为 `dced038...`，随后阶段 7 记忆检查点继续 fast-forward。最终远程与本地 HEAD 经独立 `ls-remote` 核对一致、tracking 为 0/0；`origin/main@11931d0` 未变化。候选分支没有可见 Actions 运行，远程 CI 仍未验证。
+- 阶段 8 已把 `origin/codex/dingxin-stable` fast-forward 晋升到候选；`origin/main` 未变，Actions 未触发。
+- 阶段 9 已使用保留真实卷 recreate 到 Backend `sha256:21e3f2ab...`、Web `sha256:36dc2302...`；两者 healthy、restart0、OOM=false。Backend 报告 `v1.2.5+dingxin.1`、commit `b6cff796...`、schema 6/6 ready。
+- 新恢复点 `BKP-20260905-194003-STAGE9-V125` 已 verified/protected；克隆双启动和真实迁移后均为80表、完整性ok、外键0、业务计数与密钥合同不变。当前 `runtime_candidate_healthy_edge_pending`，等待用户 Edge 验收及画布颜色选择。

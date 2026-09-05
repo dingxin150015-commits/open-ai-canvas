@@ -119,3 +119,6 @@
 - [ ] 最终 Microsoft Edge 验收对比本地画布底板/柔和网格与官方 v1.2.5 底板/80% 网格；由用户选择最终默认，当前实现不得被表述为永久产品决定。
 - [x] 阶段 6 创建本地双父 merge commit `b6cff79`，固定纳入官方 `v1.2.5@f8e87bc`。
 - [x] 阶段 7 已将候选分支非 force 推送到 fork 并独立核对 `dced038...`；`origin/main` 未变化，未触发可见 Actions，不能称远程 CI 通过。
+- [x] 阶段 8 将 `codex/dingxin-stable` 非 force fast-forward 到 v1.2.5 候选；候选/稳定一致，`origin/main` 未变化。
+- [x] 阶段 9 创建 verified/protected 恢复点、完成新克隆卷双启动、旧镜像保护、真实保留卷 recreate、HTTP/版本/schema/数据库验证。
+- [ ] 用户使用登录态 Microsoft Edge 完成阶段 9 最终验收；重点对比当前本地画布底色/柔和网格与官方 v1.2.5 底色/80%网格，再决定默认方案。

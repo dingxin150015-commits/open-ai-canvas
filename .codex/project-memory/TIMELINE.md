@@ -467,3 +467,6 @@
 - 用户随后批准阶段 6 本地 merge commit 与阶段 7 fork 候选推送连续执行；画布颜色进入最终 Edge 独立视觉验收，当前本地 token 仅作为候选，保留改用官方默认方案的空间。
 - 阶段 6 创建 `b6cff796d81361b1e98fd8a83f3f340d340a63e1`；该提交有且仅有本地 `39c7e62` 与官方 `f8e87bc` 两个父提交，工作树随后干净，进入阶段 7 候选 push。
 - 阶段 7 dry-run 与实际非 force push 成功，新建 `origin/codex/upstream-v1.2.5-20260904@dced038`；独立远程核对一致，`origin/main@11931d0` 未变化。候选分支无可见 Actions 运行，远程 CI 保持未验证。
+- 阶段 8 将 fork 长期稳定分支从 `44e8c10` fast-forward 晋升到 v1.2.5 候选，候选/稳定远程一致，main 未变。
+- 阶段 9 建立新恢复点和新克隆卷，精确构建标识候选双次无网络启动成功；保护旧镜像后保留真实卷 recreate。Backend/Web healthy，schema 6/6，真实数据库72→80表且业务计数/OSS密钥合同保持。
+- 当前停在 Microsoft Edge 最终验收前；画布颜色作为独立A/B视觉项，保留采用官方默认方案的空间。

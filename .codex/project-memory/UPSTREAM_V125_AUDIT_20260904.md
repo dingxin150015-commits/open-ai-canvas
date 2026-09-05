@@ -142,3 +142,14 @@
 - `gh run list` 对候选分支返回空数组：此次 branch push 没有产生可见 GitHub Actions 运行，不能宣称远程 CI 通过；本地 Stage 5 完整门禁仍是当前验证依据。
 - 本节作为阶段 7 最终记忆检查点再 fast-forward 推送一次；仍不创建 PR、不晋升 `codex/dingxin-stable`、不更新 `origin/main`、不部署。
 - 最终检查以“远程候选分支 SHA 与本地 HEAD 一致、tracking 0/0”为权威状态，不在同一提交正文中自引用最终 SHA；精确 SHA 由 Git ref 和远程 `ls-remote` 提供。
+
+## 阶段 8–9：稳定晋升与本地运行候选（2026-09-05）
+
+- 阶段 8：确认 `origin/codex/dingxin-stable@44e8c10` 是候选 `5d0ad92` 的祖先；dry-run 后非 force fast-forward 晋升到 `5d0ad92`。稳定分支与候选分支远程 SHA 一致，`origin/main@11931d0` 未变化；两分支均无可见 Actions 运行，远程 CI 未验证。
+- 阶段 9 新建 `BKP-20260905-194003-STAGE9-V125`，迁移前快照 `ok`/外键0/72表；逐文件 ACL 仅当前用户、SYSTEM、Administrators，宽泛主体命中0，OSS 密文可解密。
+- 使用新克隆卷 `open-ai-canvas-stage9-v125-clone-20260905-194003` 和精确构建标识 Backend 连续两次无网络启动均 healthy/restart0；迁移后 `ok`/外键0/80表，业务计数不变。
+- 旧镜像已保护为 `open-ai-canvas-backend:pre-v125-stage9-20260905-194003`（`8182cc0a...`）和 `open-ai-canvas-web:pre-v125-stage9-20260905-194003`（`522109d7...`）。
+- 真实保留卷通过 `docker compose -f docker-compose.local.yml up -d --no-build --force-recreate` 升级；未运行 `down`、未删除或替换卷。当前 Backend `21e3f2ab...`、Web `36dc2302...` 均 healthy、restart0、OOM=false。
+- `/api/health` 返回业务 `code=0`、版本 `v1.2.5+dingxin.1`、commit `b6cff796...`、schema 6/6 ready；Web HTTP 200 且构建产物包含该版本。
+- 部署后快照 `ok`/外键0/80表；迁移1–6齐全，`idx_resources_user_upload_key` 存在，skills/versions/files 为33/33/33，用户/会话/渠道/模型/任务/资源/素材/画布为1/1/1/320/3/5/5/2，OSS 密钥合同不变。
+- 当前状态为 `runtime_candidate_healthy_edge_pending`。阶段 9 尚需用户使用登录态 Microsoft Edge 完成最终视觉/功能验收；画布颜色必须对比当前本地方案与官方方案后再定稿。未执行 Provider 调用、付费生成或 Host Updater。
