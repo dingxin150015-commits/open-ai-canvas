@@ -134,3 +134,10 @@
 - 已创建本地 merge commit `b6cff796d81361b1e98fd8a83f3f340d340a63e1`，提交说明为 `chore(upstream): 官方版本 - 集成 v1.2.5`。
 - 两个父提交精确为 `39c7e626cdf58c7f901cdfaa7f138041e44d1459` 和 `f8e87bcc4ce3e6f7eae7a89dc8b9231801116072`；官方固定提交是新 HEAD 的祖先。
 - merge commit 后工作树干净，阶段 7 只允许推送 `origin/codex/upstream-v1.2.5-20260904`，不允许 force、更新 `origin/main`、稳定分支晋升或部署。
+
+### 阶段 7 结果
+
+- 在项目记忆提交 `dced038188ca2e400fe6e7a5704cd0be9a3b7eef` 上执行 dry-run，结果仅为新建 `origin/codex/upstream-v1.2.5-20260904`；随后非 force 推送成功并建立同名 upstream tracking。
+- 独立 `git ls-remote` 确认远程候选 SHA 与本地 `dced038...` 一致；`origin/main` 仍为 `11931d0085ccfec3952a4a7e30bd482173c51492`，未变化。
+- `gh run list` 对候选分支返回空数组：此次 branch push 没有产生可见 GitHub Actions 运行，不能宣称远程 CI 通过；本地 Stage 5 完整门禁仍是当前验证依据。
+- 本节作为阶段 7 最终记忆检查点再 fast-forward 推送一次；仍不创建 PR、不晋升 `codex/dingxin-stable`、不更新 `origin/main`、不部署。

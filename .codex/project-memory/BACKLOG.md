@@ -118,4 +118,4 @@
 - [ ] Host Updater 完成 fork 仓库、镜像命名空间、版本策略和祖先校验前保持不可用。
 - [ ] 最终 Microsoft Edge 验收对比本地画布底板/柔和网格与官方 v1.2.5 底板/80% 网格；由用户选择最终默认，当前实现不得被表述为永久产品决定。
 - [x] 阶段 6 创建本地双父 merge commit `b6cff79`，固定纳入官方 `v1.2.5@f8e87bc`。
-- [ ] 阶段 7 仅将候选分支推送到 fork 并独立核对远程 SHA；不得更新 `origin/main`。
+- [x] 阶段 7 已将候选分支非 force 推送到 fork 并独立核对 `dced038...`；`origin/main` 未变化，未触发可见 Actions，不能称远程 CI 通过。
