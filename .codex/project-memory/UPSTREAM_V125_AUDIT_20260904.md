@@ -141,3 +141,4 @@
 - 独立 `git ls-remote` 确认远程候选 SHA 与本地 `dced038...` 一致；`origin/main` 仍为 `11931d0085ccfec3952a4a7e30bd482173c51492`，未变化。
 - `gh run list` 对候选分支返回空数组：此次 branch push 没有产生可见 GitHub Actions 运行，不能宣称远程 CI 通过；本地 Stage 5 完整门禁仍是当前验证依据。
 - 本节作为阶段 7 最终记忆检查点再 fast-forward 推送一次；仍不创建 PR、不晋升 `codex/dingxin-stable`、不更新 `origin/main`、不部署。
+- 最终检查以“远程候选分支 SHA 与本地 HEAD 一致、tracking 0/0”为权威状态，不在同一提交正文中自引用最终 SHA；精确 SHA 由 Git ref 和远程 `ls-remote` 提供。
