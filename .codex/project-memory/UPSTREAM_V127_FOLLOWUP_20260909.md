@@ -4,7 +4,7 @@
 
 - 运行状态：`runtime_followup_healthy_edge_pending`。修复版源码提交 `ae01c5d667a979c835da03bca21bc4d418382e4e` 已部署；Web/Backend均healthy、RestartCount=0，显示版本`v1.2.7+dingxin.1`。
 - 当前运行镜像：Backend `sha256:03b068b2782b4533688d574b12f273e2dc7ea7b016cd3e9fc2d40ff782b3b012`，Web `sha256:f736a584ed204db1087cbc606d57c660754f150d3d270725686c2b1d102d36d6`。
-- 本文件将形成纯文档提交，因此候选HEAD会比运行源码多一个记忆提交；业务源码和运行构建均固定在`ae01c5d6`。未推送修复提交，远程候选仍为`aff2c8e5`；stable/main未变。
+- 候选分支在业务源码后只增加项目记忆提交；业务源码和运行构建均固定在`ae01c5d6`。未推送修复提交，远程候选仍为`aff2c8e5`；stable/main未变。
 
 ## 已整改事项
 
