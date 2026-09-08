@@ -100,7 +100,7 @@ export function useCanvasProjectLifecycle({
 
             const applyRestoredProject = (restoredNodes: CanvasNodeData[], restoredSessions: CanvasAssistantSession[]) => {
                 if (cancelled) return;
-                const fallbackTheme = useThemeStore.getState().theme;
+                const fallbackTheme = useThemeStore.getState().preferredTheme;
                 const restoredAppearance = project.appearance ? normalizeCanvasAppearance(project.appearance, fallbackTheme) : canvasAppearanceForTheme(fallbackTheme);
                 const snapshot: CanvasHistorySnapshot = {
                     nodes: restoredNodes,
@@ -119,7 +119,7 @@ export function useCanvasProjectLifecycle({
                 setChatSessions(snapshot.chatSessions);
                 setActiveChatId(snapshot.activeChatId);
                 setCanvasAppearance(snapshot.canvasAppearance);
-                useThemeStore.getState().setTheme(canvasAppearanceBaseTheme(snapshot.canvasAppearance, fallbackTheme));
+                useThemeStore.getState().setCanvasTheme(canvasAppearanceBaseTheme(snapshot.canvasAppearance, fallbackTheme));
                 setBackgroundMode(snapshot.backgroundMode);
                 setShowImageInfo(snapshot.showImageInfo);
                 setViewport(project.viewport);

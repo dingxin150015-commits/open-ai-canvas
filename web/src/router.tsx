@@ -107,7 +107,7 @@ export const router = createBrowserRouter([
         element: <AuthenticatedWorkspaceLayout />,
         errorElement: <RouteErrorPage />,
         children: [
-            { path: "/", element: <RequireAuth>{deferred(<CreatePage />)}</RequireAuth> },
+            { path: "/", element: <RequireAuth>{deferred(<HomePage />)}</RequireAuth> },
             { path: "/create", element: <RequireAuth>{deferred(<CreatePage />)}</RequireAuth> },
             { path: "/home", element: <RequireAuth>{deferred(<HomePage />)}</RequireAuth> },
             {

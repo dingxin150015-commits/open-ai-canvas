@@ -31,16 +31,16 @@ describe("workspace route loading", () => {
         expect(navigation).toContain("onFocus={() => preloadWorkspaceRoute(linkTo)}");
     });
 
-    test("keeps the creation page at root and preserves the create compatibility route", () => {
+    test("keeps home and creation as distinct authenticated routes", () => {
         const router = source("../src/router.tsx");
         const navigation = source("../src/components/layout/workspace-sidebar-nav.tsx");
 
-        expect(router).toContain('{ path: "/", element: <RequireAuth>{deferred(<CreatePage />)}</RequireAuth> }');
+        expect(router).toContain('{ path: "/", element: <RequireAuth>{deferred(<HomePage />)}</RequireAuth> }');
         expect(router).toContain('{ path: "/create", element: <RequireAuth>{deferred(<CreatePage />)}</RequireAuth> }');
         expect(router).toContain('{ path: "/home", element: <RequireAuth>{deferred(<HomePage />)}</RequireAuth> }');
         expect(router).toContain("HomePage");
         expect(navigation).toContain('{ id: "home", title: "首页", icon: Home, to: "/" }');
-        expect(navigation).not.toContain('to: "/create"');
+        expect(navigation).toContain('toolItem("create", "/create")');
         expect(navigation).not.toContain('to: "/home"');
     });
 

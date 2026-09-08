@@ -81,12 +81,9 @@ export default function SharedCanvasPage() {
 
     useEffect(() => {
         let active = true;
-        const themeBeforeShare = useThemeStore.getState().theme;
+        const themeBeforeShare = useThemeStore.getState().preferredTheme;
+        const previousCanvasTheme = useThemeStore.getState().canvasTheme;
         let appliedShareTheme: typeof themeBeforeShare | null = null;
-        let themeChangedAfterApply = false;
-        const unsubscribeTheme = useThemeStore.subscribe((state, previous) => {
-            if (appliedShareTheme && state.theme !== previous.theme && state.theme !== appliedShareTheme) themeChangedAfterApply = true;
-        });
         setLoading(true);
         getPublicCanvasShare(token)
             .then(({ project }) => {
@@ -97,7 +94,7 @@ export default function SharedCanvasPage() {
                 const nextAppearance = project.appearance ? normalizeCanvasAppearance(project.appearance, themeBeforeShare) : canvasAppearanceForTheme(themeBeforeShare);
                 setAppearance(nextAppearance);
                 appliedShareTheme = canvasAppearanceBaseTheme(nextAppearance, themeBeforeShare);
-                useThemeStore.getState().setTheme(appliedShareTheme);
+                useThemeStore.getState().setCanvasTheme(appliedShareTheme);
                 setBackgroundMode(project.backgroundMode || DEFAULT_CANVAS_BACKGROUND_MODE);
                 const initial = project.viewport || { x: 0, y: 0, k: 1 };
                 viewportRef.current = initial;
@@ -111,9 +108,8 @@ export default function SharedCanvasPage() {
             });
         return () => {
             active = false;
-            unsubscribeTheme();
-            if (appliedShareTheme && !themeChangedAfterApply && useThemeStore.getState().theme === appliedShareTheme) {
-                useThemeStore.getState().setTheme(themeBeforeShare);
+            if (appliedShareTheme && useThemeStore.getState().canvasTheme === appliedShareTheme) {
+                useThemeStore.getState().setCanvasTheme(previousCanvasTheme);
             }
         };
     }, [token]);

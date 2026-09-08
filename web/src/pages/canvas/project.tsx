@@ -225,7 +225,8 @@ function InfiniteCanvasPage() {
     const assetsHydrated = useAssetStore((state) => state.hydrated);
     const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
     const colorTheme = useThemeStore((state) => state.theme);
-    const setTheme = useThemeStore((state) => state.setTheme);
+    const setCanvasTheme = useThemeStore((state) => state.setCanvasTheme);
+    useEffect(() => () => setCanvasTheme(null), [setCanvasTheme]);
     const theme = canvasThemes[colorTheme];
     const defaultDrawingEngine = useUserStore((state) => state.drawingEngine.defaultEngine);
     const shortDramaEnabled = useUserStore((state) => state.features.shortDramaEnabled);
@@ -265,6 +266,9 @@ function InfiniteCanvasPage() {
     const [canvasTool, setCanvasTool] = useState<CanvasToolMode>("box-select");
     const [mediaPerformanceMode, setMediaPerformanceMode] = useState<CanvasMediaPerformanceMode>(readCanvasMediaPerformanceMode);
     const [projectLoaded, setProjectLoaded] = useState(false);
+    useEffect(() => {
+        if (projectLoaded) setCanvasTheme(canvasAppearanceBaseTheme(canvasAppearance, useThemeStore.getState().preferredTheme));
+    }, [canvasAppearance, projectLoaded, setCanvasTheme]);
     const [workspaceMode, setWorkspaceMode] = useState<CanvasWorkspaceMode>(readCanvasWorkspaceMode);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -376,9 +380,9 @@ function InfiniteCanvasPage() {
             const fallback = canvasAppearanceBaseTheme(next, colorTheme);
             const normalized = normalizeCanvasAppearance(next, fallback);
             setCanvasAppearance(normalized);
-            setTheme(canvasAppearanceBaseTheme(normalized, fallback));
+            setCanvasTheme(canvasAppearanceBaseTheme(normalized, fallback));
         },
-        [colorTheme, setTheme],
+        [colorTheme, setCanvasTheme],
     );
     const saveCanvasAppearanceDefault = useCallback(
         (next: CanvasAppearance) => {
@@ -2362,6 +2366,7 @@ function InfiniteCanvasPage() {
                                 <InfiniteCanvas
                                     containerRef={containerRef}
                                     viewport={viewport}
+                                    appearance={canvasAppearance}
                                     backgroundMode={backgroundMode}
                                     graphicsLayer={
                                         <CanvasLeaferGraphicsLayer

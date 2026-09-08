@@ -474,7 +474,6 @@ function CanvasGrid({ appearance, mode }: { appearance?: CanvasAppearance; mode:
                 inset: 0,
                 backgroundImage,
                 backgroundSize: "48px 48px",
-                opacity: mode === "dots" ? 0.34 : 0.46,
             }}
         />
     );

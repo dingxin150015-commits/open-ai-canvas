@@ -46,7 +46,14 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 function buildNav(features: FeatureAvailability, balance: string, isAdmin: boolean): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
     const groups: WorkspaceNavGroup[] = [
         {
-            items: [{ id: "home", title: "首页", icon: Home, to: "/" }, toolItem("projects", "/projects"), toolItem("canvas", "/canvas"), ...(features.taskCenterEnabled ? [toolItem("tasks", "/tasks")] : []), toolItem("assets", "/assets")],
+            items: [
+                { id: "home", title: "首页", icon: Home, to: "/" },
+                toolItem("create", "/create"),
+                toolItem("projects", "/projects"),
+                toolItem("canvas", "/canvas"),
+                ...(features.taskCenterEnabled ? [toolItem("tasks", "/tasks")] : []),
+                toolItem("assets", "/assets"),
+            ],
         },
         {
             heading: "工作台管理",
