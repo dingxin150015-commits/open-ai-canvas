@@ -1,4 +1,7 @@
-import { App, Button, Form, Input, Modal, Segmented, Select, Switch, Upload, type UploadFile } from "antd";
+import { App, Button, Form, Input, Modal, Upload, type UploadFile } from "antd";
+import { Select } from "@/components/ui/base/select";
+import { Switch } from "@/components/ui/base/switch";
+import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import { FileArchive, FileText, GitBranch, UploadCloud } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -104,7 +107,7 @@ export function SkillInstallModal({ open, onClose, onInstalled, onManualCreate }
             open={open}
             width={680}
             destroyOnHidden
-            maskClosable={!installing}
+            mask={{ closable: !installing }}
             title="安装技能"
             onCancel={onClose}
             footer={
@@ -124,7 +127,7 @@ export function SkillInstallModal({ open, onClose, onInstalled, onManualCreate }
             <p className="mb-4 text-sm leading-6 text-foreground/55">
                 支持标准 <code>SKILL.md</code>、包含多层目录的 ZIP 技能包，或公开 GitHub 仓库。名称和简介会优先从技能入口自动读取。
             </p>
-            <Segmented
+            <SegmentedControl
                 className="skill-install-mode"
                 block
                 options={modeOptions}

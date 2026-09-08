@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Empty } from "antd";
+import { App, Button } from "antd";
+import { EmptyState } from "@/components/ui/product/empty-state";
 import { Link } from "react-router";
 
 import { formatShotOrdinal } from "@/lib/shot-label";
@@ -72,11 +73,14 @@ export default function ProjectWorkflowView({ detail, projectId, unitId, stage }
     if (!unit) {
         return (
             <div className="grid h-full place-items-center">
-                <Empty description="先添加一个章节，再进入分镜制作">
-                    <Link to={`/projects/${projectId}/chapters`}>
-                        <Button type="primary">添加章节</Button>
-                    </Link>
-                </Empty>
+                <EmptyState
+                    title="先添加一个章节，再进入分镜制作"
+                    action={
+                        <Link to={`/projects/${projectId}/chapters`}>
+                            <Button type="primary">添加章节</Button>
+                        </Link>
+                    }
+                />
             </div>
         );
     }

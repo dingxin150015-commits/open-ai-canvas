@@ -1,4 +1,7 @@
-import { Button, Input, Modal, Segmented, Skeleton, Tooltip, Tree } from "antd";
+import { Button, Input, Modal, Skeleton, Tree } from "antd";
+import { Tooltip } from "@/components/ui/base/tooltip";
+
+import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import type { DataNode } from "antd/es/tree";
 import { Check, ChevronRight, Code2, ExternalLink, File, FileArchive, FileCode2, FileImage, FileText, Folder, FolderOpen, Heart, Pencil, Plus, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
@@ -195,8 +198,8 @@ export function SkillDetailModal({
                             <div className="skill-package-preview-toolbar">
                                 <div className="min-w-0 flex-1 truncate font-mono text-xs text-foreground/58">{activePath || "请选择文件"}</div>
                                 {canPreviewMarkdown ? (
-                                    <Segmented
-                                        size="small"
+                                    <SegmentedControl
+                                        size="sm"
                                         value={previewMode}
                                         onChange={(value) => setPreviewMode(value as PreviewMode)}
                                         options={[

@@ -168,7 +168,9 @@ export type EmailSetting = {
     encryption: "starttls" | "tls" | "none";
     fromEmail: string;
     fromName: string;
+    fromNameInherited: boolean;
     hasPassword: boolean;
+    registrationAllowedDomains: string[];
     updatedBy?: string;
     createdAt?: string;
     updatedAt?: string;
@@ -291,9 +293,13 @@ export function listAdminChannelModels(channelId: string) {
     return request<{ models: ChannelModel[] }>(api.get(`/admin/channels/${encodeURIComponent(channelId)}/models`));
 }
 
-// 管理员从上游和官方 Manifest 拉取完整目录；非 ready 项只能查看。
+// 管理员从上游读取模型目录；确认导入后才会写入渠道模型，价格和启用仍需人工确认。
 export function fetchAdminChannelModels(channelId: string) {
-    return request<ChannelModelFetchResult>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/fetch`));
+    return request<{ models: string[] }>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/fetch`));
+}
+
+export function importAdminChannelModels(channelId: string, models: string[]) {
+    return request<{ models: string[]; added: number }>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/import`, { models }));
 }
 
 export function testAdminChannelModel(channelId: string, input: Pick<ChannelModel, "modelKey" | "providerModelKey" | "capability" | "protocol"> & { capabilityConfig?: ChannelModel["capabilityConfig"] }) {
@@ -310,6 +316,10 @@ export function updateAdminChannelModel(channelId: string, id: string, input: Ch
 
 export function deleteAdminChannelModel(channelId: string, id: string) {
     return request<{ ok: boolean }>(api.delete(`/admin/channels/${encodeURIComponent(channelId)}/models/${encodeURIComponent(id)}`));
+}
+
+export function deleteAdminChannelModels(channelId: string, modelIds: string[]) {
+    return request<{ deleted: number }>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/batch-delete`, { modelIds }));
 }
 
 export type AdminFinanceListParams = { keyword?: string; status?: string; validity?: string; page?: number; limit?: number };

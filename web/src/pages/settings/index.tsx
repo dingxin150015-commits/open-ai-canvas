@@ -1,4 +1,6 @@
-import { App, Button, Form, Input, InputNumber, Select } from "antd";
+import { App, Button, Input, InputNumber } from "antd";
+import { Select } from "@/components/ui/base/select";
+import { SettingsRow } from "@/components/ui/product/settings-row";
 import { ArrowLeft, Boxes, Bug, Cloud, MessageSquareText, MonitorUp, RadioTower, SlidersHorizontal, SquareTerminal, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -46,9 +48,7 @@ export default function SettingsPage() {
     const runtimeStatuses = usePluginStore((state) => state.runtimeStatuses);
     const runningHubPluginEnabled = runtimeStatuses[RUNNINGHUB_PLUGIN_ID] === "enabled";
     const comfyUIPluginEnabled = runtimeStatuses[COMFYUI_PLUGIN_ID] === "enabled";
-    const requestedSectionEnabled = requestedSection !== "runninghub" && requestedSection !== "comfyui"
-        || requestedSection === "runninghub" && runningHubPluginEnabled
-        || requestedSection === "comfyui" && comfyUIPluginEnabled;
+    const requestedSectionEnabled = (requestedSection !== "runninghub" && requestedSection !== "comfyui") || (requestedSection === "runninghub" && runningHubPluginEnabled) || (requestedSection === "comfyui" && comfyUIPluginEnabled);
     const initialSection = isConfigSection(requestedSection) && requestedSectionEnabled ? requestedSection : customChannelsEnabled ? "channels" : "models";
     const [activeTab, setActiveTab] = useState<ConfigSectionKey>(initialSection === "channels" && !customChannelsEnabled ? "models" : initialSection);
     const config = useConfigStore((state) => state.config);
@@ -57,9 +57,13 @@ export default function SettingsPage() {
     const shouldPromptContinue = searchParams.get("continue") === "1";
     const userId = useUserStore((state) => state.user?.id);
     const userChannels = config.channels.filter((channel) => channel.scope !== "system");
-    const visibleConfigSections = useMemo(() => (customChannelsEnabled ? configSections : configSections.filter((section) => section.key !== "channels"))
-        .filter((section) => section.key !== "runninghub" || runningHubPluginEnabled)
-        .filter((section) => section.key !== "comfyui" || comfyUIPluginEnabled), [comfyUIPluginEnabled, customChannelsEnabled, runningHubPluginEnabled]);
+    const visibleConfigSections = useMemo(
+        () =>
+            (customChannelsEnabled ? configSections : configSections.filter((section) => section.key !== "channels"))
+                .filter((section) => section.key !== "runninghub" || runningHubPluginEnabled)
+                .filter((section) => section.key !== "comfyui" || comfyUIPluginEnabled),
+        [comfyUIPluginEnabled, customChannelsEnabled, runningHubPluginEnabled],
+    );
 
     const isVisibleConfigSection = (value: string | null): value is ConfigSectionKey => isConfigSection(value) && visibleConfigSections.some((section) => section.key === value);
 
@@ -68,7 +72,7 @@ export default function SettingsPage() {
             setActiveTab(requestedSection);
             return;
         }
-        setActiveTab((current) => visibleConfigSections.some((section) => section.key === current) ? current : customChannelsEnabled ? "channels" : "models");
+        setActiveTab((current) => (visibleConfigSections.some((section) => section.key === current) ? current : customChannelsEnabled ? "channels" : "models"));
     }, [customChannelsEnabled, requestedSection, visibleConfigSections]);
 
     useEffect(() => {
@@ -100,8 +104,8 @@ export default function SettingsPage() {
         }
         const hasReadyLocalRuntime = effectiveConfig.channels.some((channel) => channel.transport === "local-runtime" && channel.enabled !== false && Boolean(channel.localModels?.length));
         const workflowReady = Boolean(
-            (runningHubPluginEnabled && config.runningHub.enabled && config.runningHub.workflowId.trim() && config.runningHub.baseUrl.trim() && config.runningHub.apiKey.trim())
-            || (comfyUIPluginEnabled && config.comfyBridge.enabled && config.comfyBridge.bridgeId.trim() && config.comfyBridge.workflowId.trim()),
+            (runningHubPluginEnabled && config.runningHub.enabled && config.runningHub.workflowId.trim() && config.runningHub.baseUrl.trim() && config.runningHub.apiKey.trim()) ||
+            (comfyUIPluginEnabled && config.comfyBridge.enabled && config.comfyBridge.bridgeId.trim() && config.comfyBridge.workflowId.trim()),
         );
         if (!effectiveConfig.channels.some(isChannelReady) && !hasReadyLocalRuntime && !workflowReady) {
             selectSection(customChannelsEnabled ? "channels" : "models");
@@ -113,8 +117,20 @@ export default function SettingsPage() {
     };
 
     const panes: Record<ConfigSectionKey, ReactNode> = {
-        "local-cli": <SettingsPane><LocalCliSettings /></SettingsPane>,
-        channels: <SettingsPane><ChannelSettingsPane onOpenModels={() => selectSection("models")} onOpenRunningHub={runningHubPluginEnabled ? () => selectSection("runninghub") : undefined} onOpenComfyUI={comfyUIPluginEnabled ? () => selectSection("comfyui") : undefined} /></SettingsPane>,
+        "local-cli": (
+            <SettingsPane>
+                <LocalCliSettings />
+            </SettingsPane>
+        ),
+        channels: (
+            <SettingsPane>
+                <ChannelSettingsPane
+                    onOpenModels={() => selectSection("models")}
+                    onOpenRunningHub={runningHubPluginEnabled ? () => selectSection("runninghub") : undefined}
+                    onOpenComfyUI={comfyUIPluginEnabled ? () => selectSection("comfyui") : undefined}
+                />
+            </SettingsPane>
+        ),
         models: (
             <SettingsPane>
                 <div className="settings-pane-header">
@@ -128,8 +144,16 @@ export default function SettingsPage() {
                 </div>
             </SettingsPane>
         ),
-        runninghub: <SettingsPane><RunningHubSettingsPane /></SettingsPane>,
-        comfyui: <SettingsPane><ComfyUIBridgeSettingsPane /></SettingsPane>,
+        runninghub: (
+            <SettingsPane>
+                <RunningHubSettingsPane />
+            </SettingsPane>
+        ),
+        comfyui: (
+            <SettingsPane>
+                <ComfyUIBridgeSettingsPane />
+            </SettingsPane>
+        ),
         preferences: (
             <SettingsPane>
                 <div className="settings-pane-header">
@@ -139,13 +163,14 @@ export default function SettingsPage() {
                     </div>
                 </div>
                 <div className="settings-section">
-                    <Form layout="vertical" requiredMark={false}>
-                        <section className="settings-preference-block pb-6">
-                            <div className="mb-4">
-                                <h3 className="text-sm font-semibold">画布生成</h3>
-                                <p className="mt-1 text-xs text-foreground/55">设置新建生成任务时使用的初始值，节点内仍可单独覆盖。</p>
-                            </div>
-                            <Form.Item label="默认生图张数" className="mb-0 max-w-xs">
+                    <section className="settings-preference-block py-4">
+                        <div className="mb-3">
+                            <h3 className="text-[13px] font-medium text-foreground/60">画布生成</h3>
+                            <p className="mt-1 text-xs text-foreground/55">设置新建生成任务时使用的初始值，节点内仍可单独覆盖。</p>
+                        </div>
+                        <SettingsRow
+                            label="默认生图张数"
+                            control={
                                 <InputNumber
                                     min={1}
                                     max={15}
@@ -154,50 +179,59 @@ export default function SettingsPage() {
                                     value={Number(config.canvasImageCount)}
                                     onChange={(value) => updateConfig("canvasImageCount", normalizeImageCount(String(value ?? defaultConfig.canvasImageCount)))}
                                 />
-                            </Form.Item>
-                        </section>
-                        <section className="settings-preference-block py-6">
-                            <div className="mb-4">
-                                <h3 className="text-sm font-semibold">音频默认值</h3>
-                                <p className="mt-1 text-xs text-foreground/55">用于新建音频节点和未单独设置参数的生成任务。</p>
-                            </div>
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <Form.Item label="默认声音" className="mb-0">
-                                    <Select value={config.audioVoice} options={audioVoiceOptions} onChange={(value) => updateConfig("audioVoice", value)} />
-                                </Form.Item>
-                                <Form.Item label="文件格式" className="mb-0">
-                                    <Select value={config.audioFormat} options={audioFormatOptions} onChange={(value) => updateConfig("audioFormat", value)} />
-                                </Form.Item>
-                                <Form.Item label="语速" className="mb-0">
-                                    <InputNumber
-                                        min={0.25}
-                                        max={4}
-                                        step={0.05}
-                                        precision={2}
-                                        className="w-full"
-                                        value={Number(config.audioSpeed)}
-                                        onChange={(value) => updateConfig("audioSpeed", normalizeAudioSpeedValue(String(value ?? defaultConfig.audioSpeed)))}
-                                    />
-                                </Form.Item>
-                            </div>
-                        </section>
-                        <section className="settings-preference-block pt-6">
-                            <div className="mb-4">
-                                <h3 className="text-sm font-semibold">音频指令</h3>
-                                <p className="mt-1 text-xs text-foreground/55">在音频节点没有单独填写时使用。</p>
-                            </div>
-                            <div className="max-w-2xl">
-                                <Form.Item label="默认音频指令" className="mb-0">
-                                    <Input.TextArea rows={5} value={config.audioInstructions} placeholder="例如：自然、温暖、适合旁白。" onChange={(event) => updateConfig("audioInstructions", event.target.value)} />
-                                </Form.Item>
-                            </div>
-                        </section>
-                    </Form>
+                            }
+                            controlClassName="w-[200px]"
+                        />
+                    </section>
+                    <section className="settings-preference-block py-4">
+                        <div className="mb-3">
+                            <h3 className="text-[13px] font-medium text-foreground/60">音频默认值</h3>
+                            <p className="mt-1 text-xs text-foreground/55">用于新建音频节点和未单独设置参数的生成任务。</p>
+                        </div>
+                        <SettingsRow label="默认声音" control={<Select value={config.audioVoice} options={audioVoiceOptions} onChange={(value) => updateConfig("audioVoice", value)} />} controlClassName="w-[200px]" />
+                        <SettingsRow label="文件格式" control={<Select value={config.audioFormat} options={audioFormatOptions} onChange={(value) => updateConfig("audioFormat", value)} />} controlClassName="w-[200px]" />
+                        <SettingsRow
+                            label="语速"
+                            description="音频朗读速度（0.25–4）。"
+                            control={
+                                <InputNumber
+                                    min={0.25}
+                                    max={4}
+                                    step={0.05}
+                                    precision={2}
+                                    className="w-full"
+                                    value={Number(config.audioSpeed)}
+                                    onChange={(value) => updateConfig("audioSpeed", normalizeAudioSpeedValue(String(value ?? defaultConfig.audioSpeed)))}
+                                />
+                            }
+                            controlClassName="w-[200px]"
+                        />
+                    </section>
+                    <section className="settings-preference-block py-4">
+                        <div className="mb-3">
+                            <h3 className="text-[13px] font-medium text-foreground/60">音频指令</h3>
+                            <p className="mt-1 text-xs text-foreground/55">在音频节点没有单独填写时使用。</p>
+                        </div>
+                        <SettingsRow
+                            label="默认音频指令"
+                            align="top"
+                            control={<Input.TextArea rows={5} value={config.audioInstructions} placeholder="例如：自然、温暖、适合旁白。" onChange={(event) => updateConfig("audioInstructions", event.target.value)} />}
+                            controlClassName="w-full max-w-[480px]"
+                        />
+                    </section>
                 </div>
             </SettingsPane>
         ),
-        prompts: <SettingsPane fill><PromptPreferencesPane /></SettingsPane>,
-        diagnostics: <SettingsPane><DiagnosticsPanel taskId={searchParams.get("taskId") || undefined} projectId={searchParams.get("projectId") || undefined} /></SettingsPane>,
+        prompts: (
+            <SettingsPane fill>
+                <PromptPreferencesPane />
+            </SettingsPane>
+        ),
+        diagnostics: (
+            <SettingsPane>
+                <DiagnosticsPanel taskId={searchParams.get("taskId") || undefined} projectId={searchParams.get("projectId") || undefined} />
+            </SettingsPane>
+        ),
         storage: (
             <SettingsPane>
                 <div className="settings-section">
@@ -218,7 +252,11 @@ export default function SettingsPage() {
                     ) : null}
                     <h1 className="truncate text-sm font-semibold">设置</h1>
                 </div>
-                {shouldPromptContinue ? <Button type="primary" size="small" onClick={finishConfig}>保存并返回</Button> : null}
+                {shouldPromptContinue ? (
+                    <Button type="primary" size="small" onClick={finishConfig}>
+                        保存并返回
+                    </Button>
+                ) : null}
             </header>
             <div className="settings-library-frame flex min-h-0 flex-1 flex-col md:flex-row">
                 <aside className="settings-nav-panel w-full shrink-0 md:w-[200px]">
@@ -245,9 +283,7 @@ export default function SettingsPage() {
                 </aside>
                 <section className="settings-content flex min-h-0 min-w-0 flex-1 flex-col">
                     <div className="app-workspace-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5">
-                        <div className={`settings-pane-root ${activeTab === "prompts" ? "h-full w-full" : "mx-auto w-full max-w-none"}`}>
-                            {panes[activeTab]}
-                        </div>
+                        <div className={`settings-pane-root ${activeTab === "prompts" ? "h-full w-full" : "mx-auto w-full max-w-none"}`}>{panes[activeTab]}</div>
                     </div>
                 </section>
             </div>

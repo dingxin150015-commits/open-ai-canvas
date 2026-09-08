@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpenText, CheckCircle2, CircleAlert, Clapperboard, Clock3, Film, PackageCheck, PlaySquare, UsersRound } from "lucide-react";
+import { ArrowRight, BookOpenText, CheckCircle2, CircleAlert, Clapperboard, Clock3, Film, PackageCheck, PlaySquare, Scissors, UsersRound } from "lucide-react";
 import { Link } from "react-router";
 
 import { WorkspaceState } from "@/components/layout/workspace-state";
@@ -36,7 +36,15 @@ export default function ProjectOverviewView({ detail, overview }: ProjectDetailV
             href: `/projects/${project.id}/chapters`,
             complete: metrics.unitCount > 0,
         },
-        { id: "assets", icon: UsersRound, label: "角色与资产", description: "确认角色、场景、道具和项目画风", metric: `${metrics.assetCount} 项资产`, href: `/projects/${project.id}/assets`, complete: metrics.assetCount > 0 },
+        {
+            id: "assets",
+            icon: UsersRound,
+            label: "角色与资产",
+            description: "确认角色、场景、道具和项目画风",
+            metric: `${metrics.assetCount} 项资产`,
+            href: `/projects/${project.id}/assets`,
+            complete: metrics.assetCount > 0,
+        },
         {
             id: "storyboard",
             icon: Clapperboard,
@@ -63,6 +71,20 @@ export default function ProjectOverviewView({ detail, overview }: ProjectDetailV
             metric: `${metrics.readyVideoCount}/${metrics.shotCount || 0} 镜`,
             href: workflowHref("video"),
             complete: metrics.shotCount > 0 && metrics.readyVideoCount === metrics.shotCount,
+        },
+        {
+            id: "editor",
+            icon: Scissors,
+            label: "剪辑成片",
+            description: "在时间线中编排镜头、添加字幕并输出成片",
+            metric:
+                metrics.renderSucceededCount > 0
+                    ? `已输出 ${metrics.renderSucceededCount} 个成片`
+                    : metrics.shotCount > 0 && metrics.readyVideoCount === metrics.shotCount
+                      ? "可以开始剪辑"
+                      : `还差 ${Math.max(0, metrics.shotCount - metrics.readyVideoCount)} 镜`,
+            href: `/projects/${project.id}/editor`,
+            complete: metrics.renderSucceededCount > 0,
         },
         {
             id: "delivery",
@@ -293,14 +315,37 @@ function overviewActions(projectId: string, metrics: ProjectOverviewMetrics, fir
     const projectRoot = `/projects/${projectId}`;
     const workflowHref = firstUnitId ? `${projectRoot}/workflow/${firstUnitId}/video` : `${projectRoot}/chapters`;
     if (!metrics.unitCount) {
-        return [{ id: "add-story", title: "添加第一个剧情章节", description: "导入小说、粘贴文本，或从空白章节开始。", href: `${projectRoot}/chapters`, actionLabel: "添加章节", tone: "default" }];
+        return [
+            {
+                id: "add-story",
+                title: "添加第一个剧情章节",
+                description: "导入小说、粘贴文本，或从空白章节开始。",
+                href: `${projectRoot}/chapters`,
+                actionLabel: "添加章节",
+                tone: "default",
+            },
+        ];
     }
     const actions: ProjectWorkbenchAction[] = [];
     if (metrics.unitsWithoutText) {
-        actions.push({ id: "complete-story", title: `补充 ${metrics.unitsWithoutText} 章正文`, description: "先完善章节内容，后续角色识别与分镜拆分才能获得稳定输入。", href: `${projectRoot}/chapters`, actionLabel: "整理章节", tone: "attention" });
+        actions.push({
+            id: "complete-story",
+            title: `补充 ${metrics.unitsWithoutText} 章正文`,
+            description: "先完善章节内容，后续角色识别与分镜拆分才能获得稳定输入。",
+            href: `${projectRoot}/chapters`,
+            actionLabel: "整理章节",
+            tone: "attention",
+        });
     }
     if (metrics.pendingCandidateCount) {
-        actions.push({ id: "confirm-assets", title: `确认 ${metrics.pendingCandidateCount} 个资产候选`, description: "确认角色、场景与道具后，镜头可以稳定引用项目资产。", href: `${projectRoot}/assets`, actionLabel: "去确认", tone: "attention" });
+        actions.push({
+            id: "confirm-assets",
+            title: `确认 ${metrics.pendingCandidateCount} 个资产候选`,
+            description: "确认角色、场景与道具后，镜头可以稳定引用项目资产。",
+            href: `${projectRoot}/assets`,
+            actionLabel: "去确认",
+            tone: "attention",
+        });
     }
     if (!metrics.shotCount || metrics.unitsWithoutShots) {
         actions.push({
@@ -323,10 +368,24 @@ function overviewActions(projectId: string, metrics: ProjectOverviewMetrics, fir
         });
     }
     if (!metrics.canvasCount) {
-        actions.push({ id: "create-canvas", title: "建立第一张项目画布", description: "把章节、分镜和参考资产放进同一个制作空间。", href: `${projectRoot}/canvases`, actionLabel: "查看画布", tone: "default" });
+        actions.push({
+            id: "create-canvas",
+            title: "建立第一张项目画布",
+            description: "把章节、分镜和参考资产放进同一个制作空间。",
+            href: `${projectRoot}/canvases`,
+            actionLabel: "查看画布",
+            tone: "default",
+        });
     }
     if (!actions.length) {
-        actions.push({ id: "review-delivery", title: "检查镜头并准备交付", description: "所有镜头视频已就绪，可检查版本、连续性和缺失项。", href: workflowHref, actionLabel: "检查交付", tone: "default" });
+        actions.push({
+            id: "review-delivery",
+            title: "检查镜头并准备交付",
+            description: "所有镜头视频已就绪，可检查版本、连续性和缺失项。",
+            href: workflowHref,
+            actionLabel: "检查交付",
+            tone: "default",
+        });
     }
     return actions;
 }

@@ -1,5 +1,7 @@
+import { Button } from "antd";
+import { Tooltip } from "@/components/ui/base/tooltip";
 import { useState } from "react";
-import { Button, Tooltip } from "antd";
+
 import { Mic } from "lucide-react";
 
 import { VoiceRecordingInline } from "./voice-recording-inline";
@@ -24,16 +26,7 @@ export function VoiceRecordingButton({ onTranscribed, disabled }: VoiceRecording
     return (
         <>
             <Tooltip title="实时对话">
-                <Button
-                    type="text"
-                    shape="circle"
-                    className="!h-8 !w-8 !min-w-8"
-                    disabled={disabled}
-                    style={{ color: theme.node.muted }}
-                    icon={<Mic className="size-4" />}
-                    onClick={() => setOpen(true)}
-                    aria-label="实时对话"
-                />
+                <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" disabled={disabled} style={{ color: theme.node.muted }} icon={<Mic className="size-4" />} onClick={() => setOpen(true)} aria-label="实时对话" />
             </Tooltip>
             {open ? (
                 <VoiceRecordingInline

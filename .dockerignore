@@ -6,6 +6,10 @@
 .playwright-mcp
 .spec-workflow
 .vscode
+._*
+**/._*
+.DS_Store
+**/.DS_Store
 docs
 docs2
 data
@@ -17,6 +21,7 @@ backend/cmd/server/server
 web/.next
 web/dist
 web/node_modules
+**/*.tsbuildinfo
 web/out
 canvas-agent/dist
 canvas-agent/node_modules

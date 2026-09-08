@@ -1,10 +1,12 @@
-import { App, Button, Form, Input, Select, Switch, Tag } from "antd";
+import { App, Button, Form, Input, Select, Tag } from "antd";
+import { Switch } from "@/components/ui/base/switch";
 import { Cloud, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { changesRequireOSSRetest, DEFAULT_OSS_PATH_PREFIX, getS3PresetHints, S3_PRESET_OPTIONS, type OSSConnectionTestResult, type OSSProvider, type S3Preset } from "@/lib/oss-settings";
 import { getUserOSSSetting, testUserOSSConnection, updateUserOSSSetting, type UserOSSSetting } from "@/services/api/resources";
 import { useUserStore } from "@/stores/use-user-store";
+import { StatusBadge } from "@/components/ui/base/badges";
 
 type OSSFormValues = {
     enabled?: boolean;
@@ -121,7 +123,7 @@ export function UserOSSSettingsForm() {
                     <p className="mt-1 max-w-3xl text-xs leading-5 text-foreground/55">启用后，新上传和新生成的媒体优先写入你的存储桶；停用时回退到平台存储。</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                    <Tag color={setting?.enabled ? "success" : "default"}>{setting?.enabled ? "已启用" : "未启用"}</Tag>
+                    <StatusBadge tone={setting?.enabled ? "success" : "neutral"} label={setting?.enabled ? "已启用" : "未启用"} />
                     <Tag color={setting?.hasAccessKeySecret ? "processing" : "warning"} icon={<ShieldCheck className="size-3" />}>
                         {setting?.hasAccessKeySecret ? "密钥已加密" : "未保存密钥"}
                     </Tag>
@@ -134,7 +136,12 @@ export function UserOSSSettingsForm() {
                 </Form.Item>
                 <Form.Item name="provider" label="存储服务" rules={[{ required: true, message: "请选择存储服务" }]} className="mb-3">
                     <Select
-                        options={[{ label: "阿里云 OSS", value: "aliyun" }, { label: "腾讯云 COS", value: "tencent" }, { label: "七牛云 Kodo", value: "qiniu" }, { label: "S3 兼容存储", value: "s3", disabled: setting?.allowUserS3 === false }]}
+                        options={[
+                            { label: "阿里云 OSS", value: "aliyun" },
+                            { label: "腾讯云 COS", value: "tencent" },
+                            { label: "七牛云 Kodo", value: "qiniu" },
+                            { label: "S3 兼容存储", value: "s3", disabled: setting?.allowUserS3 === false },
+                        ]}
                         onChange={(nextProvider: OSSFormValues["provider"]) => {
                             if (nextProvider !== provider) form.setFieldsValue({ s3Preset: "custom", region: "", endpoint: "", cdnBaseUrl: "", bucket: "", accessKeyId: "", accessKeySecret: "", sessionToken: "", pathStyle: false });
                         }}
@@ -149,16 +156,22 @@ export function UserOSSSettingsForm() {
                     <Input spellCheck={false} placeholder={isS3 ? getS3PresetHints(s3Preset).region : isTencentCOS ? "ap-guangzhou" : isQiniuKodo ? "z0 / cn-east-1" : "oss-cn-hangzhou"} />
                 </Form.Item>
                 <Form.Item name="endpoint" label={isQiniuKodo ? "上传 Endpoint" : "Endpoint"} extra={isS3 ? getS3PresetHints(s3Preset).help : isTencentCOS ? "可留空，系统会根据 Region 生成标准 COS Endpoint。" : undefined} className="mb-3">
-                    <Input inputMode="url" spellCheck={false} placeholder={isS3 ? getS3PresetHints(s3Preset).endpoint : isTencentCOS ? "https://cos.ap-guangzhou.myqcloud.com" : isQiniuKodo ? "https://up-z0.qiniup.com" : "https://oss-cn-hangzhou.aliyuncs.com"} />
+                    <Input
+                        inputMode="url"
+                        spellCheck={false}
+                        placeholder={isS3 ? getS3PresetHints(s3Preset).endpoint : isTencentCOS ? "https://cos.ap-guangzhou.myqcloud.com" : isQiniuKodo ? "https://up-z0.qiniup.com" : "https://oss-cn-hangzhou.aliyuncs.com"}
+                    />
                 </Form.Item>
                 <Form.Item
                     name="cdnBaseUrl"
                     label={isQiniuKodo ? "绑定域名（可选）" : isS3 ? "公开 CDN（可选）" : "CDN 加速域名"}
-                    extra={isTencentCOS
-                        ? "选填。上传仍走 Endpoint，下载与预览改走 CDN；私有桶需开启 CDN 私有存储桶访问。CDN URL 不附带 COS 签名，未配置 CDN URL 鉴权时链接将长期可访问。"
-                        : isQiniuKodo
-                            ? "选填。填写后浏览器直连七牛私有下载地址；留空时采用“浏览器 → 当前后端 /api/resources/:id/file → 七牛 S3 Endpoint”的代理链路，后端使用 AK/SK 读取并返回文件，无需绑定域名。"
-                            : "选填。上传仍走 Endpoint，下载与预览改走 CDN；阿里云私有 Bucket 需开启 CDN 私有 Bucket 回源。CDN URL 不附带 OSS 签名，未配置 CDN URL 鉴权时链接将长期可访问。"}
+                    extra={
+                        isTencentCOS
+                            ? "选填。上传仍走 Endpoint，下载与预览改走 CDN；私有桶需开启 CDN 私有存储桶访问。CDN URL 不附带 COS 签名，未配置 CDN URL 鉴权时链接将长期可访问。"
+                            : isQiniuKodo
+                              ? "选填。填写后浏览器直连七牛私有下载地址；留空时采用“浏览器 → 当前后端 /api/resources/:id/file → 七牛 S3 Endpoint”的代理链路，后端使用 AK/SK 读取并返回文件，无需绑定域名。"
+                              : "选填。上传仍走 Endpoint，下载与预览改走 CDN；阿里云私有 Bucket 需开启 CDN 私有 Bucket 回源。CDN URL 不附带 OSS 签名，未配置 CDN URL 鉴权时链接将长期可访问。"
+                    }
                     rules={[{ type: "url", message: "请填写完整的 http/https CDN 加速域名" }]}
                     className="mb-3"
                 >
@@ -189,8 +202,18 @@ export function UserOSSSettingsForm() {
             </div>
 
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-                <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-foreground/50">{savedAt ? `上次保存：${savedAt}` : "尚未保存个人对象存储配置"}</span><ConnectionTestStatus result={testResult} stale={testStale} /></div>
-                <div className="flex flex-wrap gap-2"><Button loading={testing} onClick={() => void testConnection()}>测试连接</Button><Button type="primary" loading={saving} onClick={() => void save()}>保存个人对象存储</Button></div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-foreground/50">{savedAt ? `上次保存：${savedAt}` : "尚未保存个人对象存储配置"}</span>
+                    <ConnectionTestStatus result={testResult} stale={testStale} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button loading={testing} onClick={() => void testConnection()}>
+                        测试连接
+                    </Button>
+                    <Button type="primary" loading={saving} onClick={() => void save()}>
+                        保存个人对象存储
+                    </Button>
+                </div>
             </div>
         </Form>
     );
@@ -237,7 +260,7 @@ function connectionInput(values: OSSFormValues) {
 }
 
 function ConnectionTestStatus({ result, stale }: { result: OSSConnectionTestResult | null; stale: boolean }) {
-    if (stale) return <Tag color="warning">需重新测试</Tag>;
+    if (stale) return <StatusBadge tone="warning" label="需重新测试" />;
     if (!result) return null;
-    return <Tag color={result.ok ? "success" : "error"}>{result.ok ? `测试通过${result.testedAt ? ` · ${formatSavedAt(result.testedAt)}` : ""}` : result.message || "测试失败"}</Tag>;
+    return <StatusBadge tone={result.ok ? "success" : "error"} label={result.ok ? `测试通过${result.testedAt ? ` · ${formatSavedAt(result.testedAt)}` : ""}` : result.message || "测试失败"} />;
 }

@@ -1017,54 +1017,36 @@ add({
       }),
     },
     parameters: {
-      resolution: coalesce(ref("request.resolution"), "720P"),
-      ratio: coalesce(ref("request.aspectRatio"), "16:9"),
-      duration: conditional(
-        gt(ref("request.duration"), 0),
-        ref("request.duration"),
-        5,
-      ),
-      watermark: ref("request.watermark"),
-      prompt_extend: coalesce(
-        ref("request.providerOptions.newapi-channel-1.prompt_extend"),
-        false,
-      ),
-    },
+      resolution: coalesce(ref("request.resolution"), "720P"), ratio: coalesce(ref("request.aspectRatio"), "16:9"),
+      duration: conditional(gt(ref("request.duration"), 0), ref("request.duration"), 5), watermark: ref("request.watermark"),
+      prompt_extend: coalesce(ref("request.providerOptions.newapi-channel-1.prompt_extend"), false)
+    }
   }),
-  poll: { method: "GET", path: "/v1/videos/{{taskId}}" },
-  response: asyncResponse("video"),
+  poll: { method: "GET", path: "/v1/videos/{{taskId}}" }, response: asyncResponse("video")
 });
 
 add({
-  id: "newapi-video-generations-v1",
-  providerId: "newapi-channel-2",
-  name: "NewAPI Video Generations Channel 2",
-  vendor: "NewAPI",
-  capability: "video",
-  baseUrl: "http://127.0.0.1:3000",
-  auth: bearer,
-  params: videoParams,
-  requiresPublicMediaUrls: true,
+  id: "newapi-video-generations-v1", providerId: "newapi-channel-2", name: "NewAPI Video Generations Channel 2", vendor: "NewAPI", capability: "video",
+  baseUrl: "http://127.0.0.1:3000", auth: bearer, params: videoParams, requiresPublicMediaUrls: true,
   create: jsonCreate("/v1/video/generations", {
-    model: ref("request.model"),
-    prompt: ref("request.prompt"),
-    seconds: { $toString: ref("request.duration") },
-    aspect_ratio: coalesce(ref("request.aspectRatio"), "16:9"),
-    resolution: omit(ref("request.resolution")),
-    generate_audio: ref("request.generateAudio"),
-    image_urls: omit(
-      map({ $sortByOrder: ref("request.images") }, "media", ref("media.value")),
-    ),
-    video_urls: omit(
-      map({ $sortByOrder: ref("request.videos") }, "media", ref("media.value")),
-    ),
-    audio_urls: omit(
-      map({ $sortByOrder: ref("request.audios") }, "media", ref("media.value")),
-    ),
+    model: ref("request.model"), prompt: ref("request.prompt"), seconds: { $toString: ref("request.duration") },
+    aspect_ratio: coalesce(ref("request.aspectRatio"), "16:9"), resolution: omit(ref("request.resolution")), generate_audio: ref("request.generateAudio"),
+    image_urls: omit(map({ $sortByOrder: ref("request.images") }, "media", ref("media.value"))),
+    video_urls: omit(map({ $sortByOrder: ref("request.videos") }, "media", ref("media.value"))),
+    audio_urls: omit(map({ $sortByOrder: ref("request.audios") }, "media", ref("media.value")))
   }),
   poll: { method: "GET", path: "/v1/video/generations/{{taskId}}" },
-  response: asyncResponse("video"),
+  response: asyncResponse("video", {
+    taskId: coalesce(ref("response.data.task_id"), ref("response.data.taskId"), ref("response.task_id"), ref("response.taskId"), ref("response.data.id"), ref("response.id"), ref("taskId")),
+    videos: coalesce(
+      ref("response.data.result_url"), ref("response.data.video_url"), ref("response.data.output_url"), ref("response.data.url"), ref("response.data.metadata.url"),
+      ref("response.data.data.video_url"), ref("response.data.data.output_url"), ref("response.data.data.result_url"), ref("response.data.data.url"), ref("response.data.data.metadata.url"),
+      ref("response.video_url"), ref("response.videoUrl"), ref("response.result_url"), ref("response.output_url"), ref("response.url"), ref("response.metadata.url"), ref("response.output.url")
+    )
+  })
 });
+
+
 
 add({
   id: "rolldek-wan-video",

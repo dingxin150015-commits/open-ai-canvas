@@ -30,13 +30,13 @@ describe("backend API request error semantics", () => {
                     retryable: true,
                     requestId: "req_12345678",
                 },
-                headers: { "x-request-id": "header-request-id" },
+                headers: { "x-request-id": "header-request-id", "retry-after": "60" },
             },
         };
         const thrown = await request(Promise.reject(axiosError)).catch((error) => error);
 
         expect(thrown).toBeInstanceOf(ApiError);
-        expect(thrown).toMatchObject({ status: 429, code: 42901, errorCode: "request_throttled", errorCategory: "quota", requestId: "req_12345678", message: "请求过于频繁，请稍后重试", retryable: true });
+        expect(thrown).toMatchObject({ status: 429, code: 42901, errorCode: "request_throttled", errorCategory: "quota", requestId: "req_12345678", message: "请求过于频繁，请稍后重试", retryable: true, retryAfterMs: 60_000 });
         expect(thrown.cause).toBe(axiosError);
     });
 

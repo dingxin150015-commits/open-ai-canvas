@@ -175,6 +175,9 @@ describe("creation library button", () => {
         expect(source).toContain("...(preferredVideoProfile.ratios.length > 0 ? { size: ratio } : {})");
         expect(source).toContain('size: videoProfile.ratios.length > 0 ? (normalizedVideo?.ratio ?? ratio) : ""');
         expect(source).toContain('const videoRatioSupported = props.mode === "video" && ratios.length > 0');
-        expect(source).toContain('videoRatioSupported || (props.mode !== "video" && mergedProfile.size.parameter !== "none")');
+        expect(source).toContain(') : videoRatioSupported ? ( <SettingSection title="画幅"');
+        expect(source).toContain('<ImageSizePicker profile={mergedProfile}');
+        const picker = compactSource(readFileSync(resolve(import.meta.dir, "../src/components/image-size-picker.tsx"), "utf8"));
+        expect(picker).toContain('if (profile.size.parameter === "none") return null');
     });
 });

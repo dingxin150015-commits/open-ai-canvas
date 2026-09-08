@@ -1,4 +1,6 @@
-import { App, Button, Drawer, Form, Input, Select, Switch } from "antd";
+import { App, Button, Drawer, Form, Input } from "antd";
+import { Select } from "@/components/ui/base/select";
+import { Switch } from "@/components/ui/base/switch";
 import { Minus, Plus, Save, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -102,7 +104,7 @@ export function SkillEditorDrawer({ open, skill, onClose, onSaved }: { open: boo
             open={open}
             size={720}
             destroyOnHidden
-            maskClosable={!dirty}
+            mask={{ closable: !dirty }}
             title={skill ? "编辑技能" : "创建技能"}
             onClose={requestClose}
             extra={
@@ -125,7 +127,7 @@ export function SkillEditorDrawer({ open, skill, onClose, onSaved }: { open: boo
                         maxLength={2000}
                         showCount
                         disabled={drafting}
-                        placeholder="例如：我要一个竖屏短剧分镜技能——输入剧本段落，输出按景别排列的分镜表，每个镜头包含画面、台词、时长与转场…"
+                        placeholder="例如：我要一个竖屏短剧分镜技能，输入剧本段落并输出分镜表…"
                     />
                     <div className="mt-2 flex items-center justify-between gap-2">
                         <span className="text-xs text-foreground/45">将使用你的文本模型生成一次草稿</span>

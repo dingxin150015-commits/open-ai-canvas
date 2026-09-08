@@ -39,33 +39,34 @@
 
 感谢参与产品设计、开发、测试、内容和社区建设的成员：
 
-| 头像                                                                   | 昵称                                           | 邮箱                                                        | 个性签名                                        |
-| ---------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------- |
-| <img src="assets/user-sikongyue.png" alt="爱笑的毛毛虫" width="80">    | 爱笑的毛毛虫<br><sub>用户名：sikongyue</sub>   | [315515767@qq.com](mailto:315515767@qq.com)                 | 正在啃 main 分支，争取下次 merge 的时候变成蝴蝶 |
-| <img src="assets/user-delve.jpg" alt="delve-s" width="80">             | delve-s                                        | [3013141136@qq.com](mailto:3013141136@qq.com)               | 我亦无他，惟手熟尔                              |
-| <img src="assets/user-CyrusAuyeung.jpg" alt="CyrusAuyeung" width="80"> | CyrusAuyeung                                   | [cyrusauyeungho@gmail.com](mailto:cyrusauyeungho@gmail.com) | HKUST(GZ) UG                                    |
-| <img src="assets/user-nz.jpg" alt="奶大佬" width="80">                 | 奶大佬                                         | [1304634970@qq.com](mailto:1304634970@qq.com)               | 人生就是要不断的探索                            |
-| <img src="assets/user-dyh.jpg" alt="dyh" width="80">                   | dyh                                            | [1613203335@qq.com](mailto:1613203335@qq.com)               | 无                                              |
-| <img src="assets/user-kyori.jpg" alt="kyori" width="80">               | kyori                                          | [1771634408@qq.com](mailto:1771634408@qq.com)               | 励志成为未来最好用的画布仓库的贡献者            |
-| <img src="assets/user-bowen.jpg" alt="Bowen" width="80">               | Bowen                                          | [admin@bowen.games](mailto:admin@bowen.games)               | 剑走偏峰，雷厉风行。                            |
-| <img src="assets/user-ken.jpg" alt="ken" width="80">                   | ken                                            | [2506802@qq.com](mailto:2506802@qq.com)                     | 走自己的路                                      |
-| <img src="assets/user-fish.png.jpg" alt="fish" width="80">             | fish                                           | [cihai.sea@gmail.com](mailto:cihai.sea@gmail.com)           | AI 界热于助人的拖油瓶                           |
-| <img src="assets/user-QAyong.jpg" alt="QAyong" width="80">             | QAyong<br><sub>ID：QAyong<br>B站：QAyong</sub> | [2110491559@qq.com](mailto:2110491559@qq.com)               | AI 短剧合规，资产确权                           |
-| <img src="assets/user-K37ix.jpg" alt="_K37ix." width="80">             | _K37ix.                                        | [2773843782@qq.com](mailto:2773843782@qq.com)               | Making things that think                        |
-| <img src="assets/user-rou.jpg" alt="Rou" width="80">                   | Rou                                            | [rou325089@163.com](mailto:rou325089@163.com)               | 上善若水                                        |
-| <img src="assets/user-vv.jpg" alt="vv" width="80">                     | vv<br><sub>dy/xhs：荣灵</sub>                  | [2838033228@qq.com](mailto:2838033228@qq.com)               | 就是水水                                        |
-| <img src="assets/user-dominic1556.jpg" alt="Dominic1556" width="80">   | Dominic1556                                    | [184026530@qq.com](mailto:184026530@qq.com)                 | Done is better than perfect                     |
-| <img src="assets/user-yuxi.jpg" alt="宇熙" width="80">                 | 宇熙                                           | [53121904@qq.com](mailto:53121904@qq.com)                   | 年轻的时候不狂，老了拿什么回忆                  |
-| <img src="assets/user-yingzi.png" alt="影子" width="80">               | 影子                                           | [305818148@qq.com](mailto:305818148@qq.com)                 | 年纪大佬才明白人要顺势而为。                    |
+| 头像 | 昵称 | 邮箱 | 个性签名 |
+| --- | --- | --- | --- |
+| <img src="assets/user-sikongyue.png" alt="爱笑的毛毛虫" width="80"> | 爱笑的毛毛虫<br><sub>用户名：sikongyue</sub> | [315515767@qq.com](mailto:315515767@qq.com) | 正在啃 main 分支，争取下次 merge 的时候变成蝴蝶 |
+| <img src="assets/user-delve.jpg" alt="delve-s" width="80"> | delve-s | [3013141136@qq.com](mailto:3013141136@qq.com) | 我亦无他，惟手熟尔 |
+| <img src="assets/user-CyrusAuyeung.jpg" alt="CyrusAuyeung" width="80"> | CyrusAuyeung | [cyrusauyeungho@gmail.com](mailto:cyrusauyeungho@gmail.com) | HKUST(GZ) UG |
+| <img src="assets/user-nz.jpg" alt="奶大佬" width="80"> | 奶大佬 | [1304634970@qq.com](mailto:1304634970@qq.com) | 人生就是要不断的探索 |
+| <img src="assets/user-dyh.jpg" alt="dyh" width="80"> | dyh | [1613203335@qq.com](mailto:1613203335@qq.com) | 无 |
+| <img src="assets/user-kyori.jpg" alt="kyori" width="80"> | kyori | [1771634408@qq.com](mailto:1771634408@qq.com) | 励志成为未来最好用的画布仓库的贡献者 |
+| <img src="assets/user-bowen.jpg" alt="Bowen" width="80"> | Bowen | [admin@bowen.games](mailto:admin@bowen.games) | 剑走偏峰，雷厉风行。 |
+| <img src="assets/user-ken.jpg" alt="ken" width="80"> | ken | [2506802@qq.com](mailto:2506802@qq.com) | 走自己的路 |
+| <img src="assets/user-fish.png.jpg" alt="fish" width="80"> | fish | [cihai.sea@gmail.com](mailto:cihai.sea@gmail.com) | AI 界热于助人的拖油瓶 |
+| <img src="assets/user-QAyong.jpg" alt="QAyong" width="80"> | QAyong<br><sub>ID：QAyong<br>B站：QAyong</sub> | [2110491559@qq.com](mailto:2110491559@qq.com) | AI 短剧合规，资产确权 |
+| <img src="assets/user-K37ix.jpg" alt="_K37ix." width="80"> | _K37ix. | [2773843782@qq.com](mailto:2773843782@qq.com) | Making things that think |
+| <img src="assets/user-rou.jpg" alt="Rou" width="80"> | Rou | [rou325089@163.com](mailto:rou325089@163.com) | 上善若水 |
+| <img src="assets/user-vv.jpg" alt="vv" width="80"> | vv<br><sub>dy/xhs：荣灵</sub> | [2838033228@qq.com](mailto:2838033228@qq.com) | 就是水水 |
+| <img src="assets/user-dominic1556.jpg" alt="Dominic1556" width="80"> | Dominic1556 | [184026530@qq.com](mailto:184026530@qq.com) | Done is better than perfect |
+| <img src="assets/user-yuxi.jpg" alt="宇熙" width="80"> | 宇熙 | [53121904@qq.com](mailto:53121904@qq.com) | 年轻的时候不狂，老了拿什么回忆 |
+| <img src="assets/user-yingzi.png" alt="影子" width="80"> | 影子 | [305818148@qq.com](mailto:305818148@qq.com) | 年纪大佬才明白人要顺势而为。 |
+| <img src="assets/user-ray.jpg" alt="Ray" width="80"> | Ray | [cnraylee@qq.com](mailto:cnraylee@qq.com) | AI时代的全栈落地工，欢迎找我聊需求 |
 
 ## 交流与反馈
 
-Issue 反馈、技术讨论和产品升级建议都可以在 QQ 群中沟通。群内还会不定期组织 AI 学习与培训交流会。
+Issue 反馈、技术讨论和产品升级建议都可以在 微信 群中沟通。群内还会不定期组织 AI 学习与培训交流会。
 
 <p align="center">
-  <img src="assets/qq.jpg" alt="影策 QQ 交流群" width="280">
-  <img src="assets/wx.jpg" alt="影策 微信交流群" width="280">
+  <img src="assets/wx.jpg" alt="影策 微信交流群" width="100%">
 </p>
+
 
 ## 当前能力
 

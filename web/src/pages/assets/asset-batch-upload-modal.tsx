@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { App, Button, Modal, Progress, Select, Tag } from "antd";
+import { App, Button, Modal, Progress, Select } from "antd";
+import { StatusBadge } from "@/components/ui/base/badges";
 import { FileImage, UploadCloud, X } from "lucide-react";
 
 import { ASSET_CATEGORY_OPTIONS, type AssetCategory } from "@/lib/asset-category";
@@ -135,13 +136,11 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
                                     {item.status === "uploading" ? (
                                         <Progress percent={item.percent || 10} size="small" showInfo={false} className="w-20" />
                                     ) : item.status === "done" ? (
-                                        <Tag color="green">完成</Tag>
+                                        <StatusBadge tone="success" size="sm" label="完成" />
                                     ) : item.status === "error" ? (
-                                        <Tag color="red" title={item.error}>
-                                            失败
-                                        </Tag>
+                                        <StatusBadge tone="error" size="sm" label="失败" title={item.error} />
                                     ) : (
-                                        <Tag>待上传</Tag>
+                                        <StatusBadge tone="neutral" size="sm" label="待上传" />
                                     )}
                                     <button type="button" aria-label={`移除 ${item.file.name}`} title="移除" className="batch-upload-remove" onClick={() => setItems((current) => current.filter((entry) => entry.id !== item.id))} disabled={uploading}>
                                         <X className="size-3.5" />

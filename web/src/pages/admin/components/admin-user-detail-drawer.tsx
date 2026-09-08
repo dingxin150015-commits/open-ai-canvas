@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { App, Button, Descriptions, Drawer, Empty, Progress, Skeleton, Tabs } from "antd";
+import { App, Button, Descriptions, Drawer, Progress, Skeleton, Tabs } from "antd";
+import { IconButton } from "@/components/ui/base/buttons";
+import { EmptyState } from "@/components/ui/product/empty-state";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { PaginationBar } from "@/components/layout/workspace-page";
@@ -95,12 +97,14 @@ export function AdminUserDetailDrawer({ userId, onClose, previousUserId, nextUse
             size="min(920px, 100vw)"
             destroyOnHidden
             rootClassName="admin-drawer"
-            extra={onNavigate ? (
-                <div className="flex items-center gap-1">
-                    <Button type="text" size="small" aria-label="上一条用户" disabled={!previousUserId} icon={<ChevronLeft className="size-4" />} onClick={() => previousUserId && onNavigate(previousUserId)} />
-                    <Button type="text" size="small" aria-label="下一条用户" disabled={!nextUserId} icon={<ChevronRight className="size-4" />} onClick={() => nextUserId && onNavigate(nextUserId)} />
-                </div>
-            ) : null}
+            extra={
+                onNavigate ? (
+                    <div className="flex items-center gap-1">
+                        <IconButton size="sm" variant="ghost" aria-label="上一条用户" disabled={!previousUserId} icon={ChevronLeft} onClick={() => previousUserId && onNavigate(previousUserId)} />
+                        <IconButton size="sm" variant="ghost" aria-label="下一条用户" disabled={!nextUserId} icon={ChevronRight} onClick={() => nextUserId && onNavigate(nextUserId)} />
+                    </div>
+                ) : null
+            }
         >
             {loading && !detail ? (
                 <Skeleton active paragraph={{ rows: 10 }} />
@@ -144,7 +148,7 @@ export function AdminUserDetailDrawer({ userId, onClose, previousUserId, nextUse
                                                         <span className="text-foreground/60">{item.label}</span>
                                                         <span className="shrink-0 tabular-nums text-foreground/75">{item.display}</span>
                                                     </div>
-                                                    <Progress percent={Math.min(100, item.limit > 0 ? Math.round(item.value / item.limit * 100) : 0)} size="small" showInfo={false} status={item.value >= item.limit ? "exception" : "normal"} />
+                                                    <Progress percent={Math.min(100, item.limit > 0 ? Math.round((item.value / item.limit) * 100) : 0)} size="small" showInfo={false} status={item.value >= item.limit ? "exception" : "normal"} />
                                                 </div>
                                             ))}
                                         </div>
@@ -163,10 +167,10 @@ export function AdminUserDetailDrawer({ userId, onClose, previousUserId, nextUse
                                         dataSource: ledger,
                                         pagination: false,
                                         columns: [
-                                        { title: "时间", dataIndex: "createdAt", width: 170, render: formatTime },
-                                        { title: "类型", dataIndex: "type", width: 130 },
-                                        { title: "变化", dataIndex: "amountMicrocredits", width: 120, align: "right", render: (value) => formatCredits(value) },
-                                        { title: "说明", dataIndex: "note", ellipsis: true },
+                                            { title: "时间", dataIndex: "createdAt", width: 170, render: formatTime },
+                                            { title: "类型", dataIndex: "type", width: 130 },
+                                            { title: "变化", dataIndex: "amountMicrocredits", width: 120, align: "right", render: (value) => formatCredits(value) },
+                                            { title: "说明", dataIndex: "note", ellipsis: true },
                                         ],
                                         scroll: { x: 720 },
                                     }}
@@ -186,11 +190,11 @@ export function AdminUserDetailDrawer({ userId, onClose, previousUserId, nextUse
                                         dataSource: tasks,
                                         pagination: false,
                                         columns: [
-                                        { title: "时间", dataIndex: "createdAt", width: 170, render: formatTime },
-                                        { title: "类型", dataIndex: "type", width: 180 },
-                                        { title: "模型", dataIndex: "model", width: 180, ellipsis: true },
-                                        { title: "状态", dataIndex: "status", width: 100, render: (value) => <AdminStatusBadge label={value || "未知"} tone={taskStatusTone(value)} /> },
-                                        { title: "阶段", dataIndex: "stage", ellipsis: true },
+                                            { title: "时间", dataIndex: "createdAt", width: 170, render: formatTime },
+                                            { title: "类型", dataIndex: "type", width: 180 },
+                                            { title: "模型", dataIndex: "model", width: 180, ellipsis: true },
+                                            { title: "状态", dataIndex: "status", width: 100, render: (value) => <AdminStatusBadge label={value || "未知"} tone={taskStatusTone(value)} /> },
+                                            { title: "阶段", dataIndex: "stage", ellipsis: true },
                                         ],
                                         scroll: { x: 820 },
                                     }}
@@ -210,10 +214,10 @@ export function AdminUserDetailDrawer({ userId, onClose, previousUserId, nextUse
                                         dataSource: events,
                                         pagination: false,
                                         columns: [
-                                        { title: "时间", dataIndex: "createdAt", width: 170, render: formatTime },
-                                        { title: "管理员", dataIndex: "actorUserId", width: 160, ellipsis: true },
-                                        { title: "动作", dataIndex: "action", width: 160 },
-                                        { title: "摘要", dataIndex: "summary", ellipsis: true },
+                                            { title: "时间", dataIndex: "createdAt", width: 170, render: formatTime },
+                                            { title: "管理员", dataIndex: "actorUserId", width: 160, ellipsis: true },
+                                            { title: "动作", dataIndex: "action", width: 160 },
+                                            { title: "摘要", dataIndex: "summary", ellipsis: true },
                                         ],
                                         scroll: { x: 720 },
                                     }}
@@ -225,7 +229,7 @@ export function AdminUserDetailDrawer({ userId, onClose, previousUserId, nextUse
                     ]}
                 />
             ) : (
-                <Empty description="没有用户详情" />
+                <EmptyState size="compact" title="没有用户详情" />
             )}
         </Drawer>
     );
@@ -245,7 +249,7 @@ function taskStatusTone(value?: string): AdminStatusTone {
 
 function quotaUsageItems(detail: AdminUserDetail) {
     const structuredBytes = detail.storageUsage.assetBytes + detail.storageUsage.canvasBytes + detail.storageUsage.sessionBytes;
-    const bytes = (value: number) => value >= 1024 ** 3 ? `${(value / 1024 ** 3).toFixed(2)} GB` : `${(value / 1024 ** 2).toFixed(1)} MB`;
+    const bytes = (value: number) => (value >= 1024 ** 3 ? `${(value / 1024 ** 3).toFixed(2)} GB` : `${(value / 1024 ** 2).toFixed(1)} MB`);
     const number = (value: number) => new Intl.NumberFormat("zh-CN").format(value);
     return [
         { label: "资源与附件", value: detail.storedFileBytes, limit: detail.quota.storedFileGB * 1024 ** 3, display: `${bytes(detail.storedFileBytes)} / ${detail.quota.storedFileGB} GB` },

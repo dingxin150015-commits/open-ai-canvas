@@ -1,4 +1,5 @@
-import { Popover, Switch } from "antd";
+import { Popover } from "antd";
+import { Switch } from "@/components/ui/base/switch";
 import { CircleUserRound, LogIn, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -20,9 +21,7 @@ export function WorkspaceAccountMenu() {
     const { availableMicrocredits } = useWalletBalance(user?.id, creditsEnabled);
     const [menuOpen, setMenuOpen] = useState(false);
 
-    const balance = availableMicrocredits === null
-        ? "--"
-        : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+    const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
     if (!hydrated) {
         return <span className="size-9 animate-pulse rounded-[var(--r-md)] bg-foreground/[.06]" aria-hidden />;
@@ -35,27 +34,35 @@ export function WorkspaceAccountMenu() {
             rootClassName="workspace-account-popover"
             open={menuOpen}
             onOpenChange={setMenuOpen}
-            content={(
+            content={
                 <div className="w-56 py-0.5">
                     <div className="flex items-center gap-3 px-1 pb-3">
                         <UserAvatar user={user} className="size-8" />
                         <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 items-center gap-1.5"><span className="truncate text-sm font-medium">{user.displayName || user.username}</span><IdentityProviderBadge user={user} /></div>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                                <span className="truncate text-sm font-medium">{user.displayName || user.username}</span>
+                                <IdentityProviderBadge user={user} />
+                            </div>
                             {creditsEnabled ? <div className="mt-0.5 truncate text-[var(--fs-label)] tabular-nums text-foreground/45">可用 {balance} 积分</div> : null}
                         </div>
                     </div>
 
                     <div className="border-t border-border/35 py-2">
-                        <AppChangelogButton className="flex h-8 w-full items-center gap-2 rounded px-2 text-[var(--fs-label)] text-foreground/58 hover:bg-surface-hover hover:text-foreground [&_svg]:size-3.5" showLabel showVersion versionClassName="ml-auto text-[var(--fs-micro)] tabular-nums text-foreground/32" />
+                        <AppChangelogButton
+                            className="flex h-8 w-full items-center gap-2 rounded px-2 text-[var(--fs-label)] text-foreground/58 hover:bg-surface-hover hover:text-foreground [&_svg]:size-3.5"
+                            showLabel
+                            showVersion
+                            versionClassName="ml-auto text-[var(--fs-micro)] tabular-nums text-foreground/32"
+                        />
                     </div>
 
                     <div className="flex h-10 items-center px-2">
                         {theme === "dark" ? <Moon className="size-3.5 text-foreground/45" /> : <Sun className="size-3.5 text-foreground/45" />}
                         <span className="ml-2 flex-1 text-xs text-foreground/65">深色模式</span>
-                        <Switch size="small" checked={theme === "dark"} onChange={(checked) => setTheme(checked ? "dark" : "light")} aria-label="深色模式" />
+                        <Switch size="sm" checked={theme === "dark"} onChange={(checked) => setTheme(checked ? "dark" : "light")} aria-label="深色模式" />
                     </div>
                 </div>
-            )}
+            }
         >
             <button type="button" className="app-workspace-topbar-icon-button app-workspace-account-trigger" aria-label="账户菜单" title={user.displayName || user.username}>
                 <UserAvatar user={user} className="size-6" />
@@ -77,11 +84,7 @@ function UserAvatar({ user, className }: { user: LocalUser; className?: string }
     // 结构保持 button > span > svg：占位图标自动复用顶栏图标按钮的 18px/1.8 描边与配色合同；默认不套圆角容器，hover 由按钮背景反馈。
     return (
         <span className={cn("grid shrink-0 place-items-center overflow-hidden", className)}>
-            {avatarUrl && !failed ? (
-                <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" onError={() => setFailed(true)} />
-            ) : (
-                <CircleUserRound className="size-full" aria-hidden />
-            )}
+            {avatarUrl && !failed ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" onError={() => setFailed(true)} /> : <CircleUserRound className="size-full" aria-hidden />}
         </span>
     );
 }

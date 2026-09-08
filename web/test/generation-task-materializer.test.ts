@@ -8,7 +8,8 @@ import { applyCanvasGenerationTaskNodeEffect, persistCanvasAgentGenerationContin
 import { canvasCinematicContinuationEntryAdapters } from "../src/components/canvas/canvas-assistant-panel";
 import { applyGenerationConsumerEffect, generationEffectApplied } from "../src/services/generation-consumer-dedupe";
 import { createProviderNeutralGenerationTaskEffectStore } from "../src/services/provider-neutral-generation-effects";
-import { consumeGenerationTaskAgent, consumeGenerationTaskMessage, consumeGenerationTaskNode, materializeGenerationTaskAssets } from "../src/services/project-asset-sync";
+import { consumeGenerationTaskAgent, consumeGenerationTaskMessage, consumeGenerationTaskNode, materializeGenerationTaskAssets, retryCanvasAssetSyncAfterRateLimit } from "../src/services/project-asset-sync";
+import { ApiError } from "../src/services/api/request";
 import { flushCanvasStorePersistence, useCanvasStore, withCanvasStorePersistenceSuppressed, type CanvasProject } from "../src/stores/canvas/use-canvas-store";
 import { flushAssetStorePersistence, useAssetStore, type NewAsset } from "../src/stores/use-asset-store";
 import { CanvasNodeType, type CanvasAssistantSession, type CanvasNodeData } from "../src/types/canvas";
@@ -41,6 +42,56 @@ function createEffectStore(): GenerationTaskEffectStore {
         },
     };
 }
+
+test("automatic canvas asset sync honors Retry-After before retrying a rate limit", async () => {
+    const delays: number[] = [];
+    let attempts = 0;
+
+    const result = await retryCanvasAssetSyncAfterRateLimit(
+        async () => {
+            attempts += 1;
+            if (attempts === 1) throw new ApiError("请求过于频繁，请稍后再试", { status: 429, retryAfterMs: 60_000 });
+            return "synced";
+        },
+        {
+            wait: async (delayMs) => {
+                delays.push(delayMs);
+            },
+        },
+    );
+
+    expect(result).toBe("synced");
+    expect(attempts).toBe(2);
+    expect(delays).toEqual([60_000]);
+});
+
+test("automatic canvas asset sync does not retry non-rate-limit failures", async () => {
+    let attempts = 0;
+
+    await expect(
+        retryCanvasAssetSyncAfterRateLimit(async () => {
+            attempts += 1;
+            throw new ApiError("素材校验失败", { status: 400 });
+        }),
+    ).rejects.toThrow("素材校验失败");
+
+    expect(attempts).toBe(1);
+});
+
+test("automatic canvas asset sync aborts promptly while waiting for the rate-limit window", async () => {
+    const controller = new AbortController();
+    const syncing = retryCanvasAssetSyncAfterRateLimit(
+        async () => {
+            throw new ApiError("请求过于频繁，请稍后再试", { status: 429, retryAfterMs: 60_000 });
+        },
+        { signal: controller.signal },
+    );
+
+    await Promise.resolve();
+    controller.abort();
+
+    await expect(syncing).rejects.toMatchObject({ name: "AbortError" });
+});
 
 type MetaImageHarnessImage = {
     naturalWidth: number;
@@ -1054,7 +1105,14 @@ describe("generation task materializer", () => {
                                         ...pendingSession,
                                         pendingBackendSession: undefined,
                                         generationEffectKeys: key ? [key] : undefined,
-                                        messages: [{ id: messageId, role: "assistant", text: "completed", detail: { kind: "cinematic", backendSessionId: "backend-cinematic-materializer", status: "completed" } }],
+                                        messages: [
+                                            {
+                                                id: messageId,
+                                                role: "assistant",
+                                                text: "completed",
+                                                detail: { kind: "cinematic", backendSessionId: "backend-cinematic-materializer", status: "completed" },
+                                            },
+                                        ],
                                         updatedAt: "2026-08-14T00:01:00.000Z",
                                     },
                                 ];
@@ -2049,7 +2107,9 @@ describe("generation task materializer", () => {
             prompt: "redacted",
             attempts: 1,
             resultState: "READY",
-            resultJson: JSON.stringify({ images: [{ dataUrl: "https://example.invalid/retry-node.png", storageKey: "resource:retry-node", width: 1, height: 1, mimeType: "image/png" }] }),
+            resultJson: JSON.stringify({
+                images: [{ dataUrl: "https://example.invalid/retry-node.png", storageKey: "resource:retry-node", width: 1, height: 1, mimeType: "image/png" }],
+            }),
             outputs: [{ outputIndex: 0, mediaType: "image", materializedAssetId: "asset-first-write-retry" }],
             createdAt: "2026-08-14T00:00:00.000Z",
             updatedAt: "2026-08-14T00:00:00.000Z",
@@ -2188,7 +2248,9 @@ describe("generation task materializer", () => {
             prompt: "redacted",
             attempts: 1,
             resultState: "READY",
-            resultJson: JSON.stringify({ images: [{ dataUrl: "https://example.invalid/post-commit.png", storageKey: "resource:post-commit", width: 1, height: 1, mimeType: "image/png" }] }),
+            resultJson: JSON.stringify({
+                images: [{ dataUrl: "https://example.invalid/post-commit.png", storageKey: "resource:post-commit", width: 1, height: 1, mimeType: "image/png" }],
+            }),
             outputs: [{ outputIndex: 0, mediaType: "image", materializedAssetId: "asset-post-commit-mounted-edit" }],
             createdAt: "2026-08-14T00:00:00.000Z",
             updatedAt: "2026-08-14T00:00:00.000Z",
@@ -2219,7 +2281,15 @@ describe("generation task materializer", () => {
         try {
             setActiveUserScope(scope);
             withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: [project] }));
-            values.set(storageKey, JSON.stringify({ state: { projects: [project] }, version: 0, storageRevision: 1, tombstones: { projects: {}, nodes: {}, connections: {}, sessions: {}, messages: {} } }));
+            values.set(
+                storageKey,
+                JSON.stringify({
+                    state: { projects: [project] },
+                    version: 0,
+                    storageRevision: 1,
+                    tombstones: { projects: {}, nodes: {}, connections: {}, sessions: {}, messages: {} },
+                }),
+            );
             useAssetStore.getState().replaceAssets([
                 {
                     id: "asset-post-commit-mounted-edit",
@@ -2348,7 +2418,15 @@ describe("generation task materializer", () => {
         try {
             setActiveUserScope(scope);
             withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: [project] }));
-            values.set(storageKey, JSON.stringify({ state: { projects: [project] }, version: 0, storageRevision: 1, tombstones: { projects: {}, nodes: {}, connections: {}, sessions: {}, messages: {} } }));
+            values.set(
+                storageKey,
+                JSON.stringify({
+                    state: { projects: [project] },
+                    version: 0,
+                    storageRevision: 1,
+                    tombstones: { projects: {}, nodes: {}, connections: {}, sessions: {}, messages: {} },
+                }),
+            );
 
             await persistCanvasAgentGenerationContinuationEffect({
                 projectId: project.id,
@@ -2718,7 +2796,15 @@ describe("generation task materializer", () => {
         try {
             setActiveUserScope(scope);
             withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: [project] }));
-            values.set(storageKey, JSON.stringify({ state: { projects: [project] }, version: 0, storageRevision: 1, tombstones: { projects: {}, nodes: {}, connections: {}, sessions: {}, messages: {} } }));
+            values.set(
+                storageKey,
+                JSON.stringify({
+                    state: { projects: [project] },
+                    version: 0,
+                    storageRevision: 1,
+                    tombstones: { projects: {}, nodes: {}, connections: {}, sessions: {}, messages: {} },
+                }),
+            );
 
             failCanvasWrite = true;
             await recover();
@@ -3076,6 +3162,7 @@ describe("generation task materializer", () => {
         const source = await Bun.file(new URL("../src/services/project-asset-sync.ts", import.meta.url)).text();
         expect(source).not.toContain("if (input.task.projectId) await syncAssetToProject(assetId, input.task.projectId");
         expect(source).toContain("if (!options.domainProjectId) {");
+        expect(source).toContain("linkedToProject: false");
         expect(source).toContain("await syncAssetToProject(asset.id, options.domainProjectId");
     });
 

@@ -43,7 +43,12 @@ export const portraitVisionTool: ResponseFunctionTool = {
                     type: "object",
                     additionalProperties: false,
                     required: FEATURE_KEYS,
-                    properties: Object.fromEntries(FEATURE_KEYS.map((key) => [key, { type: "object", additionalProperties: false, required: ["similarity", "note"], properties: { similarity: { type: "string", enum: ["high", "medium", "low", "none"] }, note: { type: "string", maxLength: 1000 } } }])),
+                    properties: Object.fromEntries(
+                        FEATURE_KEYS.map((key) => [
+                            key,
+                            { type: "object", additionalProperties: false, required: ["similarity", "note"], properties: { similarity: { type: "string", enum: ["high", "medium", "low", "none"] }, note: { type: "string", maxLength: 1000 } } },
+                        ]),
+                    ),
                 },
                 basis: { type: "array", maxItems: 16, items: { type: "string", maxLength: 1000 } },
                 limitations: { type: "array", maxItems: 16, items: { type: "string", maxLength: 1000 } },
@@ -78,7 +83,8 @@ export function portraitVisionMessages(input: { queryDataUrl: string; comparison
     return [
         {
             role: "system",
-            content: "你是影策中的肖像可识别性排查分析器。只做结构化视觉比较，不识别人名或私人身份，不输出确认同一人、确认侵权、绝对安全等确定性结论。两张均为写实人像时使用 Path A，任一张明显风格化时使用 Path B；请结合本地 ArcFace、检测和质量预检，但不要将本地 embedding 当作法律结论。对脸型、五官布局、眼眉、鼻口、发型发际线、标志性特征分别说明。若图片质量、多脸或风格差异使判断不可靠，返回 unable_to_determine 并说明限制。",
+            content:
+                "你是当前创作工作台中的肖像可识别性排查分析器。只做结构化视觉比较，不识别人名或私人身份，不输出确认同一人、确认侵权、绝对安全等确定性结论。两张均为写实人像时使用 Path A，任一张明显风格化时使用 Path B；请结合本地 ArcFace、检测和质量预检，但不要将本地 embedding 当作法律结论。对脸型、五官布局、眼眉、鼻口、发型发际线、标志性特征分别说明。若图片质量、多脸或风格差异使判断不可靠，返回 unable_to_determine 并说明限制。",
         },
         {
             role: "user",
@@ -95,17 +101,41 @@ export function parsePortraitVisionToolResponse(response: ToolResponseResult): P
     const call = response.toolCalls.find((candidate) => candidate.function.name === "submit_portrait_comparison");
     if (!call) throw new Error("portrait_vision_tool_missing");
     let value: unknown;
-    try { value = JSON.parse(call.function.arguments); } catch { throw new Error("portrait_vision_result_invalid"); }
+    try {
+        value = JSON.parse(call.function.arguments);
+    } catch {
+        throw new Error("portrait_vision_result_invalid");
+    }
     return parseVisionComparison(value);
 }
 
 export function parseVisionComparison(value: unknown): PortraitVisionComparison {
-    if (!isRecord(value) || !["realistic", "stylized"].includes(String(value.imageAType)) || !["realistic", "stylized"].includes(String(value.imageBType)) || !["A", "B"].includes(String(value.analysisPath)) || !["success", "unable_to_determine"].includes(String(value.status)) || !RISKS.has(value.riskLevel as PortraitRiskLevel) || typeof value.overallSimilarity !== "number" || !Number.isFinite(value.overallSimilarity) || value.overallSimilarity < 0 || value.overallSimilarity > 1 || !isRecord(value.featureComparison) || !Array.isArray(value.basis) || !Array.isArray(value.limitations) || !Array.isArray(value.modificationSuggestions) || typeof value.insightfaceFusionNote !== "string" || typeof value.manualReviewRecommended !== "boolean") throw new Error("portrait_vision_result_invalid");
-    const featureComparison = Object.fromEntries(FEATURE_KEYS.map((key) => {
-        const item = value.featureComparison[key];
-        if (!isRecord(item) || !SIMILARITIES.has(String(item.similarity)) || typeof item.note !== "string" || item.note.length > 1000) throw new Error("portrait_vision_result_invalid");
-        return [key, { similarity: item.similarity as "high" | "medium" | "low" | "none", note: item.note }];
-    })) as PortraitVisionComparison["featureComparison"];
+    if (
+        !isRecord(value) ||
+        !["realistic", "stylized"].includes(String(value.imageAType)) ||
+        !["realistic", "stylized"].includes(String(value.imageBType)) ||
+        !["A", "B"].includes(String(value.analysisPath)) ||
+        !["success", "unable_to_determine"].includes(String(value.status)) ||
+        !RISKS.has(value.riskLevel as PortraitRiskLevel) ||
+        typeof value.overallSimilarity !== "number" ||
+        !Number.isFinite(value.overallSimilarity) ||
+        value.overallSimilarity < 0 ||
+        value.overallSimilarity > 1 ||
+        !isRecord(value.featureComparison) ||
+        !Array.isArray(value.basis) ||
+        !Array.isArray(value.limitations) ||
+        !Array.isArray(value.modificationSuggestions) ||
+        typeof value.insightfaceFusionNote !== "string" ||
+        typeof value.manualReviewRecommended !== "boolean"
+    )
+        throw new Error("portrait_vision_result_invalid");
+    const featureComparison = Object.fromEntries(
+        FEATURE_KEYS.map((key) => {
+            const item = value.featureComparison[key];
+            if (!isRecord(item) || !SIMILARITIES.has(String(item.similarity)) || typeof item.note !== "string" || item.note.length > 1000) throw new Error("portrait_vision_result_invalid");
+            return [key, { similarity: item.similarity as "high" | "medium" | "low" | "none", note: item.note }];
+        }),
+    ) as PortraitVisionComparison["featureComparison"];
     return {
         imageAType: value.imageAType as "realistic" | "stylized",
         imageBType: value.imageBType as "realistic" | "stylized",

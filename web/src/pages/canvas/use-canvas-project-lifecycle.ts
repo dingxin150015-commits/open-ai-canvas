@@ -8,9 +8,10 @@ import { removeCanvasDrawing } from "@/lib/canvas/canvas-drawing-storage";
 import { normalizeCanvasNodeTimestamps } from "@/lib/canvas/canvas-node-timestamps";
 import { hydrateAssistantImages, resetInterruptedGeneration } from "@/lib/canvas/canvas-project-generation";
 import { listAddedSkills, type Skill } from "@/services/api/skills";
-import { createCanvasProjectWithRemoteSync, deleteCanvasProjectsWithRemoteSync, saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { createCanvasProjectWithRemoteSync, deleteCanvasProjectsWithRemoteSync, loadCanvasProjectForEditing, saveRemoteUserDataNow } from "@/services/user-data-sync";
 import { flushCanvasStorePersistence, useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
 import type { CanvasHistorySnapshot } from "./use-canvas-history";
 
@@ -74,75 +75,85 @@ export function useCanvasProjectLifecycle({
     const { message } = App.useApp();
     const navigate = useNavigate();
     const hydrated = useCanvasStore((state) => state.hydrated);
+    const sessionHydrated = useUserStore((state) => state.hydrated);
     const openProject = useCanvasStore((state) => state.openProject);
     const updateProject = useCanvasStore((state) => state.updateProject);
     const renameProject = useCanvasStore((state) => state.renameProject);
     const currentProject = useCanvasStore((state) => state.projects.find((project) => project.id === projectId));
     const [addedSkills, setAddedSkills] = useState<Skill[]>([]);
+    const [loadError, setLoadError] = useState("");
+    const [loadAttempt, setLoadAttempt] = useState(0);
     const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        if (!hydrated) return;
+        if (!hydrated || !sessionHydrated) return;
         let cancelled = false;
         setProjectLoaded(false);
-        const project = openProject(projectId);
-        if (!project) {
-            navigate("/canvas", { replace: true });
-            return;
-        }
-
-        const applyRestoredProject = (restoredNodes: CanvasNodeData[], restoredSessions: CanvasAssistantSession[]) => {
+        setLoadError("");
+        const load = async () => {
+            const project = await loadCanvasProjectForEditing(projectId);
             if (cancelled) return;
-            const fallbackTheme = useThemeStore.getState().theme;
-            const restoredAppearance = project.appearance ? normalizeCanvasAppearance(project.appearance, fallbackTheme) : canvasAppearanceForTheme(fallbackTheme);
-            const snapshot: CanvasHistorySnapshot = {
-                nodes: restoredNodes,
-                connections: project.connections,
-                chatSessions: restoredSessions,
-                activeChatId: project.activeChatId || null,
-                canvasAppearance: restoredAppearance,
-                backgroundMode: project.backgroundMode || DEFAULT_CANVAS_BACKGROUND_MODE,
-                showImageInfo: project.showImageInfo || false,
+            if (!project) {
+                navigate("/canvas", { replace: true });
+                return;
+            }
+
+            const applyRestoredProject = (restoredNodes: CanvasNodeData[], restoredSessions: CanvasAssistantSession[]) => {
+                if (cancelled) return;
+                const fallbackTheme = useThemeStore.getState().theme;
+                const restoredAppearance = project.appearance ? normalizeCanvasAppearance(project.appearance, fallbackTheme) : canvasAppearanceForTheme(fallbackTheme);
+                const snapshot: CanvasHistorySnapshot = {
+                    nodes: restoredNodes,
+                    connections: project.connections,
+                    chatSessions: restoredSessions,
+                    activeChatId: project.activeChatId || null,
+                    canvasAppearance: restoredAppearance,
+                    backgroundMode: project.backgroundMode || DEFAULT_CANVAS_BACKGROUND_MODE,
+                    showImageInfo: project.showImageInfo || false,
+                };
+                nodesRef.current = snapshot.nodes;
+                connectionsRef.current = snapshot.connections;
+                viewportRef.current = project.viewport;
+                setNodes(snapshot.nodes);
+                setConnections(snapshot.connections);
+                setChatSessions(snapshot.chatSessions);
+                setActiveChatId(snapshot.activeChatId);
+                setCanvasAppearance(snapshot.canvasAppearance);
+                useThemeStore.getState().setTheme(canvasAppearanceBaseTheme(snapshot.canvasAppearance, fallbackTheme));
+                setBackgroundMode(snapshot.backgroundMode);
+                setShowImageInfo(snapshot.showImageInfo);
+                setViewport(project.viewport);
+                resetHistory(snapshot);
+                setProjectLoaded(true);
             };
-            nodesRef.current = snapshot.nodes;
-            connectionsRef.current = snapshot.connections;
-            viewportRef.current = project.viewport;
-            setNodes(snapshot.nodes);
-            setConnections(snapshot.connections);
-            setChatSessions(snapshot.chatSessions);
-            setActiveChatId(snapshot.activeChatId);
-            setCanvasAppearance(snapshot.canvasAppearance);
-            useThemeStore.getState().setTheme(canvasAppearanceBaseTheme(snapshot.canvasAppearance, fallbackTheme));
-            setBackgroundMode(snapshot.backgroundMode);
-            setShowImageInfo(snapshot.showImageInfo);
-            setViewport(project.viewport);
-            resetHistory(snapshot);
-            setProjectLoaded(true);
-        };
 
-        const restore = async () => {
-            const initialNodes = normalizeCanvasNodeTimestamps(resetInterruptedGeneration(project.nodes), {
-                createdAt: project.createdAt,
-                updatedAt: project.updatedAt,
-            });
-            const initialSessions = project.chatSessions || [];
-
-            // 先恢复可交互的节点和布局，媒体缓存/资源校验放到后台，避免首屏被远程资源拖住。
-            startTransition(() => applyRestoredProject(initialNodes, initialSessions));
-            // 画布媒体由节点自己的视口观察器按需加载；打开时遍历并解析全部节点会让大画布形成 N+1 资源读取。
-            void hydrateAssistantImages(initialSessions)
-                .then((hydratedSessions) => {
-                    if (!cancelled) setChatSessions((current) => mergeHydratedSessions(current, hydratedSessions));
-                })
-                .catch(() => {
-                    if (!cancelled) message.warning("部分助手会话素材恢复失败，已使用项目记录继续打开");
+            const restore = async () => {
+                const initialNodes = normalizeCanvasNodeTimestamps(resetInterruptedGeneration(project.nodes), {
+                    createdAt: project.createdAt,
+                    updatedAt: project.updatedAt,
                 });
+                const initialSessions = project.chatSessions || [];
+
+                // 先恢复可交互的节点和布局，媒体缓存/资源校验放到后台，避免首屏被远程资源拖住。
+                startTransition(() => applyRestoredProject(initialNodes, initialSessions));
+                // 画布媒体由节点自己的视口观察器按需加载；打开时遍历并解析全部节点会让大画布形成 N+1 资源读取。
+                void hydrateAssistantImages(initialSessions)
+                    .then((hydratedSessions) => {
+                        if (!cancelled) setChatSessions((current) => mergeHydratedSessions(current, hydratedSessions));
+                    })
+                    .catch(() => {
+                        if (!cancelled) message.warning("部分助手会话素材恢复失败，已使用项目记录继续打开");
+                    });
+            };
+            await restore();
         };
-        void restore();
+        void load().catch((error) => {
+            if (!cancelled) setLoadError(error instanceof Error ? error.message : "读取画布失败，请重试");
+        });
         return () => {
             cancelled = true;
         };
-    }, [hydrated, message, navigate, openProject, projectId, resetHistory, setActiveChatId, setBackgroundMode, setCanvasAppearance, setChatSessions, setConnections, setNodes, setShowImageInfo, setViewport]);
+    }, [hydrated, sessionHydrated, loadAttempt, message, navigate, openProject, projectId, resetHistory, setActiveChatId, setBackgroundMode, setCanvasAppearance, setChatSessions, setConnections, setNodes, setShowImageInfo, setViewport]);
 
     useEffect(() => {
         if (!projectLoaded) return;
@@ -247,6 +258,8 @@ export function useCanvasProjectLifecycle({
     }, [cleanupCanvasFiles, projectId]);
 
     return {
+        loadError,
+        retryLoad: () => setLoadAttempt((attempt) => attempt + 1),
         addedSkills,
         clearCanvasFiles,
         createAndOpenProject,

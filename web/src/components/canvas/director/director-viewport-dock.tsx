@@ -1,4 +1,5 @@
-import { Tooltip } from "antd";
+import { Tooltip } from "@/components/ui/base/tooltip";
+
 import { Bone, Box, Camera, Compass, Crosshair, Layers, Lightbulb, Move3D, Palette, Rotate3D, Scaling, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -31,18 +32,36 @@ const RENDER_VIEW_BUTTONS: Array<{ mode: DirectorRenderMode; label: string; icon
 export function DirectorViewportDock({ transformMode, renderMode, renderModes, onTransformModeChange, onRenderModeChange, onAddActor, onAddBox, onAddLight, onAddCamera, onAlignCamera }: DirectorViewportDockProps) {
     return (
         <nav className="director-viewport-dock" aria-label="导演台视口工具">
-            <DockButton label="移动对象" active={transformMode === "translate"} onClick={() => onTransformModeChange("translate")}><Move3D /></DockButton>
-            <DockButton label="旋转对象" active={transformMode === "rotate"} onClick={() => onTransformModeChange("rotate")}><Rotate3D /></DockButton>
-            <DockButton label="缩放对象" active={transformMode === "scale"} onClick={() => onTransformModeChange("scale")}><Scaling /></DockButton>
+            <DockButton label="移动对象" active={transformMode === "translate"} onClick={() => onTransformModeChange("translate")}>
+                <Move3D />
+            </DockButton>
+            <DockButton label="旋转对象" active={transformMode === "rotate"} onClick={() => onTransformModeChange("rotate")}>
+                <Rotate3D />
+            </DockButton>
+            <DockButton label="缩放对象" active={transformMode === "scale"} onClick={() => onTransformModeChange("scale")}>
+                <Scaling />
+            </DockButton>
             <DockDivider />
-            <DockButton label="添加演员" onClick={onAddActor}><UserRound /></DockButton>
-            <DockButton label="添加立方体" onClick={onAddBox}><Box /></DockButton>
-            <DockButton label="添加灯光" onClick={onAddLight}><Lightbulb /></DockButton>
-            <DockButton label="添加摄影机" onClick={onAddCamera}><Camera /></DockButton>
-            <DockButton label="摄影机对齐当前视图" onClick={onAlignCamera}><Crosshair /></DockButton>
+            <DockButton label="添加演员" onClick={onAddActor}>
+                <UserRound />
+            </DockButton>
+            <DockButton label="添加立方体" onClick={onAddBox}>
+                <Box />
+            </DockButton>
+            <DockButton label="添加灯光" onClick={onAddLight}>
+                <Lightbulb />
+            </DockButton>
+            <DockButton label="添加摄影机" onClick={onAddCamera}>
+                <Camera />
+            </DockButton>
+            <DockButton label="摄影机对齐当前视图" onClick={onAlignCamera}>
+                <Crosshair />
+            </DockButton>
             <DockDivider />
             {RENDER_VIEW_BUTTONS.filter((item) => renderModes.includes(item.mode)).map((item) => (
-                <DockButton key={item.mode} label={item.label} active={renderMode === item.mode} onClick={() => onRenderModeChange(item.mode)}>{item.icon}</DockButton>
+                <DockButton key={item.mode} label={item.label} active={renderMode === item.mode} onClick={() => onRenderModeChange(item.mode)}>
+                    {item.icon}
+                </DockButton>
             ))}
         </nav>
     );

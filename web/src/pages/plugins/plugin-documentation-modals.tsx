@@ -62,7 +62,7 @@ export function UploadPluginModal({ open, onClose, onUpload }: UploadPluginModal
                         </span>
                         <div>
                             <h2>安装插件包</h2>
-                            <p>选择统一影策插件包，安装后会立即进入插件中心。</p>
+                            <p>选择统一站点插件包，安装后会立即进入插件中心。</p>
                         </div>
                     </div>
                     <div className={`plugin-upload-dropzone-shell${isDraggingPlugin ? " is-dragging" : ""}`} onDragEnter={handlePluginDragEnter} onDragLeave={handlePluginDragLeave} onDragOver={(event) => event.preventDefault()} onDrop={handlePluginDrop}>

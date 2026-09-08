@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { Switch } from "antd";
+import { Switch } from "@/components/ui/base/switch";
 import { Palette, Info } from "lucide-react";
 
 import { FloatingDock } from "@/components/ui/aceternity/floating-dock";
@@ -270,7 +270,7 @@ export function CanvasToolbar({
                                     <Info className="size-3" />
                                     图片信息
                                 </span>
-                                <Switch size="small" checked={showImageInfo} onChange={onShowImageInfoChange} />
+                                <Switch size="sm" checked={showImageInfo} onChange={onShowImageInfoChange} />
                             </div>
                         </SpotlightSurface>
                     </motion.div>

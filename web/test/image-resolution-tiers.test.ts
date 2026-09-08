@@ -1,22 +1,54 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-    buildImageResolutionOptions,
-    formatImageResolutionSize,
-    imageResolutionChoices,
-    imageResolutionOption,
-    imageSizeForResolution,
-    supportsImageResolutionPresets,
-} from "../src/lib/image-resolution-tiers";
+import { buildImageResolutionOptions, formatImageResolutionSize, imageResolutionChoices, imageResolutionOption, imageSizeForResolution, supportsImageResolutionPresets } from "../src/lib/image-resolution-tiers";
 import { defaultImageCapabilityConfig, defaultModelCapabilityConfig, imageSizeRequest, modelCapabilityConfigFor } from "../src/lib/model-capabilities";
+import { resolveImageRequestSize } from "../src/services/api/image-validation";
 
 const sizes = [
-    "1024x1024", "1360x1024", "1024x1360", "1536x1024", "1024x1536", "1024x1280", "1280x1024", "2048x878", "1824x1024", "1024x1824",
-    "2048x2048", "2304x1728", "1728x2304", "2496x1664", "1664x2496", "1792x2240", "2240x1792", "3136x1344", "2752x1536", "1536x2752",
-    "2880x2880", "3264x2448", "2448x3264", "3504x2336", "2336x3504", "2560x3200", "3200x2560", "3808x1632", "3840x2160", "2160x3840",
+    "1024x1024",
+    "1360x1024",
+    "1024x1360",
+    "1536x1024",
+    "1024x1536",
+    "1024x1280",
+    "1280x1024",
+    "2048x878",
+    "1824x1024",
+    "1024x1824",
+    "2048x2048",
+    "2304x1728",
+    "1728x2304",
+    "2496x1664",
+    "1664x2496",
+    "1792x2240",
+    "2240x1792",
+    "3136x1344",
+    "2752x1536",
+    "1536x2752",
+    "2880x2880",
+    "3264x2448",
+    "2448x3264",
+    "3504x2336",
+    "2336x3504",
+    "2560x3200",
+    "3200x2560",
+    "3808x1632",
+    "3840x2160",
+    "2160x3840",
 ];
 
 describe("image resolution tiers", () => {
+    test("精确像素预设保持请求原值，比例协议发送比例", () => {
+        const profile = defaultImageCapabilityConfig("openai-image", "test");
+        profile.size = { parameter: "size", values: ["1920x1080", "3840x2160", "2160x3840", "1824x1024"], default: "1920x1080", allowCustom: false };
+        expect(imageResolutionChoices(profile.size.values)).toEqual(["1k", "2k", "4k"]);
+        expect(imageSizeForResolution(buildImageResolutionOptions(profile.size.values), "1k", "16:9")).toBe("1824x1024");
+        expect(resolveImageRequestSize(profile, undefined, "1920x1080")).toEqual({ parameter: "size", value: "1920x1080" });
+        profile.size = { parameter: "aspect_ratio", values: ["16:9"], default: "16:9", allowCustom: false };
+        expect(resolveImageRequestSize(profile, undefined, "16:9")).toEqual({ parameter: "aspect_ratio", value: "16:9" });
+        profile.size = { parameter: "size", values: [], default: "auto", allowCustom: true };
+        expect(() => resolveImageRequestSize(profile, undefined, "1920x1080")).toThrow("16 的倍数");
+    });
     test("将 Xiaobaishu 的精确尺寸整理为 1K、2K、4K 各十种比例", () => {
         const options = buildImageResolutionOptions(sizes);
 

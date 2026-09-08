@@ -125,7 +125,7 @@ func (s *Service) UpdateAnnouncement(actor *model.User, id string, req UpdateAnn
 			}
 			return nil, err
 		}
-		if err := s.ensureResourceHasNoBusinessReferences(oldResource, announcement.ID, false); err != nil {
+		if err := s.ensureResourceHasNoBusinessReferences(oldResource, repository.ResourceDirectReference{Kind: "公告", ID: announcement.ID}); err != nil {
 			return nil, err
 		}
 		sharedCount, countErr := s.repo.ResourceStorageReferenceCount(oldResource, []string{oldResource.ID})
@@ -316,7 +316,7 @@ func (s *Service) discardAnnouncementImageDraft(userID string, resourceID string
 		}
 		return err
 	}
-	if err := s.ensureResourceHasNoBusinessReferences(resource, "", true); err != nil {
+	if err := s.ensureResourceHasNoBusinessReferences(resource, repository.ResourceDirectReference{Kind: "公告草稿", ID: resource.ID}); err != nil {
 		return err
 	}
 	sharedCount, err := s.repo.ResourceStorageReferenceCount(resource, []string{resource.ID})
@@ -340,7 +340,7 @@ func (s *Service) discardAnnouncementImageDraft(userID string, resourceID string
 	return nil
 }
 
-func (s *Service) ensureResourceHasNoBusinessReferences(resource *model.Resource, excludedAnnouncementID string, allowOwnDraft bool) error {
+func (s *Service) ensureResourceHasNoBusinessReferences(resource *model.Resource, ignoredDirect ...repository.ResourceDirectReference) error {
 	if resource == nil {
 		return NotFound("资源不存在")
 	}
@@ -348,13 +348,18 @@ func (s *Service) ensureResourceHasNoBusinessReferences(resource *model.Resource
 	if err != nil {
 		return err
 	}
-	for _, reference := range snapshot.Direct {
-		if allowOwnDraft && reference.Kind == "公告草稿" && reference.ResourceID == resource.ID {
-			continue
+	hasBlocking := false
+DirectLoop:
+	for _, direct := range snapshot.Direct {
+		for _, ignored := range ignoredDirect {
+			if direct.Kind == ignored.Kind && direct.ID == ignored.ID {
+				continue DirectLoop
+			}
 		}
-		if reference.Kind == "公告" && excludedAnnouncementID != "" && reference.ID == excludedAnnouncementID {
-			continue
-		}
+		hasBlocking = true
+		break
+	}
+	if hasBlocking {
 		return BadAuthRequest("公告配图仍被其他业务数据引用，已停止删除")
 	}
 	resourceIDs := map[string]struct{}{resource.ID: {}}
@@ -454,8 +459,8 @@ func validAnnouncementLevel(level model.AnnouncementLevel) bool {
 func normalizeAnnouncementInput(req CreateAnnouncementRequest) (string, string, model.AnnouncementLevel, error) {
 	title := strings.TrimSpace(req.Title)
 	content := strings.TrimSpace(req.Content)
-	if title == "" || content == "" {
-		return "", "", "", BadAuthRequest("请填写公告标题和正文")
+	if title == "" {
+		return "", "", "", BadAuthRequest("请填写公告标题")
 	}
 	if utf8.RuneCountInString(title) > 120 {
 		return "", "", "", BadAuthRequest("公告标题不能超过 120 个字符")

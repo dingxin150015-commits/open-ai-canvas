@@ -3,7 +3,6 @@ import { App, Button, Divider, Input } from "antd";
 import { ArrowRight, Info, LockKeyhole, Mail, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { applyUserSession } from "@/lib/user-session";
 import { getAuthSession, getAuthSettings, linuxDOLoginURL, register, sendRegistrationEmailCode } from "@/services/api/auth";
 import { LinuxDOIcon } from "./auth-scene";
 
@@ -67,6 +66,7 @@ export default function RegisterPage() {
         setSubmitting(true);
         try {
             await register({ username, email, emailCode, displayName, password });
+            const { applyUserSession } = await import("@/lib/user-session");
             await applyUserSession(await getAuthSession());
             if (!settings?.firstUser) window.sessionStorage.setItem("infinite-canvas:model-setup-guide", "1");
             message.success(settings?.firstUser ? "管理员账号已创建" : "注册成功");
