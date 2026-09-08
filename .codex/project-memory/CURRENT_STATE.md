@@ -1,5 +1,9 @@
 # 当前状态
 
+## 最新：阶段8复盘整改版已部署，等待Edge
+
+源码`ae01c5d6`恢复模型选择导入时的存量安全补齐，生产/测试镜像补ffmpeg/ffprobe，quality改跑173文件的完整测试清单。Backend/Web全量、专项、类型、构建、配置一致克隆双启动和真实卷部署前后摘要通过；运行身份`v1.2.7+dingxin.1 / ae01c5d6`，容器healthy/restart0。敏感审计副本已移出D盘并核验私有ACL；新恢复点`BKP-20260909-005845-V127-FOLLOWUP` verified/protected。当前`runtime_followup_healthy_edge_pending`，远程候选仍aff2c8e5，stable/main未变。详见`UPSTREAM_V127_FOLLOWUP_20260909.md`。
+
 ## 最新：阶段7候选已推送，远程CI未触发
 
 候选已非强制推送到用户fork `origin/codex/upstream-v1.2.7-20260908`，首次核对远程SHA3a541320与本地一致。quality workflow仅监听main push/PR，因此候选分支check-runs=0、Actions为空，记录为未触发而非通过。stable仍5c1203e，origin/main仍11931d00，未部署。F6及视觉项保留到阶段8手工Edge验收。详见 `UPSTREAM_V127_STAGE7_20260908.md`。

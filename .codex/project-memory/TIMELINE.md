@@ -1,5 +1,9 @@
 # 开发历史时间线
 
+## 2026-09-09：阶段8复盘整改版部署
+
+迁移D盘15个敏感审计副本并核验私有ACL；提交642ff5e1恢复模型选择导入时的安全补齐，提交ae01c5d6补ffmpeg/ffprobe与CI全量测试。Backend Linux CGO+ffmpeg全量第二轮通过，Web1624/类型/构建通过。配置一致无网络克隆从Schema6连续启动到8两次，关键摘要与2个密文解密均通过；临时卷已删除。建立`BKP-20260909-005845-V127-FOLLOWUP`后保留卷部署ae01c5d6，真实数据摘要不变，运行healthy，停在用户Edge门前。
+
 ## 2026-09-08：阶段7推送fork候选
 
 经dry-run后非强制新建 `origin/codex/upstream-v1.2.7-20260908`，首次远程SHA3a541320与本地一致；stable/main未变。quality仅监听main push/PR，候选分支无check-runs/Actions，明确记录为未触发。未创建PR、dispatch、部署或更新默认分支；F6与视觉项留到阶段8。

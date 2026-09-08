@@ -1,5 +1,17 @@
 # 影策备份登记簿
 
+## BKP-20260909-005845-V127-FOLLOWUP
+
+- 状态：`verified/protected`；私有位置使用`<private-backup-root>\v127-followup-predeploy-20260909-005845`。
+- 内容：冻结完整数据、DB/WAL/SHM、匹配`.settings-key`、迁移标记、plugin registry和`ae01c5d6`源码bundle。Backend暂停3.84秒，随后恢复healthy。
+- 逐文件关键副本SHA256一致；ACL仅当前用户、SYSTEM、Administrators，宽泛主体0。数据库80表、Schema8、完整性ok、外键0；业务计数和八组关键摘要已登记为脱敏证据；2个密文解密成功、失败0。
+- 部署前旧镜像由`pre-v127-followup-20260909-005845`标签保护。恢复仍需新的明确授权，禁止删除真实命名卷。
+
+## 2026-09-09：阶段8审计副本安全整改
+
+- D盘`clone-pass1`、`clone-pass2`、`real-postdeploy`中的15个DB/WAL/SHM/密钥/标记副本已迁入`<private-backup-root>\v127-stage8-audit-snapshots-20260909-000447`。
+- 迁移前后逐文件SHA256一致；私有副本逐文件ACL宽泛主体0；D盘对应文件清零，仅保留脱敏JSON与日志。
+
 本文件是 `<project-root>` 备份、快照和恢复材料的权威登记。登记只保存脱敏路径、组成、哈希、验证状态和维护规则，不保存任何 Secret、Token、Cookie、API Key 或用户数据正文。公开版本使用 `<project-root>`、`<private-backup-root>` 等占位符；本机精确恢复位置保存在 Git 忽略的 `.local/backups/*/backup-pointer.md`。
 
 ## 状态定义
