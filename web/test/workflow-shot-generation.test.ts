@@ -31,7 +31,7 @@ test("production workbench does not silently drop bound voice samples before bac
 
     expect(source).toContain('const generationReferenceAudios = generationCapability === "video" ? shotAssetReferenceContext.referenceAudios : [];');
     expect(source).not.toContain("selectedVideoProfile?.references.maxAudios");
-    expect(source).toContain("quoteLogicalModel(quoteRequest.modelID");
+    expect(source).toContain("quoteModelCatalog(quoteRequest.modelID");
     expect(source).not.toContain("quoteRequest.logicalModelID");
 });
 

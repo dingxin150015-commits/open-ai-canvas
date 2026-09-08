@@ -18,6 +18,7 @@ type LocalRuntimeStore = {
     modules: LocalRuntimeModuleDescriptor[];
     error: string;
     connect(signal?: AbortSignal): Promise<void>;
+    ensureConnected(signal?: AbortSignal): Promise<void>;
 };
 
 type LocalRuntimeStoreDependencies = {
@@ -38,12 +39,32 @@ export function createLocalRuntimeStore(dependencies: LocalRuntimeStoreDependenc
     let revision = 0;
     let activeController: AbortController | undefined;
 
-    return create<LocalRuntimeStore>((set, get) => ({
+    const store = create<LocalRuntimeStore>((set, get) => ({
         connection: "idle",
         connecting: false,
         runtime: null,
         modules: [],
         error: "",
+        ensureConnected: async (signal) => {
+            if (signal?.aborted) return;
+            // Joining callers must not abort the shared handshake of another page.
+            if (get().connecting) {
+                await new Promise<void>((resolve) => {
+                    const finish = () => {
+                        unsubscribe();
+                        signal?.removeEventListener("abort", finish);
+                        resolve();
+                    };
+                    const unsubscribe = store.subscribe((state) => {
+                        if (!state.connecting) finish();
+                    });
+                    signal?.addEventListener("abort", finish, { once: true });
+                    if (!get().connecting || signal?.aborted) finish();
+                });
+                return;
+            }
+            return get().connect(signal);
+        },
         connect: async (signal) => {
             if (signal?.aborted) return;
             const requestRevision = ++revision;
@@ -131,9 +152,49 @@ export function createLocalRuntimeStore(dependencies: LocalRuntimeStoreDependenc
             }
         },
     }));
+    return store;
 }
 
 export const useLocalRuntimeStore = createLocalRuntimeStore();
+
+export function createAutomaticRuntimeDiscovery(
+    connect: () => Promise<void>,
+    schedule: (run: () => void) => () => void = (run) => {
+        const timer = setTimeout(run, 0);
+        return () => clearTimeout(timer);
+    },
+) {
+    let consumers = 0;
+    let attempted = false;
+    let cancelScheduled: (() => void) | undefined;
+    return () => {
+        consumers++;
+        if (!attempted && !cancelScheduled) {
+            cancelScheduled = schedule(() => {
+                cancelScheduled = undefined;
+                if (!consumers || attempted) return;
+                attempted = true;
+                // This discovery belongs to the shared store, not to a route.
+                void connect().catch(() => {});
+            });
+        }
+        let released = false;
+        return () => {
+            if (released) return;
+            released = true;
+            consumers--;
+            if (!consumers && cancelScheduled) {
+                cancelScheduled();
+                cancelScheduled = undefined;
+            }
+        };
+    };
+}
+
+const acquireAutomaticDiscovery = createAutomaticRuntimeDiscovery(async () => {
+    const state = useLocalRuntimeStore.getState();
+    if (state.connection === "idle") await state.ensureConnected();
+});
 
 export function startLocalRuntimeBootstrap(
     connect: (signal?: AbortSignal) => Promise<void>,
@@ -156,11 +217,10 @@ export function startLocalRuntimeBootstrap(
 }
 
 export function useLocalRuntimeBootstrap(enabled = true) {
-    const connect = useLocalRuntimeStore((state) => state.connect);
     useEffect(() => {
         if (!enabled) return;
-        return startLocalRuntimeBootstrap(connect);
-    }, [connect, enabled]);
+        return acquireAutomaticDiscovery();
+    }, [enabled]);
 }
 
 function connectionFailure(error: unknown, timedOut: boolean) {

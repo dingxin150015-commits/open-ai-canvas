@@ -4,7 +4,7 @@ import { Popover } from "antd";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { modelCapabilityConfigFor, videoDurationOptions } from "@/lib/model-capabilities";
-import { formatPriceRange, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
+import { formatPriceRange, modelQuoteValidationError, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
 import { compatibleModelInGroup, configuredModelDisplayName, groupModelsByDisplayName, modelCompatibilityError, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
 import { cn } from "@/lib/utils";
 import { modelDisplayName, modelIcon, modelOptionName, PUBLIC_MODEL_CATALOG_ID, resolveModelChannel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
@@ -80,7 +80,10 @@ export function ModelPicker({
     const current = options.includes(resolvedCurrent) ? resolvedCurrent : "";
     const currentPrice = modelMenuPrice(config, current, capability, false, requirements);
     const quoteRequest = useMemo(() => modelQuoteRequest(config, current, capability, requirements), [capability, config, current, requirements]);
+    const quoteRequestKey = JSON.stringify(quoteRequest);
+    const durationError = modelQuoteValidationError(config, current, capability, requirements);
     const [routeQuote, setRouteQuote] = useState<ModelQuote | undefined>();
+    const [quoteError, setQuoteError] = useState("");
     const creationVariant = variant === "creation";
 
     useLayoutEffect(() => {
@@ -96,17 +99,24 @@ export function ModelPicker({
     useEffect(() => {
         if (!showSelectedPrice || !creditsEnabled || !quoteRequest) {
             setRouteQuote(undefined);
+            setQuoteError(durationError);
             return;
         }
         const controller = new AbortController();
         setRouteQuote(undefined);
+        setQuoteError("");
         quoteModelCatalog(quoteRequest.modelID, quoteRequest.intent, controller.signal)
             .then((payload) => setRouteQuote(payload.quote))
-            .catch(() => {
-                if (!controller.signal.aborted) setRouteQuote(undefined);
+            .catch((error: unknown) => {
+                if (!controller.signal.aborted) {
+                    setRouteQuote(undefined);
+                    setQuoteError(error instanceof Error ? error.message : "报价失败");
+                }
             });
         return () => controller.abort();
-    }, [creditsEnabled, quoteRequest, showSelectedPrice]);
+        // Only a changed model or request intent requires a new quote.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [creditsEnabled, quoteRequestKey, showSelectedPrice, durationError]);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -276,7 +286,15 @@ export function ModelPicker({
                             <ModelIcon config={config} model={current} />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{current ? (creationVariant ? pickerModelDisplayName(config, current, showConfiguredModelName) : pickerModelOptionLabel(config, current, showConfiguredModelName)) : placeholder}</span>
-                        {showSelectedPrice && creditsEnabled ? <ModelPrice price={currentPrice} quote={routeQuote} compact /> : null}
+                        {showSelectedPrice && creditsEnabled ? (
+                            quoteError ? (
+                                <span className="text-[var(--fs-tiny)]" role="status" title={quoteError}>
+                                    报价不可用
+                                </span>
+                            ) : (
+                                <ModelPrice price={currentPrice} quote={routeQuote} compact />
+                            )
+                        ) : null}
                     </span>
                     <ChevronDown className={cn("canvas-model-picker-chevron", open && "is-open")} aria-hidden="true" />
                 </button>

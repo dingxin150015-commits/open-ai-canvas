@@ -165,10 +165,23 @@ function logicalModelCompatibilityError(spec: NonNullable<NonNullable<AiConfig["
     return "";
 }
 
+export function logicalIntentCompatibilityError(spec: Parameters<typeof logicalModelCompatibilityError>[0], intent: { capability: ModelCapability; operation?: string; inputs?: Record<string, number>; options?: Record<string, unknown> }) {
+    return logicalModelCompatibilityError(
+        spec,
+        {
+            capability: intent.capability,
+            videoOperation: intent.operation,
+            input: { textCount: 0, imageCount: intent.inputs?.image || 0, characterCount: 0, videoCount: intent.inputs?.video || 0, audioCount: intent.inputs?.audio || 0 },
+            options: intent.options,
+        },
+        intent.inputs?.image || 0,
+    );
+}
+
 function logicalOptionMatches(name: string, constraint: { values?: unknown[]; min?: number; max?: number; step?: number }, value: unknown) {
     if (constraint.values?.length) {
         const requested = normalizeLogicalOptionValue(name, value);
-        return constraint.values.some((candidate) => normalizeLogicalOptionValue(name, candidate) === requested);
+        return constraint.values.some((candidate) => candidate === "*" || normalizeLogicalOptionValue(name, candidate) === requested);
     }
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return false;

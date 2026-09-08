@@ -7,7 +7,7 @@ import { CheckCircle2, Copy, ExternalLink, FolderOpen, History, LoaderCircle, Pl
 import { motion } from "motion/react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
-import { consumeLocalRuntimeEventStream, postCanvasRuntimeState, prepareCanvasRuntimeConnection, waitForCanvasRuntimeReconnect, type LocalRuntimeEvent } from "@/lib/canvas/local-runtime-connection";
+import { canvasRuntimeRetryDelay, consumeLocalRuntimeEventStream, postCanvasRuntimeState, prepareCanvasRuntimeConnection, waitForCanvasRuntimeReconnect, type LocalRuntimeEvent } from "@/lib/canvas/local-runtime-connection";
 import { createClientId } from "@/lib/client-id";
 import { getLocalRuntimeSessionClient, useLocalRuntimeStore } from "@/stores/use-local-runtime-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -254,9 +254,11 @@ export const CanvasLocalAgentPanel = memo(function CanvasLocalAgentPanel({
         connectionControllerRef.current = controller;
         const clientId = clientIdRef.current;
         let lastEventId = "";
+        let consecutiveFailures = 0;
         const receive = (event: LocalRuntimeEvent) => {
             if (event.id) lastEventId = event.id;
             if (event.type === "hello") {
+                consecutiveFailures = 0;
                 errorLoggedRef.current = false;
                 connectedRef.current = true;
                 setAgentState({ connected: true, activity: "已连接", connectError: "", messages: useCanvasAgentStore.getState().messages.filter((item) => !isConnectionErrorMessage(item)) });
@@ -312,7 +314,12 @@ export const CanvasLocalAgentPanel = memo(function CanvasLocalAgentPanel({
                     errorLoggedRef.current = true;
                     connectedRef.current = false;
                     setAgentState(canvasAgentTransientDisconnectPatch(wasConnected ? "正在重连" : "连接失败", text));
-                    await waitForCanvasRuntimeReconnect(controller.signal);
+                    const delay = canvasRuntimeRetryDelay(++consecutiveFailures);
+                    if (delay === null) {
+                        setAgentState({ enabled: false, connected: false, activity: "离线", connectError: "本机 Runtime 不可达，已停止自动重连；启动服务后点击连接。" });
+                        return;
+                    }
+                    await waitForCanvasRuntimeReconnect(controller.signal, delay);
                 }
             }
         })();

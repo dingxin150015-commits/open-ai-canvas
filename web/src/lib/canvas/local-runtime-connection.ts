@@ -25,6 +25,11 @@ export class CanvasRuntimeStreamError extends Error {
 const MAX_EVENT_BYTES = 256 * 1024;
 const AUTO_CONNECT_MODES = new Set(["new", "recent", "choose"]);
 
+// 三次自动重试后交回显式连接入口，避免离线 Runtime 被每秒无限探测。
+export function canvasRuntimeRetryDelay(consecutiveFailures: number): number | null {
+    return [2_000, 5_000, 15_000][consecutiveFailures - 1] ?? null;
+}
+
 export function shouldAutoConnectCanvasRuntime(params: URLSearchParams) {
     return AUTO_CONNECT_MODES.has(params.get("mode") ?? "");
 }
@@ -35,12 +40,14 @@ type CanvasRuntimeStore = {
         modules: Array<{ id: string }>;
         error?: string;
         connect(signal?: AbortSignal): Promise<void>;
+        ensureConnected?(signal?: AbortSignal): Promise<void>;
     };
 };
 
 export async function prepareCanvasRuntimeConnection(store: CanvasRuntimeStore, signal?: AbortSignal) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    await store.getState().connect(signal);
+    const connection = store.getState();
+    await (connection.ensureConnected ?? connection.connect)(signal);
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const state = store.getState();
     if (state.connection !== "connected" || state.error) {
@@ -82,7 +89,7 @@ export async function postCanvasRuntimeState(client: LocalRuntimeTransport, clie
             headers: { "content-type": "application/json" },
             body: JSON.stringify(snapshot),
         });
-        const body = await response.json().catch(() => null) as Partial<CanvasRuntimeStateResult> | null;
+        const body = (await response.json().catch(() => null)) as Partial<CanvasRuntimeStateResult> | null;
         if (!response.ok && response.status !== 409) throw new Error("Canvas Agent 状态同步请求失败");
         if (body?.accepted !== true || typeof body.revision !== "number" || typeof body.stateHash !== "string") {
             throw new CanvasRuntimeStreamError("canvas_state_conflict", body?.reason === "stale_revision" || body?.reason === "revision_conflict" ? "画布状态已被其他操作更新，请重新读取后再试" : "画布状态同步被拒绝");

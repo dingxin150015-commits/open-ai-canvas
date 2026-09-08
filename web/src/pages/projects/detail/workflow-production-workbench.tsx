@@ -14,12 +14,12 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ModelPicker } from "@/components/model-picker";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationOptions } from "@/lib/model-capabilities";
-import { modelQuoteRequest } from "@/lib/model-pricing";
+import { modelQuoteValidationError, modelQuoteRequest } from "@/lib/model-pricing";
 import { customShotTitle, formatShotOrdinal, normalizeDefaultShotTitle } from "@/lib/shot-label";
 import { modelCompatibilityError, resolveCompatibleModel, resolveModelVideoBooleanOptions, type ModelRequirements } from "@/lib/model-selection";
 import { formatVideoResolutionLabel } from "@/lib/video-generation-options";
 import { submitBackendGenerationTask } from "@/services/api/generation-task";
-import { quoteLogicalModel } from "@/services/api/logical-models";
+import { quoteModelCatalog } from "@/services/api/logical-models";
 import { type GenerationTask } from "@/services/api/task-center";
 import {
     createUnitWorkflow,
@@ -138,8 +138,8 @@ export default function WorkflowProductionWorkbench(props: Props) {
         const references = (detail.shotReferences || []).filter((reference) => reference.shotId === selectedShot?.id && reference.role === "reference" && reference.status === "linked");
         return new Map(references.flatMap((reference) => [[reference.assetVersionId, reference] as const, ...(reference.asset?.primaryVersionId ? [[reference.asset.primaryVersionId, reference] as const] : [])]));
     }, [detail.shotReferences, selectedShot?.id]);
-    const currentDurationSeconds = Number(watchedDuration || Math.max(0.5, (selectedShot?.durationMs || 3000) / 1000));
-    const generationSeconds = String(Math.max(1, Math.round(currentDurationSeconds)));
+    const currentDurationSeconds = Number(watchedDuration ?? Math.max(0.5, (selectedShot?.durationMs || 3000) / 1000));
+    const generationSeconds = String(currentDurationSeconds);
     const generationReferenceAudios = generationCapability === "video" ? shotAssetReferenceContext.referenceAudios : [];
     const videoEditOperation = generationCapability === "video" && shotAssetReferenceContext.referenceImages.length ? "reference_to_video" : undefined;
     const modelRequirements = useMemo<ModelRequirements>(
@@ -199,8 +199,10 @@ export default function WorkflowProductionWorkbench(props: Props) {
     });
     const quoteRequest = useMemo(() => modelQuoteRequest(generationConfig, routedModel, generationCapability, modelRequirements), [generationCapability, generationConfig, modelRequirements, routedModel]);
     const quoteRequestKey = JSON.stringify(quoteRequest || null);
+    const validationError = modelQuoteValidationError(generationConfig, routedModel, generationCapability, modelRequirements);
+    const [quoteError, setQuoteError] = useState("");
     const [quotedCredits, setQuotedCredits] = useState<number | null>(null);
-    const generationCredits = quotedCredits ?? configuredCredits;
+    const generationCredits = quoteError ? null : (quotedCredits ?? configuredCredits);
     const formattedGenerationCredits = generationCredits?.toLocaleString("zh-CN", { maximumFractionDigits: 6 });
     const modelSummary = routedModel ? modelDisplayName(effectiveConfig, routedModel) : "未选择模型";
     const durationSummary = `${Number(watchedDuration || Math.max(0.5, (selectedShot?.durationMs || 3000) / 1000))}s`;
@@ -230,19 +232,24 @@ export default function WorkflowProductionWorkbench(props: Props) {
     useEffect(() => {
         if (!creditsEnabled || !quoteRequest) {
             setQuotedCredits(null);
+            setQuoteError(validationError);
             return;
         }
         const controller = new AbortController();
         setQuotedCredits(null);
-        quoteLogicalModel(quoteRequest.modelID, quoteRequest.intent, controller.signal)
+        setQuoteError("");
+        quoteModelCatalog(quoteRequest.modelID, quoteRequest.intent, controller.signal)
             .then(({ quote }) => setQuotedCredits(quote.amountMicrocredits / 1_000_000))
-            .catch(() => {
-                if (!controller.signal.aborted) setQuotedCredits(null);
+            .catch((error: unknown) => {
+                if (!controller.signal.aborted) {
+                    setQuotedCredits(null);
+                    setQuoteError(error instanceof Error ? error.message : "报价失败");
+                }
             });
         return () => controller.abort();
         // quoteRequestKey captures the normalized request without retriggering on object identity.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [creditsEnabled, quoteRequestKey]);
+    }, [creditsEnabled, quoteRequestKey, validationError]);
 
     useEffect(() => {
         const shotDurationSeconds = Math.max(0.5, (revision?.durationMs || selectedShot?.durationMs || 3000) / 1000);
@@ -365,7 +372,9 @@ export default function WorkflowProductionWorkbench(props: Props) {
                 revision: revisionInput(values),
             });
             const mode = generationCapability;
-            const config = { ...generationConfig, videoSeconds: String(Math.max(1, Math.round(values.durationSeconds))) };
+            const config = { ...generationConfig, videoSeconds: String(values.durationSeconds) };
+            const requestError = modelQuoteValidationError(config, routedModel, generationCapability, { ...modelRequirements, videoSeconds: String(values.durationSeconds) });
+            if (requestError) throw new Error(requestError);
             if (!isAiConfigReady(config, routedModel)) throw new Error("当前模型渠道配置不完整，请先到设置中补齐");
             const basePrompt =
                 mode === "video"
@@ -560,7 +569,8 @@ export default function WorkflowProductionWorkbench(props: Props) {
                                             fullWidth
                                             className="workflow-model-picker"
                                             placeholder={activeStage === "video" ? "选择视频模型" : "选择图片模型"}
-                                            showSelectedPrice
+                                            showSelectedPrice={false}
+                                            showOptionPrices
                                         />
                                     </Form.Item>
                                     <Form.Item label="技能库">
@@ -642,7 +652,9 @@ export default function WorkflowProductionWorkbench(props: Props) {
                         </div>
                         <footer className="workflow-editor-actions">
                             <div className="workflow-generation-cost" aria-live="polite">
-                                {creditsEnabled && formattedGenerationCredits ? (
+                                {creditsEnabled && quoteError ? (
+                                    <span role="status">报价不可用：{quoteError}</span>
+                                ) : creditsEnabled && formattedGenerationCredits ? (
                                     <>
                                         <CreditSymbol />
                                         <span>本次预计 {formattedGenerationCredits} 积分</span>
@@ -662,7 +674,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                                     type="primary"
                                     icon={<Play className="size-4" />}
                                     loading={selectedShotSubmitting || shotTask?.status === "queued" || shotTask?.status === "running"}
-                                    disabled={deleteShot.isPending}
+                                    disabled={deleteShot.isPending || Boolean(validationError)}
                                     onClick={() => void generateArtifact()}
                                 >
                                     {selectedShotSubmitting

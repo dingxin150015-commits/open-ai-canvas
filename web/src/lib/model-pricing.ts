@@ -1,4 +1,4 @@
-import { modelRequestOptions, resolveVideoOperation, type ModelRequirements } from "@/lib/model-selection";
+import { logicalIntentCompatibilityError, modelCompatibilityError, modelRequestOptions, resolveVideoOperation, type ModelRequirements } from "@/lib/model-selection";
 import { videoResolutionComparisonKey } from "@/lib/video-generation-options";
 import { buildImageResolutionOptions, imageResolutionOption } from "@/lib/image-resolution-tiers";
 import type { ModelRequestIntent } from "@/services/api/logical-models";
@@ -78,6 +78,34 @@ export function modelQuoteRequest(config: AiConfig, value: string, capability?: 
     const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(value));
     const modelID = cost?.logicalModelId || cost?.channelModelId;
     if (!modelID) return undefined;
+    if (modelQuoteValidationError(config, value, capability, requirements)) return undefined;
+    return { modelID, intent: modelQuoteIntent(config, capability, requirements) };
+}
+
+export function modelQuoteValidationError(config: AiConfig, value: string, capability?: ModelCapability, requirements?: ModelRequirements): string {
+    if (!capability || !value) return "";
+    const channel = resolveModelChannel(config, value);
+    if (channel.scope !== "system") return "";
+    const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(value));
+    const intent = modelQuoteIntent(config, capability, requirements);
+    const profiles = cost?.logicalCapabilityProfiles?.length ? cost.logicalCapabilityProfiles : cost?.logicalCapabilitySpec ? [cost.logicalCapabilitySpec] : [];
+    if (profiles.length) {
+        const errors = profiles.map((profile) => logicalIntentCompatibilityError(profile, intent));
+        return errors.some((error) => !error) ? "" : errors[0];
+    }
+    // Only durable per-model profiles are authoritative. Generic defaults must
+    // not reject a real model merely because its catalog metadata is missing.
+    if (!cost?.capabilityConfig) return "";
+    return modelCompatibilityError(config, value, {
+        ...requirements,
+        capability,
+        ...(capability === "video" ? { videoSeconds: String(intent.options?.videoSeconds ?? "") } : {}),
+        ...(capability === "image" ? { imageSize: String(intent.options?.size ?? "") } : {}),
+        options: intent.options,
+    });
+}
+
+function modelQuoteIntent(config: AiConfig, capability: ModelCapability, requirements?: ModelRequirements): ModelRequestIntent {
     const input = requirements?.input;
     const intent: ModelRequestIntent = {
         capability,
@@ -90,11 +118,11 @@ export function modelQuoteRequest(config: AiConfig, value: string, capability?: 
         options: {
             ...modelRequestOptions(config, capability),
             ...(requirements?.options || {}),
-            ...(requirements?.videoSeconds ? { videoSeconds: Number(requirements.videoSeconds) } : {}),
+            ...(capability === "video" && requirements?.videoSeconds !== undefined && requirements.videoSeconds !== "" ? { videoSeconds: Number(requirements.videoSeconds) } : {}),
             ...(requirements?.imageSize ? { size: requirements.imageSize } : {}),
         },
     };
-    return { modelID, intent };
+    return intent;
 }
 
 function creditAmount(billingMode: "fixed_request" | "per_second", unitPriceMicrocredits: number, count?: string | number, seconds?: string | number) {

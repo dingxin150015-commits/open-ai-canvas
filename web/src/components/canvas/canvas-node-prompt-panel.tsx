@@ -8,7 +8,7 @@ import { defaultConfig, modelOptionName, resolveModelChannel, useEffectiveConfig
 import { resolveCanvasGenerationModel } from "@/lib/canvas/canvas-project-generation";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { modelQuoteRequest } from "@/lib/model-pricing";
+import { modelQuoteValidationError, modelQuoteRequest } from "@/lib/model-pricing";
 import { normalizeVideoDuration, normalizeVideoResolution } from "@/lib/video-generation-options";
 import { modelRequestOptions, resolveCompatibleModel, resolveModelGenerationDefaults, defaultImageParamsForModel, type ModelRequirements } from "@/lib/model-selection";
 import { navigateToSettings } from "@/lib/settings-navigation";
@@ -146,8 +146,10 @@ export function CanvasNodePromptPanel({
     });
     const quoteRequest = modelQuoteRequest(config, config.model, mode, resolvedRequirements);
     const quoteRequestKey = JSON.stringify(quoteRequest || null);
+    const validationError = modelQuoteValidationError(config, config.model, mode, resolvedRequirements);
+    const [quoteError, setQuoteError] = useState("");
     const [quotedCredits, setQuotedCredits] = useState<number | null>(null);
-    const credits = quotedCredits ?? configuredCredits;
+    const credits = quoteError ? null : (quotedCredits ?? configuredCredits);
     const activeReferenceCount = activeReferences.length;
     const videoFrameOptions = resolvedMentionReferences.filter((item) => item.active && item.kind === "image").map((item) => ({ nodeId: item.nodeId, label: item.label, title: item.title, previewUrl: item.previewUrl }));
     const hasVideoPromptTools = mode === "video" && !simpleMode && videoFrameOptions.length > 0;
@@ -192,19 +194,24 @@ export function CanvasNodePromptPanel({
     useEffect(() => {
         if (!creditsEnabled || !quoteRequest) {
             setQuotedCredits(null);
+            setQuoteError(validationError);
             return;
         }
         const controller = new AbortController();
         setQuotedCredits(null);
+        setQuoteError("");
         quoteModelCatalog(quoteRequest.modelID, quoteRequest.intent, controller.signal)
             .then(({ quote }) => setQuotedCredits(quote.amountMicrocredits / 1_000_000))
-            .catch(() => {
-                if (!controller.signal.aborted) setQuotedCredits(null);
+            .catch((error: unknown) => {
+                if (!controller.signal.aborted) {
+                    setQuotedCredits(null);
+                    setQuoteError(error instanceof Error ? error.message : "报价失败");
+                }
             });
         return () => controller.abort();
         // quoteRequestKey captures the full normalized request without retriggering on object identity.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [creditsEnabled, quoteRequestKey]);
+    }, [creditsEnabled, quoteRequestKey, validationError]);
 
     const skillReferences = useMemo(() => resolvedMentionReferences.filter((item) => item.kind === "skill"), [resolvedMentionReferences]);
 
@@ -306,7 +313,7 @@ export function CanvasNodePromptPanel({
             <Button
                 type="text"
                 className={`canvas-node-composer-submit canvas-node-composer-submit-canvas ${showCost ? "has-cost" : ""}`}
-                disabled={isRunning || isSubmitDisabled}
+                disabled={isRunning || isSubmitDisabled || Boolean(validationError)}
                 style={
                     {
                         color: isSubmitDisabled ? theme.node.faint : theme.node.text,
@@ -316,8 +323,13 @@ export function CanvasNodePromptPanel({
                 }
                 onClick={() => (expanded ? submitExpandedPrompt() : submit())}
                 aria-label={actionLabel}
-                title={actionLabel}
+                title={quoteError || actionLabel}
             >
+                {quoteError ? (
+                    <span className="canvas-node-composer-submit-cost" role="status">
+                        报价不可用
+                    </span>
+                ) : null}
                 {showCost ? (
                     <span className="canvas-node-composer-submit-cost">
                         <CreditSymbol />
