@@ -1,5 +1,9 @@
 # 当前状态
 
+## 最新：阶段6自动化通过，F6人工门禁待决定
+
+源码88087501：Backend全量、Web完整1624测试/类型/构建、Agent Linux322+Windows6、7种Compose解析、两项PS解析、80Manifest及构建版本/SHA读回通过。官方Director F6“留在导演台”确认框尚未浏览器复验；当前 `v127_stage6_automated_pass_manual_e2e_pending`，不自动放行阶段7。详见 `UPSTREAM_V127_STAGE6_20260908.md`。原运行UI2、stable和真实数据均未变化。
+
 ## 最新：v1.2.7阶段5源码适配完成
 
 从8f730ac4选择性适配三个UI来源提交，新代码提交8082e9e2/2aebd53e/d10c5e32；干净类型、默认1278测试、独立23专项及生产构建通过，33个Web改动文件与测试镜像哈希一致。详见 `UPSTREAM_V127_STAGE5_20260908.md`。未push/部署/操作Edge或真实数据；视觉、Runtime真实连接和偶发加载失败仍待后续人工验收。当前停在阶段6批准前，下方为历史检查点。
