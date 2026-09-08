@@ -1,5 +1,9 @@
 # 当前状态
 
+## 最新：阶段7候选已推送，远程CI未触发
+
+候选已非强制推送到用户fork `origin/codex/upstream-v1.2.7-20260908`，首次核对远程SHA3a541320与本地一致。quality workflow仅监听main push/PR，因此候选分支check-runs=0、Actions为空，记录为未触发而非通过。stable仍5c1203e，origin/main仍11931d00，未部署。F6及视觉项保留到阶段8手工Edge验收。详见 `UPSTREAM_V127_STAGE7_20260908.md`。
+
 ## 最新：阶段6自动化通过，F6人工门禁待决定
 
 源码88087501：Backend全量、Web完整1624测试/类型/构建、Agent Linux322+Windows6、7种Compose解析、两项PS解析、80Manifest及构建版本/SHA读回通过。官方Director F6“留在导演台”确认框尚未浏览器复验；当前 `v127_stage6_automated_pass_manual_e2e_pending`，不自动放行阶段7。详见 `UPSTREAM_V127_STAGE6_20260908.md`。原运行UI2、stable和真实数据均未变化。

@@ -1,5 +1,9 @@
 # 开发历史时间线
 
+## 2026-09-08：阶段7推送fork候选
+
+经dry-run后非强制新建 `origin/codex/upstream-v1.2.7-20260908`，首次远程SHA3a541320与本地一致；stable/main未变。quality仅监听main push/PR，候选分支无check-runs/Actions，明确记录为未触发。未创建PR、dispatch、部署或更新默认分支；F6与视觉项留到阶段8。
+
 ## 2026-09-08：F6延后至阶段8并批准阶段7
 
 用户明确同意将Director F6与其他视觉项统一留到阶段8，由用户手工Microsoft Edge验收；同时批准阶段7仅推送fork候选并核对远程。F6未被判定通过，稳定分支、部署和数据仍不在阶段7范围。
