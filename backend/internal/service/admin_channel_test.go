@@ -249,6 +249,56 @@ func TestImportAdminChannelModelsOnlyImportsSelectedModels(t *testing.T) {
 	}
 }
 
+func TestImportAdminChannelModelsEnrichesSelectedUntouchedModelIdempotently(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"model-a","model_type":"text"}]}`))
+	}))
+	defer upstream.Close()
+
+	svc, db := newChannelModelTestService(t)
+	svc.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin}
+	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`, AllowLocalChannel: true}
+	existing := model.ChannelModel{ID: "existing-model", ChannelID: channel.ID, ModelKey: "model-a", DisplayName: "model-a", BillingMode: "fixed_request", PriceVersion: 1}
+	if err := db.Create(&channel).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&existing).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := svc.ImportAdminChannelModels(context.Background(), admin, channel.ID, []string{"model-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Added != 0 || first.Updated != 1 || first.UpdateFieldCounts["support_status"] != 1 {
+		t.Fatalf("first import result = %#v, want one safe enrichment", first)
+	}
+	var enriched model.ChannelModel
+	if err := db.First(&enriched, "id = ?", existing.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if enriched.ProviderModelKey != "model-a" || enriched.Capability != "text" || enriched.Protocol != model.ChannelInterfaceChatCompletion || enriched.SupportStatus != model.ChannelModelSupportPlanned || enriched.CatalogSource != "upstream" {
+		t.Fatalf("enriched model = %#v", enriched)
+	}
+	firstUpdatedAt := enriched.UpdatedAt
+
+	second, err := svc.ImportAdminChannelModels(context.Background(), admin, channel.ID, []string{"model-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Added != 0 || second.Updated != 0 || second.Unchanged != 1 {
+		t.Fatalf("second import result = %#v, want idempotent no-op", second)
+	}
+	if err := db.First(&enriched, "id = ?", existing.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !enriched.UpdatedAt.Equal(firstUpdatedAt) {
+		t.Fatalf("second import changed updated_at: %v -> %v", firstUpdatedAt, enriched.UpdatedAt)
+	}
+}
+
 func TestImportAdminChannelModelsRejectsUnknownSelection(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

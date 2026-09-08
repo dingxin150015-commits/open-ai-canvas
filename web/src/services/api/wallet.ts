@@ -299,7 +299,7 @@ export function fetchAdminChannelModels(channelId: string) {
 }
 
 export function importAdminChannelModels(channelId: string, models: string[]) {
-    return request<{ models: string[]; added: number }>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/import`, { models }));
+    return request<ChannelModelFetchResult>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/import`, { models }));
 }
 
 export function testAdminChannelModel(channelId: string, input: Pick<ChannelModel, "modelKey" | "providerModelKey" | "capability" | "protocol"> & { capabilityConfig?: ChannelModel["capabilityConfig"] }) {

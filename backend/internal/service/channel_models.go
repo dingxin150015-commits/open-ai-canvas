@@ -181,26 +181,11 @@ func (s *Service) FetchAdminChannelModels(ctx context.Context, actor *model.User
 	retired := retiredChannelModelKeys(channel.RetiredModelsJSON)
 	missing := make([]model.ChannelModel, 0, len(catalog))
 	updates := make([]repository.ChannelModelCatalogUpdate, 0, len(catalog))
-	result := &AdminChannelModelFetchResult{
-		Models:              make([]string, 0, len(catalog)),
-		CapabilityCounts:    map[string]int{},
-		SupportStatusCounts: map[string]int{},
-		UpdateFieldCounts:   map[string]int{},
-	}
+	result := adminChannelModelCatalogResult(catalog)
 	for _, catalogItem := range catalog {
 		name := strings.TrimPrefix(strings.TrimSpace(catalogItem.ID), "models/")
 		if name == "" {
 			continue
-		}
-		result.Models = append(result.Models, name)
-		result.CapabilityCounts[normalizeCatalogModelType(catalogItem.ModelType)]++
-		result.SupportStatusCounts[string(normalizeCatalogSupportStatus(string(catalogItem.SupportStatus)))]++
-		if strings.Contains(catalogItem.CatalogSource, "upstream") {
-			result.UpstreamCount++
-		}
-		if strings.Contains(catalogItem.CatalogSource, "official") {
-			result.SupplementalCount++
-			result.OfficialCatalogReady = true
 		}
 		key := channelModelCatalogKey(name)
 		if retired[key] {
@@ -242,6 +227,32 @@ func (s *Service) FetchAdminChannelModels(ctx context.Context, actor *model.User
 	return result, nil
 }
 
+func adminChannelModelCatalogResult(catalog []ChannelModelCatalogItem) *AdminChannelModelFetchResult {
+	result := &AdminChannelModelFetchResult{
+		Models:              make([]string, 0, len(catalog)),
+		CapabilityCounts:    map[string]int{},
+		SupportStatusCounts: map[string]int{},
+		UpdateFieldCounts:   map[string]int{},
+	}
+	for _, item := range catalog {
+		name := strings.TrimPrefix(strings.TrimSpace(item.ID), "models/")
+		if name == "" {
+			continue
+		}
+		result.Models = append(result.Models, name)
+		result.CapabilityCounts[normalizeCatalogModelType(item.ModelType)]++
+		result.SupportStatusCounts[string(normalizeCatalogSupportStatus(string(item.SupportStatus)))]++
+		if strings.Contains(item.CatalogSource, "upstream") {
+			result.UpstreamCount++
+		}
+		if strings.Contains(item.CatalogSource, "official") {
+			result.SupplementalCount++
+			result.OfficialCatalogReady = true
+		}
+	}
+	return result
+}
+
 // PreviewAdminChannelModels 只读取上游模型目录，不修改渠道模型配置。
 func (s *Service) PreviewAdminChannelModels(ctx context.Context, actor *model.User, channelID string) ([]string, error) {
 	if err := s.RequireAdmin(actor); err != nil {
@@ -281,7 +292,7 @@ func (s *Service) ImportAdminChannelModels(ctx context.Context, actor *model.Use
 	for _, item := range models {
 		available[channelModelCatalogKey(item.ID)] = item
 	}
-	chosen := make([]string, 0, len(selected))
+	chosenCatalog := make([]ChannelModelCatalogItem, 0, len(selected))
 	seen := make(map[string]struct{}, len(selected))
 	for _, rawName := range selected {
 		name := strings.TrimPrefix(strings.TrimSpace(rawName), "models/")
@@ -297,9 +308,9 @@ func (s *Service) ImportAdminChannelModels(ctx context.Context, actor *model.Use
 			continue
 		}
 		seen[key] = struct{}{}
-		chosen = append(chosen, strings.TrimPrefix(strings.TrimSpace(canonical.ID), "models/"))
+		chosenCatalog = append(chosenCatalog, canonical)
 	}
-	if len(chosen) == 0 {
+	if len(chosenCatalog) == 0 {
 		return nil, BadAuthRequest("请至少选择一个有效的模型")
 	}
 
@@ -307,32 +318,53 @@ func (s *Service) ImportAdminChannelModels(ctx context.Context, actor *model.Use
 	if err != nil {
 		return nil, err
 	}
-	known := make(map[string]struct{}, len(existing))
+	existingByKey := make(map[string]model.ChannelModel, len(existing))
 	for _, item := range existing {
-		known[channelModelCatalogKey(item.ModelKey)] = struct{}{}
+		existingByKey[channelModelCatalogKey(item.ModelKey)] = item
 	}
 	retired := retiredChannelModelKeys(channel.RetiredModelsJSON)
-	missing := make([]model.ChannelModel, 0, len(chosen))
-	for _, name := range chosen {
+	missing := make([]model.ChannelModel, 0, len(chosenCatalog))
+	updates := make([]repository.ChannelModelCatalogUpdate, 0, len(chosenCatalog))
+	result := adminChannelModelCatalogResult(chosenCatalog)
+	for _, catalogItem := range chosenCatalog {
+		name := strings.TrimPrefix(strings.TrimSpace(catalogItem.ID), "models/")
 		key := channelModelCatalogKey(name)
-		if _, ok := known[key]; ok || retired[key] {
+		if retired[key] {
+			result.SkippedRetired++
+			continue
+		}
+		desired := channelModelFromCatalog("", channelID, catalogItem)
+		if current, ok := existingByKey[key]; ok {
+			if !catalogMayBeEnriched(current) {
+				result.SkippedConfigured++
+			} else if update := catalogEnrichmentUpdate(current, desired); update != nil {
+				for field := range update.Changes {
+					result.UpdateFieldCounts[field]++
+				}
+				updates = append(updates, *update)
+			} else {
+				result.Unchanged++
+			}
 			continue
 		}
 		modelID, idErr := s.repo.NextPrefixedID("MODEL")
 		if idErr != nil {
 			return nil, idErr
 		}
-		missing = append(missing, channelModelFromCatalog(modelID, channelID, available[key]))
-		known[key] = struct{}{}
+		desired.ID = modelID
+		missing = append(missing, desired)
 	}
-	added, err := s.repo.CreateMissingChannelModels(missing)
+	result.Added, result.Updated, err = s.repo.SyncChannelModelCatalog(missing, updates)
 	if err != nil {
 		return nil, err
 	}
-	if added > 0 {
+	if result.Added > 0 || result.Updated > 0 {
 		s.invalidateRouteCatalog()
 	}
-	return &AdminChannelModelFetchResult{Models: chosen, Added: added}, nil
+	if len(result.UpdateFieldCounts) > 0 {
+		log.Printf("selected channel model catalog sync summary added=%d updated=%d update_fields=%v", result.Added, result.Updated, result.UpdateFieldCounts)
+	}
+	return result, nil
 }
 
 func (s *Service) fetchAdminChannelModelCatalog(ctx context.Context, actor *model.User, channelID string) ([]ChannelModelCatalogItem, error) {

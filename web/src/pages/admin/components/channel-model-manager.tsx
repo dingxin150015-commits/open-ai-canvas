@@ -12,7 +12,7 @@ import type { ModelChannel } from "@/stores/use-config-store";
 import { ChannelModelEditor } from "./channel-model-editor";
 import { AdminPageFrame } from "./admin-shell";
 import { AdminBatchBar, AdminDataTable, AdminFilterChip, AdminStatusBadge } from "./admin-ui";
-import { channelModelSupportMeta, isChannelModelReadOnly } from "./channel-model-support";
+import { channelModelFetchSummary, channelModelSupportMeta, isChannelModelReadOnly } from "./channel-model-support";
 
 export function ChannelModelManager({ channel, onClose, onChanged }: { channel: ModelChannel; onClose: () => void; onChanged: () => void | Promise<void> }) {
     const { message, modal } = App.useApp();
@@ -108,19 +108,14 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
 
     const importSelectedModels = async () => {
         if (!selectedFetchModels.length) return;
-        if (!selectedNewFetchModels.length) {
-            message.info("当前勾选的模型均已存在，没有需要新增的模型");
-            resetFetchPreview();
-            return;
-        }
         setImporting(true);
         try {
             const result = await importAdminChannelModels(channel.id, selectedFetchModels);
             await reload();
             await onChanged();
             resetFetchPreview();
-            if (result.added > 0) message.success(`已导入 ${result.added} 个模型，新增模型仍需配置价格后启用`);
-            else message.info("所选模型均已存在，没有新增模型");
+            if (result.added > 0 || result.updated > 0) message.success(channelModelFetchSummary(result));
+            else message.info("所选模型均已存在且无需补齐");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "导入模型失败");
         } finally {
@@ -442,12 +437,12 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                         取消
                     </Button>,
                     <Button key="confirm" type="primary" loading={importing} disabled={!selectedFetchModels.length} onClick={() => void importSelectedModels()}>
-                        确认导入
+                        确认导入/补齐
                     </Button>,
                 ]}
             >
                 <div className="space-y-3">
-                    <p className="m-0 text-sm text-foreground/65">上游共返回 {fetchPreviewModels.length} 个模型。默认已全选，可批量全选或取消全选；已存在的模型不会重复导入。</p>
+                    <p className="m-0 text-sm text-foreground/65">上游共返回 {fetchPreviewModels.length} 个模型。默认已全选；新模型会导入，未配置的已有模型只补齐缺失的目录元数据，不覆盖价格、启用状态或管理员配置。</p>
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/70 bg-muted/25 px-3 py-2">
                         <span className="text-sm font-medium text-foreground/70" aria-live="polite">
                             已选择 {selectedFetchModels.length} / {fetchPreviewModels.length} 个模型
@@ -471,8 +466,8 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                         />
                     </div>
                     <div className="text-xs text-foreground/50">
-                        {selectedNewFetchModels.length > 0 ? `将导入 ${selectedNewFetchModels.length} 个新模型` : "当前勾选的模型均已存在"}
-                        {selectedExistingFetchCount > 0 ? `，另有 ${selectedExistingFetchCount} 个已存在模型已勾选` : ""}
+                        {selectedNewFetchModels.length > 0 ? `将导入 ${selectedNewFetchModels.length} 个新模型` : "没有新模型需要导入"}
+                        {selectedExistingFetchCount > 0 ? `，并检查 ${selectedExistingFetchCount} 个已有模型的安全补齐项` : ""}
                     </div>
                 </div>
             </Modal>
