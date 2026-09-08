@@ -19,6 +19,8 @@ import type { CanvasNodeTypeId, CanvasToolMode, CanvasWorkspaceMode } from "@/ty
 
 export function CanvasToolbar({
     selectedCount,
+    compact = false,
+    maxVisible,
     workspaceMode,
     canvasTool,
     onToolChange,
@@ -54,6 +56,8 @@ export function CanvasToolbar({
     onOpenProjectCharacters,
 }: {
     selectedCount: number;
+    compact?: boolean;
+    maxVisible?: number;
     workspaceMode: CanvasWorkspaceMode;
     canvasTool: CanvasToolMode;
     onToolChange: (tool: CanvasToolMode) => void;
@@ -230,10 +234,10 @@ export function CanvasToolbar({
     const createCommands = useCanvasCreateCommands(ctx, runAddAction);
 
     return (
-        <div ref={rootRef} data-canvas-no-zoom className="pointer-events-none absolute inset-x-[var(--canvas-inset-x)] bottom-[var(--canvas-inset-y)] z-[var(--z-toolbar)] flex justify-center">
+        <div ref={rootRef} data-canvas-no-zoom className="pointer-events-auto relative shrink-0 flex justify-center">
             <AnimatePresence>{addOpen ? <AddNodeMenu x={panelX} theme={theme} commands={createCommands} /> : null}</AnimatePresence>
 
-            <FloatingDock ref={dockRef} items={items} className="canvas-floating-dock pointer-events-auto max-w-full" style={canvasDockStyle(theme)} />
+            <FloatingDock ref={dockRef} items={items} size={compact ? "compact" : "default"} maxVisible={maxVisible} className="canvas-floating-dock pointer-events-auto w-fit" style={canvasDockStyle(theme)} />
 
             <AnimatePresence>
                 {appearanceOpen ? (
@@ -251,7 +255,7 @@ export function CanvasToolbar({
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.97, transition: { duration: 0 } }}
                             transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
-                            className="aceternity-floating-panel overflow-hidden rounded-[var(--panel-radius)] border p-2.5 backdrop-blur-2xl"
+                            className="aceternity-floating-panel max-h-[calc(100dvh-96px)] overflow-y-auto rounded-[var(--panel-radius)] border p-2.5 backdrop-blur-2xl"
                             style={{ background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                             onWheel={(event) => event.stopPropagation()}
                         >
@@ -298,7 +302,7 @@ function AddNodeMenu({ x, theme, commands }: { x: number; theme: CanvasTheme; co
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97, transition: { duration: 0 } }}
                 transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
-                className="aceternity-floating-panel overflow-hidden rounded-[var(--panel-radius)] border p-2 backdrop-blur-2xl"
+                className="aceternity-floating-panel max-h-[calc(100dvh-96px)] overflow-y-auto rounded-[var(--panel-radius)] border p-2 backdrop-blur-2xl"
                 style={{ background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.node.text }}
                 onWheel={(event) => event.stopPropagation()}
             >
@@ -328,5 +332,7 @@ function getPanelX(dock: HTMLDivElement | null, target: HTMLElement) {
     if (!dock) return 0;
     const rootBox = dock.parentElement?.getBoundingClientRect() || dock.getBoundingClientRect();
     const box = target.getBoundingClientRect();
-    return box.left - rootBox.left + box.width / 2;
+    const half = Math.min(420, window.innerWidth - 24) / 2;
+    const center = Math.max(12 + half, Math.min(window.innerWidth - 12 - half, box.left + box.width / 2));
+    return center - rootBox.left;
 }

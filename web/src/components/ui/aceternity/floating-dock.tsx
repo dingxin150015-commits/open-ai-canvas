@@ -3,6 +3,9 @@ import { forwardRef, useEffect, useRef, useState, type CSSProperties, type Mouse
 
 import { cn } from "@/lib/utils";
 import { aceternityMotion } from "@/lib/aceternity-motion";
+import { Popover } from "antd";
+import { MoreHorizontal } from "lucide-react";
+import { partitionDockEntries } from "@/lib/canvas/canvas-chrome-layout";
 
 export type FloatingDockCommand = {
     kind?: "command";
@@ -30,6 +33,8 @@ type FloatingDockProps = {
     style?: CSSProperties;
     ariaLabel?: string;
     showLabels?: boolean;
+    maxVisible?: number;
+    preferredIds?: string[];
 };
 
 type DockMetrics = {
@@ -52,7 +57,10 @@ const TOUCH_DOCK_METRICS: Record<NonNullable<FloatingDockProps["size"]>, DockMet
     compact: { base: 36, magnified: 36, icon: 16, iconMagnified: 16, distance: 0 },
 };
 
-export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(function FloatingDock({ items, size = "default", embedded = false, className, style, ariaLabel = "画布工具", showLabels = false }, forwardedRef) {
+export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(function FloatingDock({ items, size = "default", embedded = false, className, style, ariaLabel = "画布工具", showLabels = false, maxVisible, preferredIds }, forwardedRef) {
+    const [moreOpen, setMoreOpen] = useState(false);
+    const bounded = maxVisible !== undefined;
+    const partition = bounded ? partitionDockEntries(items, maxVisible, preferredIds) : { visible: items, overflow: [] };
     const mouseX = useMotionValue(Number.POSITIVE_INFINITY);
     const reducedMotion = useReducedMotion();
     const [coarsePointer, setCoarsePointer] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
@@ -74,9 +82,9 @@ export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(functi
     }, []);
 
     // scrollable 场景（触屏或窄屏）禁用放大并允许横向滚动，保证按钮始终可达
-    const scrollable = coarsePointer || narrow;
-    const motionEnabled = !reducedMotion && !scrollable;
-    const metrics = coarsePointer ? TOUCH_DOCK_METRICS[size] : DOCK_METRICS[size];
+    const scrollable = !bounded && (coarsePointer || narrow);
+    const motionEnabled = !bounded && !reducedMotion && !scrollable;
+    const metrics = coarsePointer && !bounded ? TOUCH_DOCK_METRICS[size] : DOCK_METRICS[size];
 
     return (
         <motion.div
@@ -119,7 +127,42 @@ export const FloatingDock = forwardRef<HTMLDivElement, FloatingDockProps>(functi
             }}
             onPointerLeave={() => mouseX.set(Number.POSITIVE_INFINITY)}
         >
-            {renderDockItems(items, { mouseX, metrics, motionEnabled: motionEnabled && !showLabels, compact: size === "compact", showLabel: showLabels })}
+            {renderDockItems(partition.visible, { mouseX, metrics, motionEnabled: motionEnabled && !showLabels, compact: size === "compact", showLabel: showLabels })}
+            {partition.overflow.length > 0 ? (
+                <Popover
+                    open={moreOpen}
+                    onOpenChange={setMoreOpen}
+                    trigger="click"
+                    placement="topRight"
+                    content={
+                        <div data-canvas-no-zoom className="grid max-h-[60vh] min-w-40 overflow-y-auto" aria-label={`${ariaLabel}更多选项`}>
+                            {partition.overflow.map((entry) =>
+                                entry.kind === "separator" ? null : (
+                                    <button
+                                        key={entry.id}
+                                        type="button"
+                                        disabled={entry.disabled}
+                                        aria-pressed={entry.expands ? undefined : entry.active}
+                                        aria-expanded={entry.expands ? entry.active : undefined}
+                                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-surface-hover disabled:opacity-40 ${entry.danger ? "text-red-500" : ""}`}
+                                        onClick={(event) => {
+                                            setMoreOpen(false);
+                                            entry.onClick?.(event);
+                                        }}
+                                    >
+                                        <span className="grid size-4 place-items-center [&_svg]:size-4">{entry.icon}</span>
+                                        {entry.label}
+                                    </button>
+                                ),
+                            )}
+                        </div>
+                    }
+                >
+                    <button type="button" aria-label={`${ariaLabel}更多工具`} aria-expanded={moreOpen} className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-md hover:bg-surface-hover focus-visible:ring-2">
+                        <MoreHorizontal className="size-4" />
+                    </button>
+                </Popover>
+            ) : null}
         </motion.div>
     );
 });

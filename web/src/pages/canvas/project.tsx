@@ -86,6 +86,7 @@ import { CanvasAgentChangeToast, CanvasMergeStatusToast, CanvasUploadStatusToast
 import { backendProviderConfig, getGenerationCount } from "@/lib/canvas/canvas-project-generation";
 import { cancelGenerationTask } from "@/services/api/task-center";
 import { CanvasTopBar, CanvasWorkspaceModeSwitch } from "./canvas-project-top-bar";
+import { canvasChromeLayout } from "@/lib/canvas/canvas-chrome-layout";
 import { LibTVImportDialog } from "./components/libtv-import-dialog";
 import { TapNowImportDialog } from "./components/tapnow-import-dialog";
 import { CanvasFocusModeBar } from "@/components/canvas/canvas-focus-mode-bar";
@@ -255,6 +256,7 @@ function InfiniteCanvasPage() {
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [size, setSize] = useState({ width: 1200, height: 720 });
+    const chrome = canvasChromeLayout(size.width);
     const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
     const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -2280,6 +2282,7 @@ function InfiniteCanvasPage() {
                     <section className="relative min-w-0 flex-1 flex flex-col min-h-0 overflow-hidden">
                         {!focusMode ? (
                             <CanvasTopBar
+                                compact={chrome.compactTop}
                                 title={currentProject?.title || "未命名画布"}
                                 titleDraft={titleDraft}
                                 isTitleEditing={titleEditing}
@@ -2316,19 +2319,6 @@ function InfiniteCanvasPage() {
                                 onEnterFocusMode={enterFocusMode}
                                 shortDramaGuide={shortDramaGuide}
                             />
-                        ) : null}
-
-                        {!focusMode ? (
-                            <div
-                                data-canvas-no-zoom
-                                className="pointer-events-none absolute bottom-[calc(var(--canvas-inset-y)+var(--space-16))] z-[var(--z-toolbar)] transition-[right,bottom] duration-300 lg:bottom-[var(--canvas-inset-y)]"
-                                style={{ right: assistantMounted ? `calc(var(--canvas-inset-x) + ${assistantWidth}px + var(--space-3))` : "var(--canvas-inset-x)" }}
-                                onMouseDown={(event) => event.stopPropagation()}
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onWheel={(event) => event.stopPropagation()}
-                            >
-                                <CanvasWorkspaceModeSwitch mode={workspaceMode} onChange={setWorkspaceMode} />
-                            </div>
                         ) : null}
 
                         <CanvasNodeSearchModal
@@ -2499,44 +2489,72 @@ function InfiniteCanvasPage() {
                                 {emptyCanvasState}
 
                                 {!focusMode || focusDockRevealed ? (
-                                    <CanvasToolbar
-                                        selectedCount={selectedNodeIds.size}
-                                        workspaceMode={workspaceMode}
-                                        canvasTool={canvasTool}
-                                        onToolChange={setCanvasTool}
-                                        isProjectLinked={Boolean(shortDramaEnabled && currentProject?.projectId)}
-                                        canUndo={historyState.canUndo}
-                                        canRedo={historyState.canRedo}
-                                        appearance={canvasAppearance}
-                                        backgroundMode={backgroundMode}
-                                        showImageInfo={showImageInfo}
-                                        onAddImage={() => createNode(CanvasNodeType.Image)}
-                                        onAddVideo={() => createNode(CanvasNodeType.Video)}
-                                        onAddAudio={() => createNode(CanvasNodeType.Audio)}
-                                        onAddText={() => createNode(CanvasNodeType.Text)}
-                                        onChooseStyle={() => setStylePickerOpen(true)}
-                                        onAddScript={() => createNode(CanvasNodeType.Script)}
-                                        onAddFrame={() => createNode(CanvasNodeType.Frame)}
-                                        onAddFolder={createFolder}
-                                        onAddDrawing={() => createNode(CanvasNodeType.Drawing)}
-                                        onAddExtensionNode={(type) => createNode(type)}
-                                        onAddWorkflow={() => createNode(CanvasNodeType.Config)}
-                                        onOpenDirector={() => setDirectorTemplateRequest({})}
-                                        onUndo={undoCanvas}
-                                        onRedo={redoCanvas}
-                                        onUpload={() => handleUploadRequest()}
-                                        onDelete={() => deleteNodes(new Set(selectedNodeIds))}
-                                        onClear={() => setClearConfirmOpen(true)}
-                                        onDeselect={deselectCanvas}
-                                        onAppearanceChange={applyCanvasAppearance}
-                                        onSaveAppearanceDefault={saveCanvasAppearanceDefault}
-                                        onBackgroundModeChange={setBackgroundMode}
-                                        onShowImageInfoChange={setShowImageInfo}
-                                        onOpenMyAssets={() => {
-                                            openCanvasAssetLibrary();
-                                        }}
-                                        onOpenProjectCharacters={() => openProjectAssets("character")}
-                                    />
+                                    <div data-canvas-bottom-bar data-canvas-no-zoom className="pointer-events-none absolute inset-x-2 bottom-[var(--canvas-inset-y)] z-[var(--z-toolbar)] flex justify-center">
+                                        <div className="pointer-events-auto flex w-fit shrink-0 items-center gap-1 sm:gap-2" onPointerDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
+                                            <CanvasZoomControls
+                                                compact={chrome.compact}
+                                                maxVisible={chrome.zoomLimit}
+                                                scale={viewport.k}
+                                                containerRef={containerRef}
+                                                onScaleChange={setZoomScale}
+                                                onFitContent={fitCanvasContent}
+                                                onAutoArrange={autoArrangeCanvasNodes}
+                                                isMiniMapOpen={isMiniMapOpen}
+                                                onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)}
+                                                onOpenShortcuts={() => setShortcutRequestNonce((value) => value + 1)}
+                                            />
+                                            <CanvasAssetTray
+                                                compact={chrome.compact}
+                                                assetImages={imageAssets}
+                                                canvasImages={canvasImageNodes}
+                                                showLibrary={!currentProject?.projectId}
+                                                activeNodeId={selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null}
+                                                onInsertAssetImage={(asset) => void createImageAssetNode(asset)}
+                                                onFocusCanvasImage={focusCanvasImageNode}
+                                            />
+                                            <CanvasToolbar
+                                                compact={chrome.compact}
+                                                maxVisible={chrome.mainLimit}
+                                                selectedCount={selectedNodeIds.size}
+                                                workspaceMode={workspaceMode}
+                                                canvasTool={canvasTool}
+                                                onToolChange={setCanvasTool}
+                                                isProjectLinked={Boolean(shortDramaEnabled && currentProject?.projectId)}
+                                                canUndo={historyState.canUndo}
+                                                canRedo={historyState.canRedo}
+                                                appearance={canvasAppearance}
+                                                backgroundMode={backgroundMode}
+                                                showImageInfo={showImageInfo}
+                                                onAddImage={() => createNode(CanvasNodeType.Image)}
+                                                onAddVideo={() => createNode(CanvasNodeType.Video)}
+                                                onAddAudio={() => createNode(CanvasNodeType.Audio)}
+                                                onAddText={() => createNode(CanvasNodeType.Text)}
+                                                onChooseStyle={() => setStylePickerOpen(true)}
+                                                onAddScript={() => createNode(CanvasNodeType.Script)}
+                                                onAddFrame={() => createNode(CanvasNodeType.Frame)}
+                                                onAddFolder={createFolder}
+                                                onAddDrawing={() => createNode(CanvasNodeType.Drawing)}
+                                                onAddExtensionNode={(type) => createNode(type)}
+                                                onAddWorkflow={() => createNode(CanvasNodeType.Config)}
+                                                onOpenDirector={() => setDirectorTemplateRequest({})}
+                                                onUndo={undoCanvas}
+                                                onRedo={redoCanvas}
+                                                onUpload={() => handleUploadRequest()}
+                                                onDelete={() => deleteNodes(new Set(selectedNodeIds))}
+                                                onClear={() => setClearConfirmOpen(true)}
+                                                onDeselect={deselectCanvas}
+                                                onAppearanceChange={applyCanvasAppearance}
+                                                onSaveAppearanceDefault={saveCanvasAppearanceDefault}
+                                                onBackgroundModeChange={setBackgroundMode}
+                                                onShowImageInfoChange={setShowImageInfo}
+                                                onOpenMyAssets={() => {
+                                                    openCanvasAssetLibrary();
+                                                }}
+                                                onOpenProjectCharacters={() => openProjectAssets("character")}
+                                            />
+                                            <CanvasWorkspaceModeSwitch compact={chrome.compact} mode={workspaceMode} onChange={setWorkspaceMode} />
+                                        </div>
+                                    </div>
                                 ) : null}
                             </div>
 
@@ -2700,36 +2718,6 @@ function InfiniteCanvasPage() {
                         />
 
                         {isMiniMapOpen && !focusMode ? <Minimap nodes={nodes} viewport={viewport} viewportSize={size} canvasContainerRef={containerRef} onViewportPreviewChange={previewViewport} onViewportChange={handleViewportChange} /> : null}
-
-                        {!focusMode ? (
-                            <CanvasOverlayLayerContainer
-                                overlayId="asset-tray"
-                                fallbackZIndex="var(--z-panel)"
-                                className="absolute bottom-[calc(var(--canvas-inset-y)+var(--space-16))] left-[var(--canvas-inset-x)] flex items-end gap-2 lg:bottom-[var(--canvas-inset-y)]"
-                                onMouseDown={(event) => event.stopPropagation()}
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onWheel={(event) => event.stopPropagation()}
-                            >
-                                <CanvasZoomControls
-                                    scale={viewport.k}
-                                    containerRef={containerRef}
-                                    onScaleChange={setZoomScale}
-                                    onFitContent={fitCanvasContent}
-                                    onAutoArrange={autoArrangeCanvasNodes}
-                                    isMiniMapOpen={isMiniMapOpen}
-                                    onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)}
-                                    onOpenShortcuts={() => setShortcutRequestNonce((value) => value + 1)}
-                                />
-                                <CanvasAssetTray
-                                    assetImages={imageAssets}
-                                    canvasImages={canvasImageNodes}
-                                    showLibrary={!currentProject?.projectId}
-                                    activeNodeId={selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null}
-                                    onInsertAssetImage={(asset) => void createImageAssetNode(asset)}
-                                    onFocusCanvasImage={focusCanvasImageNode}
-                                />
-                            </CanvasOverlayLayerContainer>
-                        ) : null}
 
                         <CanvasProjectContextMenu
                             menu={contextMenu}

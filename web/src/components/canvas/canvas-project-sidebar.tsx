@@ -102,7 +102,7 @@ export function CanvasProjectSidebar({ projectId, detail, onAddChapter, onLocate
 
     if (collapsed) {
         return (
-            <aside className="relative z-[var(--z-panel)] hidden w-11 shrink-0 flex-col items-center border-r border-border bg-background/94 py-2 backdrop-blur-xl lg:flex">
+            <aside className="relative z-[var(--z-panel)] flex w-11 shrink-0 flex-col items-center border-r border-border bg-background/94 py-2 backdrop-blur-xl">
                 <button type="button" className="grid size-7 place-items-center rounded-md text-foreground/55 hover:bg-surface-hover" title="展开项目侧栏" aria-label="展开项目侧栏" onClick={() => setCollapsed(false)}>
                     <ChevronRight className="size-4" />
                 </button>
@@ -114,7 +114,7 @@ export function CanvasProjectSidebar({ projectId, detail, onAddChapter, onLocate
     }
 
     return (
-        <aside className="relative z-[var(--z-panel)] hidden w-[var(--canvas-sidebar-width)] shrink-0 flex-col border-r border-border bg-background/94 backdrop-blur-xl lg:flex">
+        <aside className="relative z-[var(--z-panel)] flex w-[min(var(--canvas-sidebar-width),35vw)] min-w-0 shrink-0 flex-col border-r border-border bg-background/94 backdrop-blur-xl">
             <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-2.5">
                 <Link to={`/projects/${projectId}/canvases`} className="flex min-w-0 items-center gap-2 text-xs font-semibold" title="返回项目画布列表">
                     <FolderKanban className="size-3.5 shrink-0" />
