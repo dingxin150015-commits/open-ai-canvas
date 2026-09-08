@@ -68,7 +68,7 @@ describe("workspace route loading", () => {
         }
         expect(layout).not.toContain("useCanvasUiStore");
         expect(layout).not.toContain("CanvasDeleteProjectsDialog");
-        expect(canvas).toContain("deleteDialogOpen ? <Suspense");
+        expect(canvas).toMatch(/deleteDialogOpen\s*\?\s*\(\s*<Suspense/);
     });
 
     test("does not poll wallet balance from permanent workspace chrome", () => {
@@ -93,12 +93,14 @@ describe("workspace route loading", () => {
         expect(workflow).toContain("if (playing) return <video");
     });
 
-    test("uses a quiet workspace skeleton for initial hydration", () => {
+    test("uses the accessible branded loader for initial hydration", () => {
         const loader = source("../src/components/ui/aceternity/full-screen-loader.tsx");
         const css = source("../src/styles/globals.css");
 
-        expect(loader).toContain("full-screen-loader-topbar");
-        expect(loader).toContain("full-screen-loader-rail");
+        expect(loader).toContain("full-screen-loader-scene");
+        expect(loader).toContain("full-screen-loader-timeline");
+        expect(loader).toContain("BrandLogoFrame");
+        expect(loader).toContain('role="status" aria-live="polite"');
         expect(loader).toContain("LoadingSignal");
         expect(loader).not.toContain("YINGCE STUDIO");
         expect(loader).not.toContain("loading-cue");

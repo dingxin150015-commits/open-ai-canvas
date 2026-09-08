@@ -76,6 +76,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function launchVite(port) {
     const child = spawn("bunx", ["vite", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
         cwd: process.cwd(),
+        env: { ...process.env, CANVAS_DIRECTOR_E2E: "1" },
         stdio: ["ignore", "pipe", "pipe"],
     });
     let log = "";

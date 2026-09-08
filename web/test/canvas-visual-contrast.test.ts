@@ -31,14 +31,16 @@ describe("canvas visual contrast", () => {
         expect(canvasThemes.dark.spatial.elevated).toBe("rgba(15,15,15,.97)");
     });
 
-    test("pins intentional grid tokens while retaining canvas grid opacity", async () => {
+    test("pins grid tokens and applies custom opacity only once", async () => {
         expect(canvasThemes.light.canvas.dot).toBe("rgba(15,23,42,.20)");
         expect(canvasThemes.light.canvas.line).toBe("rgba(15,23,42,.15)");
         expect(canvasThemes.dark.canvas.dot).toBe("rgba(178,178,178,.18)");
         expect(canvasThemes.dark.canvas.line).toBe("rgba(178,178,178,.14)");
 
         const source = await Bun.file(new URL("../src/components/canvas/infinite-canvas.tsx", import.meta.url)).text();
-        expect(source).toContain('opacity: mode === "dots" ? 0.34 : 0.46');
+        expect(source).not.toContain('opacity: mode === "dots"');
+        expect(source).toContain("resolveCanvasGridColor(appearance, colorTheme, mode)");
+        expect(source).toContain('backgroundSize: "48px 48px"');
     });
 
     test("keeps the original transparent edge for standard canvas nodes", async () => {

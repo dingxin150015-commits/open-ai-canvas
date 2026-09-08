@@ -12,6 +12,9 @@ func TestCompareVersions(t *testing.T) {
 		{"v1.2.0-preview.3", "v1.2.0", -1},
 		{"v1.2.1", "v1.2.0", 1},
 		{"v1.2.0", "v1.2.0", 0},
+		{"v1.2.7+dingxin.1", "v1.2.7", 0},
+		{"v1.2.8", "v1.2.7+dingxin.1", 1},
+		{"v1.2.7+dingxin.2", "v1.2.7+dingxin.1", 0},
 	}
 	for _, test := range tests {
 		got := CompareVersions(test.left, test.right)
