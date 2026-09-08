@@ -54,6 +54,7 @@ ENV CGO_ENABLED=1
 ENV GOOS=linux
 ENV CANVAS_BACKEND_DATA_DIR=/tmp/open-ai-canvas-tests
 
+RUN apk add --no-cache ffmpeg
 COPY plugin-packages /src/plugin-packages
 
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -71,9 +72,11 @@ RUN --mount=type=cache,target=/root/.cache/go-build set -eu; \
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates tzdata wget \
+RUN apk add --no-cache ca-certificates tzdata wget ffmpeg \
     && addgroup -S app \
-    && adduser -S app -G app
+    && adduser -S app -G app \
+    && command -v ffmpeg >/dev/null \
+    && command -v ffprobe >/dev/null
 
 WORKDIR /app
 ENV GIN_MODE=release

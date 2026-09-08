@@ -100,8 +100,8 @@ jobs:
           fi
       - name: Typecheck
         run: bun run typecheck
-      - name: Run tests
-        run: bun run test
+      - name: Run complete test inventory
+        run: bun run test:all
       - name: Build production bundle
         run: bun run build
 
