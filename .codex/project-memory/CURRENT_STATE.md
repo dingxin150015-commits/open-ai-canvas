@@ -1,20 +1,24 @@
 # 当前状态
 
-## 最新：阶段8复盘整改版已部署，等待Edge
+## 最新：Edge首轮失败项已修复并部署
+
+用户确认版本/首页/导航/基本画布布局，通过截图证实Runtime重复17371请求、报价400、暗色点网格不可辨，且未找到导演台。提交601e5ada取消普通页面自动Runtime探测并在前端拦截已知无价格规格；0d815d15增强暗色点网格并为宽/窄专业画布增加导演台入口。Web1624、专项34、类型/格式/构建通过；只替换Web，运行身份`v1.2.7+dingxin.1 / 0d815d15`且healthy/restart0。Backend/真实卷未重启。当前`edge_fix_web_deployed_retest_pending`，F6仍待用户Edge。详见`UPSTREAM_V127_EDGE_FIXES_20260909.md`。
+
+## 历史：阶段8复盘整改版已部署，等待Edge
 
 源码`ae01c5d6`恢复模型选择导入时的存量安全补齐，生产/测试镜像补ffmpeg/ffprobe，quality改跑173文件的完整测试清单。Backend/Web全量、专项、类型、构建、配置一致克隆双启动和真实卷部署前后摘要通过；运行身份`v1.2.7+dingxin.1 / ae01c5d6`，容器healthy/restart0。敏感审计副本已移出D盘并核验私有ACL；新恢复点`BKP-20260909-005845-V127-FOLLOWUP` verified/protected。当前`runtime_followup_healthy_edge_pending`，远程候选仍aff2c8e5，stable/main未变。详见`UPSTREAM_V127_FOLLOWUP_20260909.md`。
 
-## 最新：阶段7候选已推送，远程CI未触发
+## 历史：阶段7候选已推送，远程CI未触发
 
 候选已非强制推送到用户fork `origin/codex/upstream-v1.2.7-20260908`，首次核对远程SHA3a541320与本地一致。quality workflow仅监听main push/PR，因此候选分支check-runs=0、Actions为空，记录为未触发而非通过。stable仍5c1203e，origin/main仍11931d00，未部署。F6及视觉项保留到阶段8手工Edge验收。详见 `UPSTREAM_V127_STAGE7_20260908.md`。
 
-## 最新：阶段6自动化通过，F6人工门禁待决定
+## 历史：阶段6自动化通过，F6人工门禁待决定
 
 源码88087501：Backend全量、Web完整1624测试/类型/构建、Agent Linux322+Windows6、7种Compose解析、两项PS解析、80Manifest及构建版本/SHA读回通过。官方Director F6“留在导演台”确认框尚未浏览器复验；当前 `v127_stage6_automated_pass_manual_e2e_pending`，不自动放行阶段7。详见 `UPSTREAM_V127_STAGE6_20260908.md`。原运行UI2、stable和真实数据均未变化。
 
 用户随后明确将F6与其他视觉项统一留到阶段8手工Edge验收，并批准阶段7。F6仍是待验收项，不因允许推送候选而变为通过。
 
-## 最新：v1.2.7阶段5源码适配完成
+## 历史：v1.2.7阶段5源码适配完成
 
 从8f730ac4选择性适配三个UI来源提交，新代码提交8082e9e2/2aebd53e/d10c5e32；干净类型、默认1278测试、独立23专项及生产构建通过，33个Web改动文件与测试镜像哈希一致。详见 `UPSTREAM_V127_STAGE5_20260908.md`。未push/部署/操作Edge或真实数据；视觉、Runtime真实连接和偶发加载失败仍待后续人工验收。当前停在阶段6批准前，下方为历史检查点。
 

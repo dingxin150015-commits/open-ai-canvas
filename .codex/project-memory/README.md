@@ -1,6 +1,6 @@
 # 影策项目级记忆入口
 
-最新记录：`UPSTREAM_V127_FOLLOWUP_20260909.md`。阶段8复盘发现的目录补齐、媒体依赖、CI覆盖、敏感副本和配置一致克隆问题已整改；修复版源码ae01c5d6已部署并healthy，等待用户Edge验收。远程候选/stable/main未变。
+最新记录：`UPSTREAM_V127_EDGE_FIXES_20260909.md`。Edge首轮确认导航/布局，通过后发现Runtime重复探测、报价400、暗色点网格和导演台入口问题；修复版Web 0d815d15已部署并healthy，等待复验。远程候选/stable/main未变。
 
 最新记录：`UPSTREAM_V127_STAGE6_20260908.md`。自动化源码门禁通过，但Director F6人工E2E门禁未闭合；当前不是无条件发布就绪。
 
