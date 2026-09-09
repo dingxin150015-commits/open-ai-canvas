@@ -284,39 +284,30 @@ test("Runtime store exposes a bounded timeout instead of hanging", async () => {
     });
 });
 
-test("the application root starts local Runtime discovery before provider catalogs bootstrap", async () => {
+test("the application root leaves local Runtime discovery to explicit local features", async () => {
     const source = await fs.readFile(new URL("../src/components/layout/client-root-init.tsx", import.meta.url), "utf8");
-    expect(source).toContain("useLocalRuntimeBootstrap");
-    expect(source.indexOf("useLocalRuntimeBootstrap()")).toBeLessThan(source.indexOf("useLocalDreaminaModelBootstrap()"));
+    const settings = await fs.readFile(new URL("../src/pages/settings/local-cli-settings.tsx", import.meta.url), "utf8");
+    expect(source).not.toContain("useLocalRuntimeBootstrap");
+    expect(source).not.toContain('transport === "local-runtime"');
+    expect(settings).toContain("state.connect");
 });
 
-test("Runtime bootstrap schedules one connect and aborts it on cleanup", async () => {
-    const module = (await import("../src/stores/use-local-runtime-store")) as {
-        startLocalRuntimeBootstrap?: (connect: (signal?: AbortSignal) => Promise<void>, schedule: (run: () => void) => () => void) => () => void;
-    };
-    expect(typeof module.startLocalRuntimeBootstrap).toBe("function");
-    if (!module.startLocalRuntimeBootstrap) return;
-
-    let scheduled: (() => void) | undefined;
-    let cancelled = 0;
-    const signals: AbortSignal[] = [];
-    const cleanup = module.startLocalRuntimeBootstrap(
-        async (signal) => {
-            if (signal) signals.push(signal);
+test("creating a Runtime store does not probe until an explicit connection request", async () => {
+    const module = await import("../src/stores/use-local-runtime-store");
+    let calls = 0;
+    const store = module.createLocalRuntimeStore({
+        client: {
+            connect: async () => {
+                calls++;
+                return { state: "connected" as const, runtimeVersion: 2, session: { sessionId: "fixture", keyId: "fixture", scopes: ["runtime:status"], expiresAt: "2099-01-01T00:00:00Z" } };
+            },
+            request: async () => runtimeStatusResponse(),
         },
-        (run) => {
-            scheduled = run;
-            return () => {
-                cancelled += 1;
-            };
-        },
-    );
-    expect(signals).toHaveLength(0);
-    scheduled?.();
-    scheduled?.();
-    expect(signals).toHaveLength(1);
-    cleanup();
-    expect({ cancelled, aborted: signals[0]?.aborted }).toEqual({ cancelled: 1, aborted: true });
+    });
+    await Promise.resolve();
+    expect(calls).toBe(0);
+    await store.getState().ensureConnected();
+    expect(calls).toBe(1);
 });
 
 type RuntimeTransport = {

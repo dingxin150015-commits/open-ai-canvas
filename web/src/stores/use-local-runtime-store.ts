@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { create } from "zustand";
 
 import { readLocalRuntimeStatus, type LocalRuntimeModuleDescriptor, type LocalRuntimeStatus, type LocalRuntimeTransport } from "@/services/local-runtime";
@@ -156,72 +155,6 @@ export function createLocalRuntimeStore(dependencies: LocalRuntimeStoreDependenc
 }
 
 export const useLocalRuntimeStore = createLocalRuntimeStore();
-
-export function createAutomaticRuntimeDiscovery(
-    connect: () => Promise<void>,
-    schedule: (run: () => void) => () => void = (run) => {
-        const timer = setTimeout(run, 0);
-        return () => clearTimeout(timer);
-    },
-) {
-    let consumers = 0;
-    let attempted = false;
-    let cancelScheduled: (() => void) | undefined;
-    return () => {
-        consumers++;
-        if (!attempted && !cancelScheduled) {
-            cancelScheduled = schedule(() => {
-                cancelScheduled = undefined;
-                if (!consumers || attempted) return;
-                attempted = true;
-                // This discovery belongs to the shared store, not to a route.
-                void connect().catch(() => {});
-            });
-        }
-        let released = false;
-        return () => {
-            if (released) return;
-            released = true;
-            consumers--;
-            if (!consumers && cancelScheduled) {
-                cancelScheduled();
-                cancelScheduled = undefined;
-            }
-        };
-    };
-}
-
-const acquireAutomaticDiscovery = createAutomaticRuntimeDiscovery(async () => {
-    const state = useLocalRuntimeStore.getState();
-    if (state.connection === "idle") await state.ensureConnected();
-});
-
-export function startLocalRuntimeBootstrap(
-    connect: (signal?: AbortSignal) => Promise<void>,
-    schedule: (run: () => void) => () => void = (run) => {
-        const timer = window.setTimeout(run, 0);
-        return () => window.clearTimeout(timer);
-    },
-) {
-    const controller = new AbortController();
-    let started = false;
-    const cancelScheduled = schedule(() => {
-        if (started) return;
-        started = true;
-        void connect(controller.signal);
-    });
-    return () => {
-        cancelScheduled();
-        controller.abort();
-    };
-}
-
-export function useLocalRuntimeBootstrap(enabled = true) {
-    useEffect(() => {
-        if (!enabled) return;
-        return acquireAutomaticDiscovery();
-    }, [enabled]);
-}
 
 function connectionFailure(error: unknown, timedOut: boolean) {
     if (timedOut) {

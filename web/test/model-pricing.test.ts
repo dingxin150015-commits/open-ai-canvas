@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection, requestCreditCost } from "../src/lib/model-pricing";
+import { modelQuoteRequest, modelQuoteValidationError, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection, requestCreditCost } from "../src/lib/model-pricing";
 import type { ModelRequirements } from "../src/lib/model-selection";
 import { createModelChannel, defaultConfig, normalizeConfigSnapshot, resolveModelChannel, type AiConfig } from "../src/stores/use-config-store";
 import { buildNodeConfig } from "../src/components/canvas/canvas-node-prompt-panel";
@@ -260,5 +260,18 @@ describe("model request pricing", () => {
             tiers: [{ selector: {}, billingMode: "fixed_request", unitPriceMicrocredits: 0 }],
         });
         expect(modelQuoteRequest(config, config.model, "video", textVideoRequirements)).toMatchObject({ modelID: "channel-video-1" });
+    });
+
+    test("does not call the quote endpoint for a known unpriced system-channel specification", () => {
+        const config = systemConfig({
+            channelModelId: "channel-video-1",
+            tiers: [{ selector: { operation: "image_to_video", imageCount: "1", vquality: "720p", videoSeconds: "15" }, billingMode: "per_second", unitPriceMicrocredits: 1 }],
+        });
+        const unavailable = { ...textVideoRequirements, videoSeconds: "30", options: { ...textVideoRequirements.options, videoSeconds: 30, vquality: "1080p" } };
+        expect(modelQuoteValidationError({ ...config, videoSeconds: "30", vquality: "1080p" }, config.model, "video", unavailable)).toContain("尚未配置所选规格的价格");
+        expect(modelQuoteRequest({ ...config, videoSeconds: "30", vquality: "1080p" }, config.model, "video", unavailable)).toBeUndefined();
+
+        const priced = { ...textVideoRequirements, input: { ...textVideoRequirements.input!, imageCount: 1 }, videoSeconds: "15", options: { ...textVideoRequirements.options, videoSeconds: 15 } };
+        expect(modelQuoteRequest({ ...config, videoSeconds: "15" }, config.model, "video", priced)).toMatchObject({ modelID: "channel-video-1" });
     });
 });

@@ -91,18 +91,24 @@ export function modelQuoteValidationError(config: AiConfig, value: string, capab
     const profiles = cost?.logicalCapabilityProfiles?.length ? cost.logicalCapabilityProfiles : cost?.logicalCapabilitySpec ? [cost.logicalCapabilitySpec] : [];
     if (profiles.length) {
         const errors = profiles.map((profile) => logicalIntentCompatibilityError(profile, intent));
-        return errors.some((error) => !error) ? "" : errors[0];
+        const capabilityError = errors.some((error) => !error) ? "" : errors[0];
+        if (capabilityError) return capabilityError;
+    } else if (cost?.capabilityConfig) {
+        const capabilityError = modelCompatibilityError(config, value, {
+            ...requirements,
+            capability,
+            ...(capability === "video" ? { videoSeconds: String(intent.options?.videoSeconds ?? "") } : {}),
+            ...(capability === "image" ? { imageSize: String(intent.options?.size ?? "") } : {}),
+            options: intent.options,
+        });
+        if (capabilityError) return capabilityError;
     }
-    // Only durable per-model profiles are authoritative. Generic defaults must
-    // not reject a real model merely because its catalog metadata is missing.
-    if (!cost?.capabilityConfig) return "";
-    return modelCompatibilityError(config, value, {
-        ...requirements,
-        capability,
-        ...(capability === "video" ? { videoSeconds: String(intent.options?.videoSeconds ?? "") } : {}),
-        ...(capability === "image" ? { imageSize: String(intent.options?.size ?? "") } : {}),
-        options: intent.options,
-    });
+    // 系统渠道的可执行范围同时受持久能力与已配置价格档约束。先在浏览器按
+    // 与后端相同的选择器规则判定，避免为已知无价格的规格持续发送400报价。
+    if (cost?.pricePolicy === "channel" && cost.logicalPriceTiers?.length && priceTiersForCurrentSelection(cost.logicalPriceTiers, capability, config, requirements).length === 0) {
+        return "当前模型尚未配置所选规格的价格";
+    }
+    return "";
 }
 
 function modelQuoteIntent(config: AiConfig, capability: ModelCapability, requirements?: ModelRequirements): ModelRequestIntent {
