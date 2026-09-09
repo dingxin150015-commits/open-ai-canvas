@@ -1,8 +1,12 @@
 # 当前状态
 
-## 最新：Edge首轮失败项已修复并部署
+## 最新：v1.2.7阶段9稳定晋升完成
 
-用户确认版本/首页/导航/基本画布布局，通过截图证实Runtime重复17371请求、报价400、暗色点网格不可辨，且未找到导演台。提交601e5ada取消普通页面自动Runtime探测并在前端拦截已知无价格规格；0d815d15增强暗色点网格并为宽/窄专业画布增加导演台入口。Web1624、专项34、类型/格式/构建通过；只替换Web，运行身份`v1.2.7+dingxin.1 / 0d815d15`且healthy/restart0。Backend/真实卷未重启。当前`edge_fix_web_deployed_retest_pending`，F6仍待用户Edge。详见`UPSTREAM_V127_EDGE_FIXES_20260909.md`。
+用户已在登录态Microsoft Edge完成当前生产环境可安全观察项复验，暂未发现问题。功能检查点37bb2375已通过dry-run后非强制快进推送到候选与stable；`origin/main`保持11931d00，默认分支仍是`codex/dingxin-stable`，未创建PR/Release或触发远程CI。F6因无法在生产环境安全构造保存失败而单列`test_only_pending`，不记为通过。运行Web仍为0d815d15、Backend为ae01c5d6且healthy/restart0。详见`UPSTREAM_V127_STAGE9_20260909.md`。
+
+## 历史：Edge首轮失败项已修复并部署
+
+用户确认版本/首页/导航/基本画布布局，通过截图证实Runtime重复17371请求、报价400、暗色点网格不可辨，且未找到导演台。提交601e5ada取消普通页面自动Runtime探测并在前端拦截已知无价格规格；0d815d15增强暗色点网格并为宽/窄专业画布增加导演台入口。Web1624、专项34、类型/格式/构建通过；只替换Web，运行身份`v1.2.7+dingxin.1 / 0d815d15`且healthy/restart0。Backend/真实卷未重启。后续生产环境可观察项已由用户Edge复验通过；F6转为测试环境单列门禁。详见`UPSTREAM_V127_EDGE_FIXES_20260909.md`。
 
 ## 历史：阶段8复盘整改版已部署，等待Edge
 
