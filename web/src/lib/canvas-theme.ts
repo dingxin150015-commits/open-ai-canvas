@@ -73,7 +73,7 @@ export const canvasThemes = {
         canvas: {
             background: "#0b0b0b",
             workspaceBackground: "#0b0b0b",
-            dot: "rgba(178,178,178,.18)",
+            dot: "rgba(210,210,210,.30)",
             line: "rgba(178,178,178,.14)",
             selectionFill: "rgba(255,255,255,.12)",
         },

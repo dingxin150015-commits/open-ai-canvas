@@ -14,6 +14,7 @@ import {
     Gauge,
     Home,
     LayoutGrid,
+    Layers3,
     LoaderCircle,
     Menu,
     MoreHorizontal,
@@ -67,6 +68,7 @@ type CanvasTopBarProps = {
     mediaPerformanceMode: CanvasMediaPerformanceMode;
     onMediaPerformanceModeChange: (mode: CanvasMediaPerformanceMode) => void;
     onOpenSearch: () => void;
+    onOpenDirector?: () => void;
     projectContext?: CanvasContextSummary & { projectId: string; projectName: string };
     onEnterFocusMode: () => void;
     shortDramaGuide?: { progress: CanvasShortDramaProgress; collapsed: boolean; onToggle: () => void };
@@ -98,6 +100,7 @@ export function CanvasTopBar({
     mediaPerformanceMode,
     onMediaPerformanceModeChange,
     onOpenSearch,
+    onOpenDirector,
     projectContext,
     onEnterFocusMode,
     shortDramaGuide,
@@ -224,6 +227,7 @@ export function CanvasTopBar({
                             placement="bottomRight"
                             menu={{
                                 items: [
+                                    ...(onOpenDirector ? [{ key: "director", label: "新建 3D 导演台", icon: <Layers3 className="size-4" />, onClick: onOpenDirector }] : []),
                                     { key: "search", label: "搜索画布节点", icon: <Search className="size-4" />, onClick: onOpenSearch },
                                     { key: "libtv", label: "导入 LibTV 画布", onClick: onImportLibTV },
                                     { key: "tapnow", label: "导入 TapNow 画布", onClick: onImportTapNow },
@@ -249,6 +253,13 @@ export function CanvasTopBar({
                     </div>
                 ) : (
                     <div className="canvas-topbar-cluster pointer-events-auto flex w-fit shrink-0 items-center gap-1.5" style={dockStyle}>
+                        {onOpenDirector ? (
+                            <CanvasTopBarTooltip label="新建 3D 导演台">
+                                <Button type="text" className="canvas-topbar-action !h-10 !rounded-xl !px-2.5 !font-medium" style={{ color: theme.node.text }} icon={<Layers3 className="size-4" />} onClick={onOpenDirector} aria-label="新建 3D 导演台">
+                                    <span className="hidden xl:inline">导演台</span>
+                                </Button>
+                            </CanvasTopBarTooltip>
+                        ) : null}
                         <CanvasTopBarTooltip label="搜索画布节点">
                             <Button
                                 type="text"

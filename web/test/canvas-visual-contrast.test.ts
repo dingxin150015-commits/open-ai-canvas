@@ -34,7 +34,7 @@ describe("canvas visual contrast", () => {
     test("pins grid tokens and applies custom opacity only once", async () => {
         expect(canvasThemes.light.canvas.dot).toBe("rgba(15,23,42,.20)");
         expect(canvasThemes.light.canvas.line).toBe("rgba(15,23,42,.15)");
-        expect(canvasThemes.dark.canvas.dot).toBe("rgba(178,178,178,.18)");
+        expect(canvasThemes.dark.canvas.dot).toBe("rgba(210,210,210,.30)");
         expect(canvasThemes.dark.canvas.line).toBe("rgba(178,178,178,.14)");
 
         const source = await Bun.file(new URL("../src/components/canvas/infinite-canvas.tsx", import.meta.url)).text();

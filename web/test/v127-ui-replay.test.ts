@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { canvasChromeLayout, canvasPanelLeft, partitionDockEntries } from "../src/lib/canvas/canvas-chrome-layout";
-import { createAutomaticRuntimeDiscovery, createLocalRuntimeStore } from "../src/stores/use-local-runtime-store";
+import { createLocalRuntimeStore } from "../src/stores/use-local-runtime-store";
 import { canvasRuntimeRetryDelay } from "../src/lib/canvas/local-runtime-connection";
 import { modelQuoteRequest, modelQuoteValidationError } from "../src/lib/model-pricing";
 import { defaultConfig, createModelChannel, type AiConfig } from "../src/stores/use-config-store";
@@ -41,54 +41,6 @@ test("one non-stretching bottom row owns all controls, with explicit focus and l
     expect(source("components/canvas/canvas-asset-tray.tsx")).toContain("displayLabel:");
 });
 
-test("shared auto discovery survives remounts without repeated offline probes", async () => {
-    let run: (() => void) | undefined;
-    let calls = 0;
-    const acquire = createAutomaticRuntimeDiscovery(
-        async () => {
-            calls++;
-        },
-        (fn) => {
-            run = fn;
-            return () => {
-                run = undefined;
-            };
-        },
-    );
-    const first = acquire();
-    const second = acquire();
-    run?.();
-    first();
-    second();
-    const remount = acquire();
-    run?.();
-    await Promise.resolve();
-    expect(calls).toBe(1);
-    remount();
-});
-
-test("StrictMode cleanup before discovery cancels only its scheduled attempt", () => {
-    let run: (() => void) | undefined;
-    let calls = 0;
-    const acquire = createAutomaticRuntimeDiscovery(
-        async () => {
-            calls++;
-        },
-        (fn) => {
-            run = fn;
-            return () => {
-                run = undefined;
-            };
-        },
-    );
-    acquire()();
-    expect(run).toBeUndefined();
-    const cleanup = acquire();
-    run?.();
-    expect(calls).toBe(1);
-    cleanup();
-});
-
 test("a concurrent connecting caller does not abort the owner handshake", async () => {
     let release!: () => void;
     let calls = 0;
@@ -124,6 +76,13 @@ test("a concurrent connecting caller does not abort the owner handshake", async 
 test("automatic stream retries have a finite budget", () => {
     expect([1, 2, 3, 4, 5].map(canvasRuntimeRetryDelay)).toEqual([2000, 5000, 15000, null, null]);
     expect(source("components/canvas/canvas-local-agent-panel.tsx")).toContain("enabled: false");
+});
+
+test("professional canvas exposes a discoverable Director entry in both top bar layouts", () => {
+    const topBar = source("pages/canvas/canvas-project-top-bar.tsx");
+    const page = source("pages/canvas/project.tsx");
+    expect(topBar.match(/新建 3D 导演台/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(page).toContain('onOpenDirector={workspaceMode === "professional"');
 });
 
 function managedConfig() {

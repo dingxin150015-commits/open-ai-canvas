@@ -2307,6 +2307,7 @@ function InfiniteCanvasPage() {
                                 mediaPerformanceMode={mediaPerformanceMode}
                                 onMediaPerformanceModeChange={setMediaPerformanceMode}
                                 onOpenSearch={() => setNodeSearchOpen(true)}
+                                onOpenDirector={workspaceMode === "professional" ? () => setDirectorTemplateRequest({}) : undefined}
                                 projectContext={
                                     shortDramaEnabled && currentProject?.projectId
                                         ? {
