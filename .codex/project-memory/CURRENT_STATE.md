@@ -1,8 +1,8 @@
 # 当前状态
 
-## 最新：百炼完整声明式插件迁移预验证中
+## 最新：百炼完整声明式插件已部署，等待用户 Edge 确认
 
-用户已批准完整迁移并部署至 Edge 门禁前。正确基线 `d9fec0f4`，独立修复工作树 `.local/worktrees/dashscope-plugins`。旧 `b6254b41` 工作区宿主直接注册补丁不适合部署；本次正式插件包及通用引擎扩展取代该方案。当前源码和测试进展、剩余门禁见 `BAILIAN_PLUGIN_MIGRATION_20260911.md`，尚不宣称运行环境已经更新。
+正确基线 `d9fec0f4`，部署提交 `8dcdfd5d`，独立修复工作树 `.local/worktrees/dashscope-plugins`。两个协议已通过正式声明式 v3 插件进入统一生命周期；最终 Linux CGO 全量、断网克隆双启动与实际保留卷部署前后数据核对通过。Backend `45b8cc449d3c` 为 `v1.2.7+dingxin.1.bailian / 8dcdfd5d`，healthy、restart 0、schema 8/8；Web 容器未变，模型/价格/启用状态未改写。旧工作树宿主注入补丁已归档撤销。当前 `bailian_declarative_deployed_preverified_edge_pending`，详细证据和 Edge 清单见 `BAILIAN_PLUGIN_MIGRATION_20260911.md`。未执行浏览器步骤或真实付费生成。
 
 ## 最新：v1.2.7阶段9稳定晋升完成
 

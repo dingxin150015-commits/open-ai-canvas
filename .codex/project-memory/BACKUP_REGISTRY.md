@@ -1,5 +1,12 @@
 # 影策备份登记簿
 
+## BKP-20260912-172928-BAILIAN-PREDEPLOY / BKP-20260912-173253-BAILIAN-POSTDEPLOY
+
+- 两份均为 `verified/protected`，私有路径分别为 `<private-backup-root>/bailian-plugin-predeploy-20260912-172928` 和 `<private-backup-root>/bailian-plugin-postdeploy-20260912-173253`；精确位置保存在修复工作树的 Git 忽略 `.local/deployment-state.json`。
+- 完整冻结 `/data`，DB/WAL/SHM、设置密钥、迁移标记和插件 registry 双份比对；逐文件 ACL 限当前用户、SYSTEM 和 Administrators。完整性 ok、外键 0、解密失败 0，Schema8、80表，关键业务摘要一致。
+- 旧 Backend 镜像由 `open-ai-canvas-backend:pre-bailian-20260912-172928` 保护；新镜像为 `sha256:8102a7c11dd4d30897c86b6a9e7245ce7e533031809f46dff9f3df17792f3609`，源码 8dcdfd5d。真卷保留；临时断网克隆容器与卷已清理。
+- 2026-09-11 首份预部署备份和克隆验证私有副本继续保留，不自动删除历史恢复点。恢复仍须核对目标与用户范围。
+
 ## BKP-20260909-005845-V127-FOLLOWUP
 
 - 状态：`verified/protected`；私有位置使用`<private-backup-root>\v127-followup-predeploy-20260909-005845`。

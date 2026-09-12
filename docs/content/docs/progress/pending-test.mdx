@@ -7,6 +7,8 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 ## 百炼完整插件迁移
 
+部署提交 `8dcdfd5d` 已通过最终 Backend Linux CGO 全量、断网克隆双启动与保留卷部署前后数据核对。当前 Backend 为 `v1.2.7+dingxin.1.bailian`，插件包版本 `3.0.0`；Web 保持原容器，模型价格和启用状态未修改。尚未完成用户 Edge 人工验收。
+
 在 `d9fec0f4` 基线上迁移为正式声明式 `dashscope-image` / `dashscope-video` 插件，原先旧工作树上的宿主直接注入补丁不作为发布候选。最终部署与验证记录见项目记忆 `BAILIAN_PLUGIN_MIGRATION_20260911.md`。
 
 Edge 人工门禁：插件中心应显示两个可管理的百炼协议；图片协议显示 `DashScope Qwen Image` 和同步 `/multimodal-generation/generation`；视频显示 `DashScope Wan / HappyHorse Video` 和异步创建/查询路径。确认旧模型记录、价格与启用状态保持，编辑器打开后选中正确协议。仅观察时不要点击模型测试或生成；真实 Provider 调用仍需另行批准。

@@ -1,5 +1,9 @@
 # 开发历史时间线
 
+## 2026-09-12：百炼完整声明式插件迁移部署
+
+从稳定 d9fec0f4 建立独立修复分支，d6fed730 完成插件/引擎迁移，8dcdfd5d 收敛无关格式。旧宿主代码仅保留为测试对照，正式 v3 包接入现有插件生命周期。最终 Backend Linux CGO 全量与请求、拒绝、恢复夹具通过；私有备份、断网克隆双启动、保留卷部署前后关键数据摘要均通过。Backend 45b8cc449d3c 运行 8dcdfd5d，Web 不变。模型和价格未改写，临时克隆已清理，停在用户 Edge 门禁前；未真实生成、push 或远程 CI。详见 `BAILIAN_PLUGIN_MIGRATION_20260911.md`。
+
 ## 2026-09-09：v1.2.7阶段9稳定晋升
 
 用户完成当前生产环境可安全观察项的Microsoft Edge复验并反馈暂未发现问题。功能检查点37bb2375经dry-run后非强制快进到用户Fork候选与stable；`origin/main`保持11931d00，默认分支仍为stable，未创建PR/Release或触发远程CI。F6无法在生产环境安全构造保存失败，转为隔离测试环境门禁且不记为通过。运行Web 0d815d15、Backend ae01c5d6保持healthy/restart0；官方main的新尾差83d9622未纳入。

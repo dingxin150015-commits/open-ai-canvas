@@ -1,6 +1,6 @@
 # {{NAME}}
 
-DashScope 视频是影策连接阿里云百炼原生异步视频接口的宿主内置协议。Registry 提供统一发现和媒体可达性元数据，Wan 3.0、Wan 2.7 与 HappyHorse 仍分别由精确 modelKey Provider 处理。它们的时长、分辨率、参考媒体、声音和水印合同不同，不能退化成一个会静默截断参数的通用 DashScope Adapter。
+DashScope 视频现通过 `dashscope-video.yingce-plugin` 独立声明式插件加载。Wan 3.0、Wan 2.7 与 HappyHorse 按精确 modelKey 声明各自的时长、分辨率、媒体角色和请求规则，不使用静默截断参数的通用 Wan 模板。本文件保留协议迁移说明；当前完整执行合同以插件包的 Manifest 与文档为准。
 
 ## 接口
 
@@ -31,4 +31,4 @@ DashScope 视频是影策连接阿里云百炼原生异步视频接口的宿主�
 
 ## 当前实现边界
 
-本协议的 execution 为 `host:dashscope-video`。创建、轮询、结果 URL 校验和下载全部保留在本地经过合同测试的 Provider 中；结果下载只使用 URL 自带签名，不转发渠道 Authorization。资源上传失败会阻止任务资产确认并保留可恢复状态，不能把临时 URL 或浏览器 blob 地址伪装成已持久化成功。
+本协议的 execution 为 `declarative`，使用 v3 包合同。插件声明创建、轮询、状态和结果映射；宿主统一处理任务恢复、出站校验、匿名结果下载、账务与资源持久化。结果下载不转发渠道 Authorization，即使结果地址与上游同源。原 Go Provider 仅保留为测试对照；资源持久化失败仍必须向上返回真实失败。
