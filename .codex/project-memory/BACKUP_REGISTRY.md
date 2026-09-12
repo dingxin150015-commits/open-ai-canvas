@@ -1,5 +1,11 @@
 # 影策备份登记簿
 
+## 2026-09-12 画布单请求多图：仅前端恢复点
+
+- 原 Web 镜像 sha256:f53d523c579c6d9831262a5808375e3e65b2bfe53db68ab916c0306b5c9a19b2 已保留标签 `open-ai-canvas-web:pre-canvas-native-batch-20260912`，可仅替换 Web 回退。
+- 新 Web cd0b4340 / 镜像44380b76e9aa，Backend/数据卷未修改，不产生新的数据库迁移或数据恢复点。所有既有数据库备份继续保留。
+- 证据：`.local/canvas-native-batch-deployment.json`。镜像身份已验证；本轮未进行实际回退演练，不将其记为已演练恢复。
+
 ## BKP-20260912-203916-BAILIAN-COMPLETE-PREDEPLOY / BKP-20260912-204448-BAILIAN-COMPLETE-POSTDEPLOY
 
 - 状态均为 verified/protected。完整冻结数据副本与 DB/WAL/SHM、设置密钥、迁移标记、插件 registry 逐份比对，ACL 限当前用户、SYSTEM、Administrators。
