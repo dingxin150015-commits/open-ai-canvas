@@ -1,5 +1,13 @@
 # 影策备份登记簿
 
+## BKP-20260912-203916-BAILIAN-COMPLETE-PREDEPLOY / BKP-20260912-204448-BAILIAN-COMPLETE-POSTDEPLOY
+
+- 状态均为 verified/protected。完整冻结数据副本与 DB/WAL/SHM、设置密钥、迁移标记、插件 registry 逐份比对，ACL 限当前用户、SYSTEM、Administrators。
+- 升级前 Schema 8，升级后 Schema 9；80 表、完整性 ok、外键 0、解密失败 0。模型、价格、逻辑模型/版本/线路、任务、订单、账户和流水摘要一致。
+- 新代码 5889345a；Backend 镜像 f5edb2742ece，Web 镜像 f53d523c579c。精确私有路径、旧/新镜像与容器身份在修复树 .local/deployment-complete-state.json。
+- 原 Backend/Web 镜像均已保护，旧恢复点不删除。专用克隆容器/卷已在确认停止和身份后清理；私有克隆快照保留。
+- 恢复须匹配 Schema 与代码，旧 Schema 8 二进制不能直接覆盖连接 Schema 9 数据；不得删除真实卷或修改迁移记录绕过校验。
+
 ## BKP-20260912-172928-BAILIAN-PREDEPLOY / BKP-20260912-173253-BAILIAN-POSTDEPLOY
 
 - 两份均为 `verified/protected`，私有路径分别为 `<private-backup-root>/bailian-plugin-predeploy-20260912-172928` 和 `<private-backup-root>/bailian-plugin-postdeploy-20260912-173253`；精确位置保存在修复工作树的 Git 忽略 `.local/deployment-state.json`。
