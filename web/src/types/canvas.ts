@@ -335,6 +335,9 @@ export type CanvasNodeMetadata = {
     videoCameraMovePrompt?: string;
     videoStartFrameNodeId?: string;
     generationOptions?: import("@/lib/bailian-generation").BailianGenerationOptions;
+    /** One provider task can own several canvas nodes, each bound to a stable output slot. */
+    taskOutputIndex?: number;
+    taskSubmissionNodeId?: string;
     videoEndFrameNodeId?: string;
     videoFrameSourceNodeId?: string;
     videoFrameTimeMs?: number;

@@ -193,7 +193,7 @@ export function CanvasConfigComposer({ model, value, inputs, skillReferences = [
                 </div>
             ) : null}
             {onMetadataChange && !isCanvasWorkflowProvider(metadata) ? (
-                <BailianGenerationOptionsPanel model={model} value={metadata?.generationOptions} imageCount={videoFrameOptions.length} onChange={(generationOptions) => onMetadataChange({ generationOptions })} />
+                <BailianGenerationOptionsPanel model={model} value={metadata?.generationOptions} imageCount={videoFrameOptions.length} showBatchControl onChange={(generationOptions) => onMetadataChange({ generationOptions })} />
             ) : null}
             <div className="canvas-config-composer-editor relative rounded-lg" style={{ background: theme.node.fill }}>
                 {!value.trim() ? (

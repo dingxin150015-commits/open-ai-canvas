@@ -17,6 +17,10 @@ export function bailianContractModel(config: Pick<AiConfig, "channels" | "model"
     return declaredGenerationContract(config, model) ?? model;
 }
 
+export function nativeImageBatchEnabled(config: AiConfig) {
+    return (config.taskWorkflowProvider || "model") === "model" && config.generationOptions?.nativeBatch === true && bailianModelKind(bailianContractModel(config)) === "qwen" && (!config.generationOptions.contractKind || config.generationOptions.contractKind === "qwen");
+}
+
 export type BailianGenerationOptions = {
     contractKind?: string;
     seed?: string | number;

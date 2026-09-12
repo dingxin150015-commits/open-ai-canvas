@@ -296,7 +296,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                 await consumeGenerationTaskNode(
                     task,
                     nodeId,
-                    0,
+                    nodesRef.current.find((node) => node.id === nodeId)?.metadata?.taskOutputIndex ?? 0,
                     async ({ task: materialized, output, effectKey, signal }) => {
                         await applyCanvasGenerationTaskNodeEffect({
                             projectId,
@@ -311,7 +311,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                     },
                     { signal: consumerControllerRef.current.signal },
                 );
-                const currentNode = nodesRef.current.find((node) => node.id === nodeId || node.metadata?.taskId === task.id);
+                const currentNode = nodesRef.current.find((node) => node.id === nodeId);
                 if (task.status === "succeeded" && (!currentNode?.metadata?.content || currentNode.metadata.status !== NODE_STATUS_SUCCESS)) {
                     // attach effect 可能已经完成，但旧画布快照仍停留在 loading。
                     // 最终以节点是否真实拿到媒体结果为准，不能只信幂等记录。
@@ -386,7 +386,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
             if (!isCurrentProject()) return;
             await Promise.all(
                 recoveryNodes.map(async (node) => {
-                    const discoveredTask = projectTasks.find((task) => generationTaskNodeId(task) === node.id);
+                    const discoveredTask = projectTasks.find((task) => generationTaskNodeId(task) === (node.metadata?.taskSubmissionNodeId || node.id));
                     const taskId = node.metadata?.taskId || node.metadata?.agentGenerationContinuation?.taskId || discoveredTask?.id;
                     if (!taskId) {
                         if (!isCurrentProject()) return;
@@ -395,8 +395,9 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                         );
                         return;
                     }
-                    if (recoveringTaskIdsRef.current.has(taskId)) return;
-                    recoveringTaskIdsRef.current.add(taskId);
+                    const recoveryKey = `${taskId}:${node.id}`;
+                    if (recoveringTaskIdsRef.current.has(recoveryKey)) return;
+                    recoveringTaskIdsRef.current.add(recoveryKey);
                     const continuationOnly = !node.metadata?.taskId && node.metadata?.agentGenerationContinuation?.taskId === taskId && !discoveredTask;
                     try {
                         const completed = await observeSubscribedGenerationTask(taskId, signal, (task) => {
@@ -439,7 +440,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                                 : current,
                         );
                     } finally {
-                        recoveringTaskIdsRef.current.delete(taskId);
+                        recoveringTaskIdsRef.current.delete(recoveryKey);
                     }
                 }),
             );

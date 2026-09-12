@@ -19,7 +19,7 @@ import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { CanvasVideoPromptTools } from "./canvas-video-prompt-tools";
-import { bailianContractModel, optionalVideoPrompt } from "@/lib/bailian-generation";
+import { bailianContractModel, nativeImageBatchEnabled, optionalVideoPrompt } from "@/lib/bailian-generation";
 import { BailianGenerationOptionsPanel } from "@/components/bailian-generation-options";
 import { CanvasPresetPicker, type CanvasPromptPreset } from "./canvas-preset-picker";
 import { CanvasPortraitTexturePopover } from "./canvas-portrait-texture-popover";
@@ -136,12 +136,13 @@ export function CanvasNodePromptPanel({
         return promptOptimizerPlugin.createPromptOptimizer(createPluginHostContext(promptOptimizerPlugin, promptOptimizerInstallation, globalConfig));
     }, [globalConfig, promptOptimizerEnabled, promptOptimizerInstallation]);
     const generationCount = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const requestCount = mode === "image" && !nativeImageBatchEnabled(config) ? generationCount : 1;
     const priceChannel = resolveModelChannel(config, config.model);
     const configuredCredits = requestCreditCost({
         channelMode: priceChannel.scope === "system" ? "remote" : "local",
         modelCosts: priceChannel.modelCosts,
         model: modelOptionName(config.model),
-        count: mode === "image" ? generationCount : 1,
+        count: requestCount,
         seconds: mode === "video" ? config.videoSeconds : 1,
         capability: mode,
         config,
@@ -205,7 +206,7 @@ export function CanvasNodePromptPanel({
         setQuotedCredits(null);
         setQuoteError("");
         quoteModelCatalog(quoteRequest.modelID, quoteRequest.intent, controller.signal)
-            .then(({ quote }) => setQuotedCredits(quote.amountMicrocredits / 1_000_000))
+            .then(({ quote }) => setQuotedCredits((quote.amountMicrocredits / 1_000_000) * requestCount))
             .catch((error: unknown) => {
                 if (!controller.signal.aborted) {
                     setQuotedCredits(null);
@@ -215,7 +216,7 @@ export function CanvasNodePromptPanel({
         return () => controller.abort();
         // quoteRequestKey captures the full normalized request without retriggering on object identity.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [creditsEnabled, quoteRequestKey, validationError]);
+    }, [creditsEnabled, quoteRequestKey, validationError, requestCount]);
 
     const skillReferences = useMemo(() => resolvedMentionReferences.filter((item) => item.kind === "skill"), [resolvedMentionReferences]);
 
@@ -453,7 +454,7 @@ export function CanvasNodePromptPanel({
 
                 {renderPromptEditor(false)}
                 {(config.taskWorkflowProvider || "model") === "model" ? (
-                    <BailianGenerationOptionsPanel model={contractModel} value={node.metadata?.generationOptions} imageCount={requirements.input?.imageCount ?? 0} onChange={(generationOptions) => onConfigChange(node.id, { generationOptions })} />
+                    <BailianGenerationOptionsPanel model={contractModel} value={node.metadata?.generationOptions} imageCount={requirements.input?.imageCount ?? 0} showBatchControl onChange={(generationOptions) => onConfigChange(node.id, { generationOptions })} />
                 ) : null}
 
                 {/* B区 参数区（对应 #98 决策2：默认折叠，手风琴展开）*/}
@@ -738,6 +739,7 @@ export function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mo
         ...globalConfig,
         model,
         quality: defaults.quality || globalConfig.quality || defaultConfig.quality,
+        generationOptions: node.metadata?.generationOptions,
         size: defaults.size ?? globalConfig.size ?? defaultConfig.size,
         transparentBackground: defaults.transparentBackground || "false",
         videoSeconds: defaults.videoSeconds || normalizeVideoDuration(globalConfig.videoSeconds || defaultConfig.videoSeconds),

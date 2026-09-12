@@ -95,6 +95,7 @@ export function useCanvasGenerationRetry({
                           size: savedImageMetadata.size || effectiveConfig.size || sourceGenerationConfig.size,
                           transparentBackground: (savedImageMetadata.transparentBackground || effectiveConfig.transparentBackground || sourceGenerationConfig.transparentBackground) === "true" ? "true" : "false",
                           count: "1",
+                          generationOptions: savedImageMetadata.generationOptions ?? sourceGenerationConfig.generationOptions,
                       }
                     : { ...sourceGenerationConfig, count: "1" };
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
@@ -226,12 +227,17 @@ export function useCanvasGenerationRetry({
                 ),
             );
             const controller = startGenerationRequest(node.id, sourceNode.id, node.id);
-            const retryContext = node.metadata?.taskId ? await createGenerationRetryContext(node.metadata.taskId, node.metadata.attemptGroupId) : {};
+            const retryGroup = node.metadata?.taskOutputIndex !== undefined ? `${node.metadata.attemptGroupId || node.metadata.taskId}:output:${node.metadata.taskOutputIndex}` : node.metadata?.attemptGroupId;
+            const retryContext = node.metadata?.taskId ? await createGenerationRetryContext(node.metadata.taskId, retryGroup) : {};
             const runAndConsumeRetry = async (input: Parameters<typeof runBackendCanvasGenerationTask>[0]) => {
                 await runCanvasGenerationTaskToConsumer(
                     { ...input, ...retryContext },
                     {
-                        bindTask: (task) => bindGenerationTask(node.id, task),
+                        bindTask: (task) => {
+                            nodesRef.current = nodesRef.current.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, taskOutputIndex: undefined, taskSubmissionNodeId: undefined } } : item);
+                            setNodes(nodesRef.current);
+                            bindGenerationTask(node.id, task);
+                        },
                         consumeTask: (task) => applyGenerationTaskResult(node.id, task),
                     },
                 );
@@ -375,7 +381,8 @@ export function useCanvasGenerationRetry({
                           size: generationConfig.size,
                           quality: generationConfig.quality,
                           transparentBackground: generationConfig.transparentBackground,
-                          count: savedImageMetadata.count || 1,
+                          count: 1,
+                          generationOptions: generationConfig.generationOptions,
                           references: savedImageMetadata.references,
                           ...generationWorkflowMetadata(generationConfig),
                       }

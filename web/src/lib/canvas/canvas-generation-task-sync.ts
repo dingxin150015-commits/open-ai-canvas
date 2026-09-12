@@ -115,7 +115,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
     const result = parseBackendGenerationResult(task);
 
     if (mode === "image") {
-        const image = result.images?.[0];
+        const image = result.images?.[node.metadata?.taskOutputIndex ?? 0];
         if (!image?.dataUrl) throw new Error("后端任务没有返回图片");
         let resultDataUrl = image.dataUrl;
         const emotionEdit = node.metadata?.emotionEdit;
@@ -228,6 +228,7 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
     if (!asset) throw new Error("生成任务输出素材不存在");
     const result = parseBackendGenerationResult(task);
     if (asset.kind === "image") {
+        if (output.outputIndex !== (node.metadata?.taskOutputIndex ?? 0)) throw new Error("图片输出序号与画布节点不匹配");
         const images = [...(result.images || [])];
         images[output.outputIndex] = {
             dataUrl: asset.data.dataUrl || asset.coverUrl,
@@ -286,7 +287,9 @@ export async function syncGenerationTaskToCanvasStore(task: GenerationTask) {
 
 function findGenerationTaskNode(nodes: CanvasNodeData[], task: GenerationTask, targetNodeId?: string) {
     const nodeId = targetNodeId || generationTaskNodeId(task);
-    return nodes.find((node) => node.id === nodeId || node.metadata?.taskId === task.id);
+    // An explicit deleted output must not fall back to a sibling sharing the task.
+    if (targetNodeId) return nodes.find((node) => node.id === targetNodeId);
+    return nodes.find((node) => node.id === nodeId) ?? nodes.find((node) => node.metadata?.taskId === task.id);
 }
 
 function completedTaskMetadata(task: GenerationTask): CanvasNodeMetadata {

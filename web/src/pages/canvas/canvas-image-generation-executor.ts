@@ -9,6 +9,8 @@ import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-s
 import { CONTENT_MODERATION_ERROR_CODE, generationFailureMetadata, type GenerationFailureMetadata } from "@/lib/generation-error";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { nativeImageBatchEnabled } from "@/lib/bailian-generation";
+import type { GenerationTask } from "@/services/api/task-center";
 
 import type { CanvasGenerationExecution } from "./canvas-generation-executor-types";
 
@@ -42,13 +44,14 @@ export async function executeImageGeneration({
     retryContext,
     showError,
     registerPendingNodeIds,
-}: CanvasGenerationExecution) {
+}: CanvasGenerationExecution, runTaskToConsumer = runCanvasGenerationTaskToConsumer) {
     const referenceLimitError = canvasImageReferenceLimitError(generationConfig, generationContext.referenceImages);
     if (referenceLimitError) {
         showError(referenceLimitError);
         return;
     }
     const count = getGenerationCount(generationConfig.count);
+    const nativeBatch = nativeImageBatchEnabled(generationConfig) && count > 1;
     const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
     const isImageNode = sourceNode?.type === CanvasNodeType.Image;
     const reuseSourceNode = canGenerateImageInPlace(sourceNode);
@@ -99,6 +102,9 @@ export async function executeImageGeneration({
             primaryImageId: undefined,
             content: reuseSourceNode ? "" : undefined,
             ...generationMetadata,
+            taskId: undefined,
+            taskOutputIndex: undefined,
+            taskSubmissionNodeId: undefined,
             ...styleMetadata,
             ...skillMetadata,
             imageBatchExpanded: count > 1 ? false : undefined,
@@ -120,6 +126,8 @@ export async function executeImageGeneration({
             size: generationConfig.size,
             batchRootId: rootId,
             ...generationMetadata,
+            taskOutputIndex: nativeBatch ? index : undefined,
+            taskSubmissionNodeId: nativeBatch ? targetIds[0] : undefined,
             ...styleMetadata,
             ...skillMetadata,
             generationErrorCode: undefined,
@@ -166,34 +174,48 @@ export async function executeImageGeneration({
     let hasFailure = false;
     let failureCount = 0;
     let representativeFailure: GenerationFailureMetadata | undefined;
+    const submit = async (targetId: string): Promise<GenerationTask> => {
+        let terminal: GenerationTask | undefined;
+        await runTaskToConsumer(
+            {
+                projectId,
+                nodeId: targetId,
+                ...retryContext,
+                mode: "image",
+                prompt: effectivePrompt,
+                config: { ...generationConfig, count: nativeBatch ? String(count) : "1" },
+                referenceImages,
+                signal: controller.signal,
+                metadata: {
+                    sourceNodeId: nodeId,
+                    ...taskContext,
+                    resolvedCharacterVersions: generationContext.resolvedCharacterVersions,
+                    promptTemplateOperation: sourceNode?.metadata?.promptTemplateOperation,
+                    promptTemplateVariables: sourceNode?.metadata?.promptTemplateVariables,
+                    ...styleMetadata,
+                    ...skillMetadata,
+                },
+            },
+            {
+                bindTask: (task) => (nativeBatch ? targetIds : [targetId]).forEach((id) => bindGenerationTask(id, task)),
+                consumeTask: async (task) => { terminal = task; },
+            },
+        );
+        if (!terminal) throw new Error("生成任务缺少成功终态");
+        return terminal;
+    };
+    const sharedTask = nativeBatch ? submit(targetIds[0]!) : undefined;
+    // Output effects share one task but have independent durable acknowledgements.
+    let consumption: Promise<void> = Promise.resolve();
     await Promise.all(
         targetIds.map(async (targetId) => {
             try {
-                await runCanvasGenerationTaskToConsumer(
-                    {
-                        projectId,
-                        nodeId: targetId,
-                        ...retryContext,
-                        mode: "image",
-                        prompt: effectivePrompt,
-                        config: { ...generationConfig, count: "1" },
-                        referenceImages,
-                        signal: controller.signal,
-                        metadata: {
-                            sourceNodeId: nodeId,
-                            ...taskContext,
-                            resolvedCharacterVersions: generationContext.resolvedCharacterVersions,
-                            promptTemplateOperation: sourceNode?.metadata?.promptTemplateOperation,
-                            promptTemplateVariables: sourceNode?.metadata?.promptTemplateVariables,
-                            ...styleMetadata,
-                            ...skillMetadata,
-                        },
-                    },
-                    {
-                        bindTask: (task) => bindGenerationTask(targetId, task),
-                        consumeTask: (task) => applyGenerationTaskResult(targetId, task),
-                    },
-                );
+                const task = await (sharedTask ?? submit(targetId));
+                if (nativeBatch) {
+                    const applied = consumption.then(() => applyGenerationTaskResult(targetId, task));
+                    consumption = applied.catch(() => undefined);
+                    await applied;
+                } else await applyGenerationTaskResult(targetId, task);
                 if (targetId !== rootId) {
                     setNodes((current) => {
                         const child = current.find((node) => node.id === targetId);
