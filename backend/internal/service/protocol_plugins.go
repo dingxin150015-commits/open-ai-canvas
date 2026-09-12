@@ -353,22 +353,20 @@ func (c *pluginRuntime) reload() error {
 		}
 		if !record.Metadata.Enabled {
 			record.Status = "disabled"
-			for _, adapter := range adapters {
+			for index, adapter := range adapters {
 				info := adapter.Metadata()
 				info.Enabled = false
-				_ = registry.Register(protocol.UnavailableAdapter{Info: info})
+				adapters[index] = protocol.UnavailableAdapter{Info: info}
+			}
+			if err := registry.RegisterAll(adapters); err != nil {
+				record.Status = "invalid"
+				record.Error = err.Error()
 			}
 			plugins[id] = record
 			continue
 		}
-		registrationFailed := false
-		for _, adapter := range adapters {
-			if err := registry.Register(adapter); err != nil {
-				record.Error = err.Error()
-				registrationFailed = true
-			}
-		}
-		if registrationFailed {
+		if err := registry.RegisterAll(adapters); err != nil {
+			record.Error = err.Error()
 			plugins[id] = record
 			continue
 		}

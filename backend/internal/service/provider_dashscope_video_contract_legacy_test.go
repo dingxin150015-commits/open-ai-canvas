@@ -1,5 +1,7 @@
 package service
 
+// Frozen pre-migration oracle; compiled only into tests, never the server.
+
 import (
 	"errors"
 	"fmt"

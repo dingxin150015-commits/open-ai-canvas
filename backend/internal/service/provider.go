@@ -1598,6 +1598,9 @@ func systemChannelIDFromBaseURL(baseURL string) string {
 }
 
 func runImageTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	if err := validateBailianLegacyProtocol(input.Config.Model, input.Config.InterfaceType); err != nil {
+		return nil, err
+	}
 	if _, ok := declarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok {
 		return runDeclarativeProtocolTask(ctx, input)
 	}
@@ -1614,7 +1617,7 @@ func runImageTask(ctx context.Context, input canvasGenerationInput) (map[string]
 		return runGeminiImageTask(ctx, input)
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceDashScopeImage) {
-		return runDashScopeImageTask(ctx, input)
+		return nil, errors.New("DashScope 图片插件未安装或未启用")
 	}
 	var payload imageResponse
 	if input.Mask != nil {
@@ -2438,7 +2441,11 @@ var defaultProtocolPollTiming = protocolPollTiming{
 }
 
 func runProtocolAdapterTask(ctx context.Context, input canvasGenerationInput, adapter protocol.Adapter) (map[string]interface{}, error) {
-	return runProtocolAdapterTaskWithTiming(ctx, input, adapter, defaultProtocolPollTiming)
+	timing := defaultProtocolPollTiming
+	if milliseconds := adapter.Metadata().PollIntervalMS; milliseconds > 0 {
+		timing.PollInterval = time.Duration(milliseconds) * time.Millisecond
+	}
+	return runProtocolAdapterTaskWithTiming(ctx, input, adapter, timing)
 }
 
 func runProtocolAdapterTaskWithTiming(ctx context.Context, input canvasGenerationInput, adapter protocol.Adapter, timing protocolPollTiming) (map[string]interface{}, error) {
@@ -2613,6 +2620,27 @@ func protocolRequestFromInput(input canvasGenerationInput) protocol.GenerationRe
 			"count":        input.Config.Count,
 		},
 	}
+	// Preserve raw option presence for plugins that distinguish an omitted value
+	// from false, zero or smart duration. No credentials enter the expression env.
+	request.Extra["rawOptions"] = map[string]any{
+		"duration": input.Config.VideoSeconds, "count": input.Config.Count,
+		"watermark": input.Config.VideoWatermark, "generateAudio": input.Config.VideoGenerateAudio,
+		"transparentBackground": input.Config.TransparentBackground,
+		"firstFrameID":          metadataString(input.Metadata, "videoStartFrameNodeId"),
+		"lastFrameID":           metadataString(input.Metadata, "videoEndFrameNodeId"),
+	}
+	generationMetadata := make(map[string]any)
+	for _, key := range []string{"seed", "negative_prompt", "prompt_extend", "prompt_extend_mode", "enable_thinking", "watermark"} {
+		if value, ok := input.Metadata[key]; ok {
+			generationMetadata[key] = value
+		}
+	}
+	request.Extra["generationMetadata"] = generationMetadata
+	imageInputs := len(input.ReferenceImages)
+	if input.Mask != nil {
+		imageInputs++
+	}
+	request.Extra["referenceCounts"] = map[string]any{"image": imageInputs, "video": len(input.ReferenceVideos), "audio": len(input.ReferenceAudios)}
 	for _, message := range input.TextHistory {
 		role := strings.ToLower(strings.TrimSpace(message.Role))
 		if role != "user" && role != "assistant" && role != "system" {
@@ -3114,6 +3142,28 @@ func protocolCredentialField(config providerConfig, field string) string {
 }
 
 func protocolRequestURL(baseURL string, spec protocol.RequestSpec) (string, error) {
+	if len(spec.BasePathSuffixes) > 0 {
+		base, err := url.Parse(strings.TrimSpace(baseURL))
+		if err != nil || base.Scheme == "" || base.Host == "" || base.RawQuery != "" || base.Fragment != "" || base.User != nil {
+			return "", fmt.Errorf("协议 Base URL 无效或包含查询参数")
+		}
+		path := strings.TrimRight(base.Path, "/")
+		for _, suffix := range spec.BasePathSuffixes {
+			if !strings.HasPrefix(suffix, "/") || strings.ContainsAny(suffix, "?#") {
+				return "", fmt.Errorf("协议路径后缀无效")
+			}
+			if strings.HasSuffix(strings.ToLower(path), strings.ToLower(suffix)) {
+				path = strings.TrimRight(path[:len(path)-len(suffix)], "/")
+				break
+			}
+		}
+		base.Path = path
+		base.RawPath = ""
+		if !strings.HasPrefix(spec.Path, "/") || strings.HasPrefix(spec.Path, "//") {
+			return "", fmt.Errorf("协议原生请求路径无效")
+		}
+		return appendProtocolQuery(strings.TrimRight(base.String(), "/")+spec.Path, spec.Query)
+	}
 	if !spec.OriginPath {
 		return appendProtocolQuery(apiURL(baseURL, spec.Path), spec.Query)
 	}
@@ -3264,8 +3314,19 @@ func protocolMediaBytes(ctx context.Context, config providerConfig, reference pr
 	var mimeType string
 	var err error
 	for attempt := 0; attempt < 3; attempt++ {
-		data, mimeType, err = getProviderExternalBinary(withProviderRequestKind(ctx, "download"), config, value)
+		if reference.Anonymous {
+			var req *http.Request
+			req, err = http.NewRequestWithContext(withProviderRequestKind(ctx, "download"), http.MethodGet, value, nil)
+			if err == nil {
+				data, mimeType, err = doBinary(req)
+			}
+		} else {
+			data, mimeType, err = getProviderExternalBinary(withProviderRequestKind(ctx, "download"), config, value)
+		}
 		if err == nil {
+			if reference.Anonymous && len(data) == 0 {
+				return nil, "", errors.New("协议媒体下载返回空内容")
+			}
 			return data, normalizedMediaMimeType(mimeType, data), nil
 		}
 		if attempt == 2 || !retryableProtocolMediaDownload(err) {
@@ -3507,6 +3568,9 @@ func audioFormatMimeType(format string) string {
 }
 
 func runVideoTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	if err := validateBailianLegacyProtocol(input.Config.Model, input.Config.InterfaceType); err != nil {
+		return nil, err
+	}
 	if _, ok := declarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok {
 		return runDeclarativeProtocolTask(ctx, input)
 	}
@@ -3521,7 +3585,7 @@ func runVideoTask(ctx context.Context, input canvasGenerationInput) (map[string]
 		return runMiniMaxVideoTask(ctx, input)
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceDashScopeVideo) {
-		return runDashScopeVideoTask(ctx, input)
+		return nil, errors.New("DashScope 视频插件未安装或未启用")
 	}
 	if input.Config.InterfaceType == string(model.ChannelInterfaceVolcengineJiMengVideo) {
 		return runVolcengineJiMengVideoTask(ctx, input)
@@ -4511,7 +4575,7 @@ func firstNonEmptyString(values ...string) string {
 }
 
 func validateGenerationInterface(mode string, interfaceType string) error {
-	return validateGenerationInterfaceWithRegistry(protocol.Builtins(), mode, interfaceType)
+	return validateGenerationInterfaceWithRegistry(loadOfficialFallbackRegistry(), mode, interfaceType)
 }
 
 func (s *Service) validateGenerationInterface(mode string, interfaceType string) error {

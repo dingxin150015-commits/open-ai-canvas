@@ -826,6 +826,9 @@ func matchSKUSelector(tier map[string]string, requested map[string]string) (bool
 }
 
 func (s *Service) logicalRouteBlocked(route cachedLogicalRoute) bool {
+	if !s.bailianModelProtocolAvailable(route.ChannelModel) {
+		return true
+	}
 	now := time.Now()
 	keys := []string{"channel:" + route.ChannelModel.ChannelID, "channel-model:" + route.ChannelModel.ID, "route:" + route.Route.ID}
 	// 这里会删除过期项，必须使用写锁；不要改成 RLock。

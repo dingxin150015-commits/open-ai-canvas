@@ -166,6 +166,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 	pricingMode, displayPrice, priceLabel := computeChannelModelPriceDisplay(cm, publicTiers)
 
 	available := cm.SupportStatus == model.ChannelModelSupportReady && (len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm)))
+	available = available && s.bailianModelProtocolAvailable(*cm)
 
 	// Catalog and task admission consume the same durable capability profile.
 	var capabilityConfig map[string]any

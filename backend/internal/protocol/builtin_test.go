@@ -12,8 +12,8 @@ func TestBuiltinCatalogContainsRequestedProtocols(t *testing.T) {
 	registry := Builtins()
 	expected := []string{
 		"chat-completion", "openai-response", "claude-api",
-		"openai-image", "grok-image", "volcengine-ark-image", "volcengine-jimeng-image", "gemini-image", "dashscope-image",
-		"newapi", "newapi-channel-2", "xai-video", "volcengine-ark-video", "volcengine-jimeng-video", "gemini-veo", "novita-video", "minimax-video", "dashscope-video", "agnes-video",
+		"openai-image", "grok-image", "volcengine-ark-image", "volcengine-jimeng-image", "gemini-image",
+		"newapi", "newapi-channel-2", "xai-video", "volcengine-ark-video", "volcengine-jimeng-video", "gemini-veo", "novita-video", "minimax-video", "agnes-video",
 	}
 	for _, id := range expected {
 		if _, ok := registry.Get(id); !ok {
@@ -54,20 +54,11 @@ func TestBuiltinCatalogContainsRequestedProtocols(t *testing.T) {
 	}
 }
 
-func TestDashScopeBuiltinsRemainHostBackedModelSpecificProtocols(t *testing.T) {
-	image, imageOK := Builtins().Get("dashscope-image")
-	video, videoOK := Builtins().Get("dashscope-video")
-	if !imageOK || !videoOK {
-		t.Fatal("DashScope builtins are missing")
-	}
-	if image.Metadata().Execution != "host:dashscope-image" || video.Metadata().Execution != "host:dashscope-video" {
-		t.Fatalf("DashScope execution metadata = image:%q video:%q", image.Metadata().Execution, video.Metadata().Execution)
-	}
-	if image.Metadata().RequiresPublicMediaURLs {
-		t.Fatal("DashScope image must retain model-specific Data URL and URL handling")
-	}
-	if !video.Metadata().RequiresPublicMediaURLs {
-		t.Fatal("DashScope video references must be materialized as public URLs")
+func TestDashScopeHasNoHostFallback(t *testing.T) {
+	for _, id := range []string{"dashscope-image", "dashscope-video"} {
+		if _, exists := Builtins().Get(id); exists {
+			t.Fatal("DashScope must load from a plugin package")
+		}
 	}
 }
 

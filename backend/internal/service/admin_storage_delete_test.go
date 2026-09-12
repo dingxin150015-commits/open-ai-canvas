@@ -166,6 +166,13 @@ func newAdminStorageDeleteTestService(t *testing.T) (*Service, *gorm.DB, string,
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Serialize fixture queries with the asynchronous outbox drainer; this
+	// avoids shared-cache table locks without changing production or assertions.
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 	if err := database.MigrateSchema(db); err != nil {
 		t.Fatal(err)
 	}

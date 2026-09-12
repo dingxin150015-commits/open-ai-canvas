@@ -1,5 +1,9 @@
 # 当前状态
 
+## 最新：百炼完整声明式插件迁移预验证中
+
+用户已批准完整迁移并部署至 Edge 门禁前。正确基线 `d9fec0f4`，独立修复工作树 `.local/worktrees/dashscope-plugins`。旧 `b6254b41` 工作区宿主直接注册补丁不适合部署；本次正式插件包及通用引擎扩展取代该方案。当前源码和测试进展、剩余门禁见 `BAILIAN_PLUGIN_MIGRATION_20260911.md`，尚不宣称运行环境已经更新。
+
 ## 最新：v1.2.7阶段9稳定晋升完成
 
 用户已在登录态Microsoft Edge完成当前生产环境可安全观察项复验，暂未发现问题。功能检查点37bb2375已通过dry-run后非强制快进推送到候选与stable；`origin/main`保持11931d00，默认分支仍是`codex/dingxin-stable`，未创建PR/Release或触发远程CI。F6因无法在生产环境安全构造保存失败而单列`test_only_pending`，不记为通过。运行Web仍为0d815d15、Backend为ae01c5d6且healthy/restart0。详见`UPSTREAM_V127_STAGE9_20260909.md`。

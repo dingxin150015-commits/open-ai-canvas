@@ -37,6 +37,9 @@ func (s *Service) QuoteSystemChannelModel(channelModelID string, intent ModelReq
 	if !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady {
 		return nil, InvalidModelSelection("指定的模型不可用")
 	}
+	if !s.bailianModelProtocolAvailable(*channelModel) {
+		return nil, InvalidModelSelection("模型协议未启用或选择不匹配")
+	}
 	if _, err := s.repo.SystemChannel(channelModel.ChannelID); errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, InvalidModelSelection("指定的渠道不可用")
 	} else if err != nil {

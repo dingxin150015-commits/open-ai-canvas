@@ -1,5 +1,7 @@
 package service
 
+// Frozen pre-migration oracle; compiled only into tests, never the server.
+
 import (
 	"errors"
 	"fmt"
@@ -8,8 +10,6 @@ import (
 	"strings"
 	"unicode/utf8"
 )
-
-const wan30VideoModel = "wan3.0-video"
 
 type wan30VideoRequest struct {
 	Model      string               `json:"model"`
@@ -34,10 +34,6 @@ type wan30VideoParameters struct {
 	Audio      bool   `json:"audio"`
 	Seed       *int64 `json:"seed,omitempty"`
 	Watermark  bool   `json:"watermark"`
-}
-
-func isWan30VideoModel(value string) bool {
-	return strings.EqualFold(strings.TrimPrefix(strings.TrimSpace(value), "models/"), wan30VideoModel)
 }
 
 func buildWan30VideoRequest(input canvasGenerationInput) (map[string]interface{}, error) {

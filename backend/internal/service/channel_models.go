@@ -551,6 +551,9 @@ func (s *Service) normalizeChannelModelPriceTiers(req ChannelModelRequest, capab
 	result := make([]model.ChannelModelPriceTier, 0, len(inputs))
 	seen := make(map[string]bool, len(inputs))
 	for _, input := range inputs {
+		if err := validateBailianLegacyProtocol(firstNonEmpty(input.ProviderModelKey, fallbackProviderModelKey), string(protocol)); err != nil {
+			return nil, BadAuthRequest(err.Error())
+		}
 		selector, resolution, videoSeconds, selectorErr := normalizeChannelModelTierSelector(capability, input)
 		if selectorErr != nil {
 			return nil, selectorErr
@@ -941,7 +944,7 @@ func imageTestDefaults(profile *ImageCapabilityConfig) (string, string) {
 }
 
 func normalizeChannelModelContract(channel *model.ModelChannel, req ChannelModelRequest) (string, string, string, model.ChannelInterfaceType, error) {
-	return normalizeChannelModelContractWithRegistry(protocol.Builtins(), channel, req)
+	return normalizeChannelModelContractWithRegistry(loadOfficialFallbackRegistry(), channel, req)
 }
 
 func (s *Service) normalizeChannelModelContract(channel *model.ModelChannel, req ChannelModelRequest) (string, string, string, model.ChannelInterfaceType, error) {
@@ -966,6 +969,9 @@ func normalizeChannelModelContractWithRegistry(registry *protocol.Registry, chan
 		return "", "", "", "", BadAuthRequest("请选择有效的模型请求协议")
 	}
 	protocol := model.ChannelInterfaceType(adapter.Metadata().ID)
+	if err := validateBailianLegacyProtocol(providerModelKey, string(protocol)); err != nil {
+		return "", "", "", "", BadAuthRequest(err.Error())
+	}
 	if expected := protocolCapabilityFromMetadata(adapter.Metadata()); expected != "" && expected != capability {
 		return "", "", "", "", BadAuthRequest("模型能力与请求协议不匹配")
 	}

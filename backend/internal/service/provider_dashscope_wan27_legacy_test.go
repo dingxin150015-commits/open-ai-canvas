@@ -1,5 +1,7 @@
 package service
 
+// Frozen pre-migration oracle; compiled only into tests, never the server.
+
 import (
 	"errors"
 	"fmt"
@@ -34,22 +36,6 @@ type wan27VideoRequest struct {
 	Input      wan27VideoInput      `json:"input"`
 	Parameters wan27VideoParameters `json:"parameters"`
 }
-
-func wan27VideoKind(value string) string {
-	value = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(value), "models/"))
-	switch value {
-	case "wan2.7-t2v", "wan2.7-t2v-2026-06-12", "wan2.7-t2v-2026-04-25":
-		return "t2v"
-	case "wan2.7-i2v", "wan2.7-i2v-2026-04-25":
-		return "i2v"
-	case "wan2.7-r2v", "wan2.7-r2v-2026-06-12":
-		return "r2v"
-	default:
-		return ""
-	}
-}
-
-func isWan27ReadyVideoModel(value string) bool { return wan27VideoKind(value) != "" }
 
 func buildWan27VideoRequest(input canvasGenerationInput) (map[string]interface{}, error) {
 	modelName := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(input.Config.Model), "models/"))

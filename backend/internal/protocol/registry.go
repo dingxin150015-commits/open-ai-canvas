@@ -23,21 +23,31 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 }
 
 func (r *Registry) Register(adapter Adapter) error {
-	if adapter == nil {
-		return fmt.Errorf("protocol adapter is nil")
-	}
-	metadata := adapter.Metadata()
-	metadata.ID = strings.TrimSpace(metadata.ID)
-	metadata.Version = strings.TrimSpace(metadata.Version)
-	if metadata.ID == "" || metadata.Version == "" {
-		return fmt.Errorf("protocol adapter metadata requires id and version")
-	}
+	return r.RegisterAll([]Adapter{adapter})
+}
+
+// RegisterAll publishes a complete plugin contribution set or nothing.
+func (r *Registry) RegisterAll(adapters []Adapter) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.adapters[metadata.ID]; exists {
-		return fmt.Errorf("protocol adapter %q is already registered", metadata.ID)
+	seen := make(map[string]bool, len(adapters))
+	for _, adapter := range adapters {
+		if adapter == nil {
+			return fmt.Errorf("protocol adapter is nil")
+		}
+		metadata := adapter.Metadata()
+		id := strings.TrimSpace(metadata.ID)
+		if id == "" || strings.TrimSpace(metadata.Version) == "" {
+			return fmt.Errorf("protocol adapter metadata requires id and version")
+		}
+		if _, exists := r.adapters[id]; exists || seen[id] {
+			return fmt.Errorf("protocol adapter %q is already registered", id)
+		}
+		seen[id] = true
 	}
-	r.adapters[metadata.ID] = adapter
+	for _, adapter := range adapters {
+		r.adapters[strings.TrimSpace(adapter.Metadata().ID)] = adapter
+	}
 	return nil
 }
 

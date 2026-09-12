@@ -37,6 +37,7 @@ const (
 )
 
 type MediaReference struct {
+	Anonymous bool           `json:"anonymous,omitempty"`
 	ID        string         `json:"id,omitempty"`
 	URL       string         `json:"url,omitempty"`
 	DataURL   string         `json:"dataUrl,omitempty"`
@@ -112,15 +113,16 @@ type PollContext struct {
 }
 
 type RequestSpec struct {
-	Method      string              `json:"method"`
-	Path        string              `json:"path"`
-	OriginPath  bool                `json:"originPath,omitempty"`
-	ContentType string              `json:"contentType"`
-	Headers     map[string]string   `json:"headers,omitempty"`
-	Query       map[string][]string `json:"query,omitempty"`
-	Body        any                 `json:"body,omitempty"`
-	Files       []RequestFilePart   `json:"files,omitempty"`
-	Auth        ManifestAuth        `json:"auth,omitempty"`
+	BasePathSuffixes []string            `json:"basePathSuffixes,omitempty"`
+	Method           string              `json:"method"`
+	Path             string              `json:"path"`
+	OriginPath       bool                `json:"originPath,omitempty"`
+	ContentType      string              `json:"contentType"`
+	Headers          map[string]string   `json:"headers,omitempty"`
+	Query            map[string][]string `json:"query,omitempty"`
+	Body             any                 `json:"body,omitempty"`
+	Files            []RequestFilePart   `json:"files,omitempty"`
+	Auth             ManifestAuth        `json:"auth,omitempty"`
 }
 
 type RequestFilePart struct {
@@ -163,6 +165,7 @@ type Parameter struct {
 }
 
 type Metadata struct {
+	PollIntervalMS          int          `json:"-"`
 	ID                      string       `json:"id"`
 	Version                 string       `json:"version"`
 	Name                    string       `json:"name"`
@@ -209,6 +212,7 @@ type Manifest struct {
 	AgentResponse   *ManifestAgentResponse `json:"-"`
 	Auth            ManifestAuth           `json:"-"`
 	Validations     []ManifestValidation   `json:"-"`
+	Variables       []ManifestVariable     `json:"-"`
 }
 
 // Manifest JSON is the public plugin contract. Metadata is an internal
@@ -324,6 +328,8 @@ type ManifestPaymentResponse struct {
 }
 
 type ManifestProvider struct {
+	Variables               []ManifestVariable     `json:"variables,omitempty"`
+	PollIntervalMS          int                    `json:"pollIntervalMs,omitempty"`
 	ID                      string                 `json:"id"`
 	Label                   string                 `json:"label"`
 	Capabilities            []Capability           `json:"capabilities"`
@@ -357,6 +363,11 @@ type ManifestAuth struct {
 type ManifestValidation struct {
 	Assert  any    `json:"assert"`
 	Message string `json:"message"`
+}
+
+type ManifestVariable struct {
+	Name  string `json:"name"`
+	Value any    `json:"value"`
 }
 
 type ManifestWorkflow struct {

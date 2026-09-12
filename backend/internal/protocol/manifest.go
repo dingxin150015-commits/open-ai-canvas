@@ -13,6 +13,7 @@ import (
 )
 
 type ManifestOperation struct {
+	BasePathSuffixes    []string           `json:"basePathSuffixes,omitempty"`
 	Method              string             `json:"method"`
 	Path                string             `json:"path"`
 	PathTemplate        any                `json:"pathTemplate,omitempty"`
@@ -34,6 +35,8 @@ type ManifestFilePart struct {
 }
 
 type ManifestResponse struct {
+	ResultAnonymous bool     `json:"resultAnonymous,omitempty"`
+	Strict          bool     `json:"strict,omitempty"`
 	TaskIDPaths     []string `json:"taskIdPaths,omitempty"`
 	StatusPaths     []string `json:"statusPaths,omitempty"`
 	ErrorPaths      []string `json:"errorPaths,omitempty"`
@@ -238,8 +241,10 @@ func loadDeclarativeManifestProvider(manifest Manifest, index int) (Adapter, err
 	return manifestAdapter{manifest: manifest}, nil
 }
 
+var manifestVariableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,95}$`)
+
 func ValidateManifest(manifest Manifest) error {
-	if version := strings.TrimSpace(manifest.APIVersion); version != "yingce.plugin/v1" && version != "yingce.plugin/v2" {
+	if version := strings.TrimSpace(manifest.APIVersion); version != "yingce.plugin/v1" && version != "yingce.plugin/v2" && version != "yingce.plugin/v3" {
 		return fmt.Errorf("unsupported protocol manifest apiVersion %q", manifest.APIVersion)
 	}
 	if strings.TrimSpace(manifest.Metadata.ID) == "" || strings.TrimSpace(manifest.Metadata.Version) == "" {
@@ -265,6 +270,16 @@ func ValidateManifest(manifest Manifest) error {
 	}
 	providerIDs := make(map[string]struct{}, len(manifest.Contributes.Providers))
 	for index, provider := range manifest.Contributes.Providers {
+		if provider.PollIntervalMS < 0 || provider.PollIntervalMS > 60000 {
+			return fmt.Errorf("invalid provider poll interval")
+		}
+		seenVariables := make(map[string]bool)
+		for _, variable := range provider.Variables {
+			if !manifestVariableNamePattern.MatchString(variable.Name) || seenVariables[variable.Name] {
+				return fmt.Errorf("invalid or duplicate provider variable %q", variable.Name)
+			}
+			seenVariables[variable.Name] = true
+		}
 		if strings.TrimSpace(provider.ID) == "" || strings.TrimSpace(provider.Label) == "" || !validManifestIdentifier(provider.ID) {
 			return fmt.Errorf("provider contribution %d requires a valid id and label", index)
 		}
@@ -394,6 +409,8 @@ func normalizeManifestForProvider(manifest *Manifest, index int) error {
 	manifest.AgentResponse = provider.AgentResponse
 	manifest.Auth = provider.Auth
 	manifest.Validations = provider.Validations
+	manifest.Variables = provider.Variables
+	manifest.Metadata.PollIntervalMS = provider.PollIntervalMS
 	return nil
 }
 
@@ -415,6 +432,14 @@ func operationSummaryPtr(operation *ManifestOperation) string {
 }
 
 func validateManifestOperation(operation ManifestOperation) error {
+	if operation.OriginPath && len(operation.BasePathSuffixes) > 0 {
+		return fmt.Errorf("originPath and basePathSuffixes cannot be combined")
+	}
+	for _, suffix := range operation.BasePathSuffixes {
+		if !strings.HasPrefix(suffix, "/") || strings.ContainsAny(suffix, "?#") || len(suffix) > 256 {
+			return fmt.Errorf("invalid base path suffix")
+		}
+	}
 	method := strings.ToUpper(strings.TrimSpace(operation.Method))
 	if method != http.MethodGet && method != http.MethodPost && method != http.MethodDelete && method != http.MethodPut {
 		return fmt.Errorf("unsupported HTTP method %q", operation.Method)
@@ -450,10 +475,10 @@ func (a manifestAdapter) BuildCreate(_ context.Context, c RequestContext) (Reque
 	if len(a.manifest.Contributes.Providers) == 0 {
 		return RequestSpec{}, fmt.Errorf("plugin %s does not provide a provider", a.manifest.Metadata.ID)
 	}
-	if err := validateManifestRequest(a.manifest.Validations, c.Request); err != nil {
+	if err := validateManifestRequest(a.manifest.Validations, c.Request, a.manifest.Variables); err != nil {
 		return RequestSpec{}, err
 	}
-	return buildManifestOperation(a.manifest.Create, a.manifest.Auth, c.Request, "")
+	return buildManifestOperation(a.manifest.Create, a.manifest.Auth, c.Request, "", a.manifest.Variables)
 }
 func (a manifestAdapter) BuildAgent(_ context.Context, c AgentRequestContext) (RequestSpec, error) {
 	if a.manifest.Agent == nil {
@@ -505,6 +530,9 @@ func (a manifestAdapter) ParseCreate(_ context.Context, body []byte) (CreateResu
 	if err != nil {
 		return CreateResult{}, err
 	}
+	if err := a.validateResponse(payload, PollContext{}); err != nil {
+		return CreateResult{}, err
+	}
 	return a.parse(payload, PollContext{}), nil
 }
 func (a manifestAdapter) BuildPoll(_ context.Context, c PollContext) (RequestSpec, error) {
@@ -518,6 +546,9 @@ func (a manifestAdapter) BuildPoll(_ context.Context, c PollContext) (RequestSpe
 func (a manifestAdapter) ParsePoll(_ context.Context, c PollContext, body []byte) (PollResult, error) {
 	payload, err := decodeObject(body)
 	if err != nil {
+		return PollResult{}, err
+	}
+	if err := a.validateResponse(payload, c); err != nil {
 		return PollResult{}, err
 	}
 	result := a.parse(payload, c)
@@ -599,8 +630,15 @@ func (a manifestAdapter) parse(payload map[string]any, c PollContext) CreateResu
 			}
 		}
 	}
-	if status == StatusPending && (result.Text != "" || len(result.Images) > 0 || len(result.Videos) > 0 || len(result.Audios) > 0) {
+	if !response.Strict && status == StatusPending && (result.Text != "" || len(result.Images) > 0 || len(result.Videos) > 0 || len(result.Audios) > 0) {
 		status = StatusSucceeded
+	}
+	if response.ResultAnonymous {
+		for _, items := range [][]MediaReference{result.Images, result.Videos, result.Audios} {
+			for index := range items {
+				items[index].Anonymous = true
+			}
+		}
 	}
 	if result.Text == "" && result.Reasoning == "" && len(result.Images) == 0 && len(result.Videos) == 0 && len(result.Audios) == 0 {
 		result = nil
@@ -608,11 +646,14 @@ func (a manifestAdapter) parse(payload map[string]any, c PollContext) CreateResu
 	return CreateResult{TaskID: id, Status: status, Result: result, Message: message}
 }
 
-func validateManifestRequest(rules []ManifestValidation, request GenerationRequest) error {
+func validateManifestRequest(rules []ManifestValidation, request GenerationRequest, variables ...[]ManifestVariable) error {
 	if len(rules) == 0 {
 		return nil
 	}
 	env := map[string]any{"request": manifestRequestValues(request)}
+	if err := evaluateManifestVariables(env, variables); err != nil {
+		return err
+	}
 	for _, rule := range rules {
 		value, err := evaluateManifestValue(rule.Assert, env)
 		if err != nil {
@@ -743,9 +784,12 @@ func mediaPathValues(payload map[string]any, path string) []string {
 	return values
 }
 
-func buildManifestOperation(operation ManifestOperation, auth ManifestAuth, request GenerationRequest, taskID string) (RequestSpec, error) {
+func buildManifestOperation(operation ManifestOperation, auth ManifestAuth, request GenerationRequest, taskID string, variables ...[]ManifestVariable) (RequestSpec, error) {
 	requestValues := manifestRequestValues(request)
 	env := map[string]any{"request": requestValues, "taskId": taskID}
+	if err := evaluateManifestVariables(env, variables); err != nil {
+		return RequestSpec{}, err
+	}
 	var body any
 	if operation.Body != nil {
 		value, err := evaluateManifestValue(operation.Body, env)
@@ -799,7 +843,40 @@ func buildManifestOperation(operation ManifestOperation, auth ManifestAuth, requ
 		return RequestSpec{}, fmt.Errorf("evaluate request content type: %w", err)
 	}
 	contentType := defaultValue(manifestString(evaluatedContentType), "application/json")
-	return RequestSpec{Method: strings.ToUpper(operation.Method), Path: path, OriginPath: operation.OriginPath, ContentType: contentType, Headers: headers, Query: query, Body: body, Files: files, Auth: auth}, nil
+	return RequestSpec{Method: strings.ToUpper(operation.Method), Path: path, OriginPath: operation.OriginPath, BasePathSuffixes: operation.BasePathSuffixes, ContentType: contentType, Headers: headers, Query: query, Body: body, Files: files, Auth: auth}, nil
+}
+
+func evaluateManifestVariables(env map[string]any, groups [][]ManifestVariable) error {
+	values := make(map[string]any)
+	env["vars"] = values
+	for _, variables := range groups {
+		for _, variable := range variables {
+			value, err := evaluateManifestValue(variable.Value, env)
+			if err != nil {
+				return fmt.Errorf("协议参数 %s 无效：%w", variable.Name, err)
+			}
+			values[variable.Name] = value
+		}
+	}
+	return nil
+}
+
+func (a manifestAdapter) validateResponse(payload map[string]any, c PollContext) error {
+	response := a.manifest.Response
+	if !response.Strict {
+		return nil
+	}
+	env := map[string]any{"response": payload, "taskId": c.TaskID, "request": manifestRequestValues(c.Request)}
+	for _, expression := range []any{response.Status, response.TaskID, response.Images, response.Videos, response.Audios, response.Usage} {
+		if _, err := evaluateManifestValue(expression, env); err != nil {
+			return fmt.Errorf("invalid provider response mapping: %w", err)
+		}
+	}
+	status := manifestResponseString(response.Status, env)
+	if !manifestError(payload, response.ErrorPaths...) && normalizeStatus(status) == "" {
+		return fmt.Errorf("provider returned an unknown or missing task status")
+	}
+	return nil
 }
 
 func evaluateManifestStringMap(values map[string]any, env map[string]any) (map[string]string, error) {

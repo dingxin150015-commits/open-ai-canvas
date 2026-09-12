@@ -5,6 +5,26 @@ description: 影策统一插件系统的扩展边界、Manifest 合同与 Eagle 
 
 # 插件系统设计
 
+## 百炼声明式协议与通用引擎扩展
+
+这些扩展使用包合同 `yingce.plugin/v3`，两个百炼包版本为 `3.0.0`，旧引擎会在加载时明确拒绝，避免忽略新变量后发送残缺请求。已有 v1/v2 包继续使用原合同。后台插件中心的展示对象仍使用既有归一化视图，包内 Manifest 才是执行合同真相。
+
+`dashscope-image` 与 `dashscope-video` 通过正式 `.yingce-plugin` 包安装，分别承接 Qwen Image 3.0 Pro，以及已登记的 Wan 2.7、HappyHorse 1.1、Wan 3.0 模型。模型 ID、校验与线协议位于 `plugin-packages/bailian-specs.mjs`，由目录生成器产出 Manifest 和完整接口文档。原 Provider 仅保留为 `_legacy_test.go` 对照夹具，不进入服务器二进制。产品能力画像仍用于 UI、报价和任务准入，不负责组装上游请求。
+
+宿主继续负责渠道鉴权、SSRF 防护、任务恢复、计费和资源持久化。插件启停、版本、目录和执行均走现有统一运行时，不增加宿主协议白名单或特殊目录注入。旧 Wanx/Wan 插件继续保留，但已知新模型不能误保存到旧协议。
+
+- `providers[].variables`：按声明顺序求值的纯变量，后续变量、请求模板和校验通过 `vars.name` 引用；名称必须唯一。
+- `$strictInt` / `$strictBool`：保留缺省值与显式零、false、智能时长的区别，非法类型直接报错。
+- `$pixelSize`：由插件指定预设、像素与比例限制、目标像素和输出分隔符，宿主不包含模型名称判断。
+- `$validateMedia` / `$selectByIds`：媒体数量、MIME、大小、尺寸、时长和地址形态校验，以及严格帧素材选择与排序。
+- `$flatten` / `$sum` / `$weightedLength` / `$replace`：数组汇总、时长相加、字符长度与字符串转换。
+- `create/poll.basePathSuffixes`：替换兼容 API 路径后缀，保留配置中的账号区域主机和代理前缀；不能与 `originPath` 同时设置。
+- `pollIntervalMs`：插件声明轮询间隔，上限 60000 毫秒；未配置沿用现有默认值。
+- `response.strict`：未知状态或错误的映射表达式直接拒绝，不能因暂存媒体 URL 把 PENDING 升级为成功。
+- `response.resultAnonymous`：结果 URL 下载不转发渠道凭证，包括同源地址；付费创建和轮询仍使用渠道鉴权。
+
+Windows 可运行 `scripts/build-bailian-plugins.ps1` 定向生成两个包；Linux 使用既有目录生成器与打包脚本。新增模型须提供成功/拒绝夹具和保存、报价、执行链验证，不能仅追加模型名称。
+
 > 状态：已实现首版（Eagle 外部素材来源 + AI 提示词优化器）
 >
 > 当前版本已经包含 Eagle 专属素材管理页面、后端本地桥接、原始文件树浏览、文件读取和写入，以及内置 `prompt-optimizer` AI 能力插件。第三方包统一使用 `.yingce-plugin`；远程 Web 入口仍必须经过沙箱运行时和宿主 RPC。

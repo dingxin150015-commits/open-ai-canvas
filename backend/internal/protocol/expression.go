@@ -391,7 +391,7 @@ func evaluateManifestOperator(operator string, operand any, env map[string]any) 
 		value, err := evaluateManifestValue(operand, env)
 		return !manifestTruthy(value), err
 	default:
-		return nil, fmt.Errorf("unsupported manifest operator %q", operator)
+		return evaluateExtendedManifestOperator(operator, operand, env)
 	}
 }
 

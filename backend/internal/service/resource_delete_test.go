@@ -410,6 +410,13 @@ func newResourceDeletionTestService(t *testing.T) (*Service, *gorm.DB, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Shared-cache in-memory SQLite otherwise races the asynchronous outbox
+	// drainer against assertion reads with SQLITE_LOCKED (not busy_timeout).
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 	if err := database.MigrateSchema(db); err != nil {
 		t.Fatal(err)
 	}

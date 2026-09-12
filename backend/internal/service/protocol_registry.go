@@ -323,6 +323,7 @@ func (s *Service) SetPluginEnabled(id string, enabled bool) (PluginView, error) 
 	plugin, err := s.pluginRuntime.setEnabled(id, enabled)
 	if err == nil {
 		s.refreshPaymentRegistry()
+		s.invalidateRouteCatalog()
 	}
 	return plugin, err
 }

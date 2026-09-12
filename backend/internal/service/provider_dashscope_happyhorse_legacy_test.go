@@ -1,5 +1,7 @@
 package service
 
+// Frozen pre-migration oracle; compiled only into tests, never the server.
+
 import (
 	"errors"
 	"fmt"
@@ -25,22 +27,6 @@ type happyHorseVideoRequest struct {
 	Input      happyHorseVideoInput      `json:"input"`
 	Parameters happyHorseVideoParameters `json:"parameters"`
 }
-
-func happyHorse11VideoKind(value string) string {
-	value = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(value), "models/"))
-	switch value {
-	case "happyhorse-1.1-t2v":
-		return "t2v"
-	case "happyhorse-1.1-i2v":
-		return "i2v"
-	case "happyhorse-1.1-r2v":
-		return "r2v"
-	default:
-		return ""
-	}
-}
-
-func isHappyHorse11ReadyVideoModel(value string) bool { return happyHorse11VideoKind(value) != "" }
 
 func buildHappyHorseVideoRequest(input canvasGenerationInput) (map[string]interface{}, error) {
 	modelName := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(input.Config.Model), "models/"))

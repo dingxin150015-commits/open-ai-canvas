@@ -39,7 +39,7 @@ func TestOfficialProtocolPackagesAreSelfContainedDeclarativePlugins(t *testing.T
 			// the declarative AI provider contract covered by this catalog test.
 			continue
 		}
-		if pkg.Manifest.APIVersion != "yingce.plugin/v2" {
+		if pkg.Manifest.APIVersion != "yingce.plugin/v2" && pkg.Manifest.APIVersion != "yingce.plugin/v3" {
 			t.Fatalf("%s apiVersion = %q", filepath.Base(path), pkg.Manifest.APIVersion)
 		}
 		if strings.HasPrefix(strings.TrimSpace(pkg.Manifest.Runtime.Backend), "host:") {

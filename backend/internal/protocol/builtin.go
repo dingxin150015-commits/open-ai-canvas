@@ -73,8 +73,8 @@ func Builtins() *Registry {
 	}
 	registry, err := NewRegistry(
 		openAIChatAdapter(), openAIResponsesAdapter(), claudeAdapter(),
-		openAIImagesAdapter(), grokImagesAdapter(), arkImagesAdapter(), jimengImagesAdapter(), geminiImagesAdapter(), dashScopeImagesAdapter(),
-		openAIVideosAdapter(), newAPIChannel1Adapter(), newAPIVideosAdapter(), xAIVideosAdapter(), arkVideosAdapter(), jimengVideosAdapter(), geminiVeoAdapter(), novitaVideosAdapter(), miniMaxVideosAdapter(), dashScopeVideosAdapter(),
+		openAIImagesAdapter(), grokImagesAdapter(), arkImagesAdapter(), jimengImagesAdapter(), geminiImagesAdapter(),
+		openAIVideosAdapter(), newAPIChannel1Adapter(), newAPIVideosAdapter(), xAIVideosAdapter(), arkVideosAdapter(), jimengVideosAdapter(), geminiVeoAdapter(), novitaVideosAdapter(), miniMaxVideosAdapter(),
 		openAIAudioAdapter(), asyncAudioAdapter(), agnesAdapter(),
 	)
 	if err != nil {
@@ -109,26 +109,6 @@ func metadata(id, name, vendor string, capability Capability, create, poll, cont
 
 func mediaParams() []Parameter {
 	return []Parameter{{Name: "model", Type: "string", Required: true, Mapping: "model"}, {Name: "prompt", Type: "string", Required: true, Mapping: "prompt"}, {Name: "images", Type: "media[]", Mapping: "provider-specific"}, {Name: "imageCount", Type: "integer", Mapping: "provider-specific"}, {Name: "aspectRatio", Type: "string", Mapping: "provider-specific"}, {Name: "resolution", Type: "string", Mapping: "provider-specific"}, {Name: "quality", Type: "string", Mapping: "provider-specific"}}
-}
-
-// DashScope 的请求序列化和异步状态机由现有模型专属 Provider 执行。
-// Registry 只提供统一的协议发现、能力分类和媒体可达性元数据，避免
-// 把 Qwen、Wan 3.0、Wan 2.7 与 HappyHorse 压扁成一套通用声明式请求。
-func dashScopeImagesAdapter() Adapter {
-	info := metadata("dashscope-image", "DashScope 图片", "Alibaba Cloud Bailian", CapabilityImage, "POST /api/v1/services/aigc/multimodal-generation/generation", "", "application/json")
-	info.Description = "阿里云百炼原生图片协议；由影策内置 Qwen/Wan 模型专属 Provider 执行。"
-	info.Execution = "host:dashscope-image"
-	info.Parameters = mediaParams()
-	return builtinAdapter{info: info}
-}
-
-func dashScopeVideosAdapter() Adapter {
-	info := metadata("dashscope-video", "DashScope 视频", "Alibaba Cloud Bailian", CapabilityVideo, "POST /api/v1/services/aigc/video-generation/video-synthesis", "GET /api/v1/tasks/{task_id}", "application/json")
-	info.Description = "阿里云百炼原生异步视频协议；由影策内置 Wan/HappyHorse 模型专属 Provider 执行。"
-	info.Execution = "host:dashscope-video"
-	info.RequiresPublicMediaURLs = true
-	info.Parameters = videoParams()
-	return builtinAdapter{info: info}
 }
 
 func videoParams() []Parameter {

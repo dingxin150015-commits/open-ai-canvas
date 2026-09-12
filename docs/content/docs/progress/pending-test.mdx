@@ -5,6 +5,12 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 # 待测试
 
+## 百炼完整插件迁移
+
+在 `d9fec0f4` 基线上迁移为正式声明式 `dashscope-image` / `dashscope-video` 插件，原先旧工作树上的宿主直接注入补丁不作为发布候选。最终部署与验证记录见项目记忆 `BAILIAN_PLUGIN_MIGRATION_20260911.md`。
+
+Edge 人工门禁：插件中心应显示两个可管理的百炼协议；图片协议显示 `DashScope Qwen Image` 和同步 `/multimodal-generation/generation`；视频显示 `DashScope Wan / HappyHorse Video` 和异步创建/查询路径。确认旧模型记录、价格与启用状态保持，编辑器打开后选中正确协议。仅观察时不要点击模型测试或生成；真实 Provider 调用仍需另行批准。
+
 > 本文按阶段累积保留历史验证过程。早期章节中的“尚未进入运行环境”“等待阶段 6/7/8”等状态已被后续章节替代；本地阶段 16 的权威状态以 `.codex/project-memory/STAGE16_FINAL_HANDOFF.md` 为准。
 
 ## v1.2.7阶段9与剩余测试门禁
