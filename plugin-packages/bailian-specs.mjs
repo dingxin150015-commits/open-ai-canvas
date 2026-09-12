@@ -113,7 +113,7 @@ export const qwenPixelPolicy = {
 };
 const imageSpec = {
   apiVersion: "yingce.plugin/v3",
-  version: "3.0.0",
+  version: "3.1.0",
   id: "dashscope-image",
   providerId: "dashscope-image",
   name: "DashScope Qwen Image",
@@ -277,7 +277,7 @@ const orderedImages = iff(
 );
 const videoSpec = {
   apiVersion: "yingce.plugin/v3",
-  version: "3.0.0",
+  version: "3.1.0",
   id: "dashscope-video",
   providerId: "dashscope-video",
   name: "DashScope Wan / HappyHorse Video",
@@ -518,13 +518,6 @@ const videoSpec = {
       "含参考视频时输出最多 10 秒",
     ),
     rule(
-      implies(
-        and(family("wan27"), not(is("r2v"))),
-        le(audioDuration, op("$multiply", v("duration"), 1000)),
-      ),
-      "驱动音频不能长于输出视频",
-    ),
-    rule(
       implies(and(ne(v("last"), ""), eq(videoCount, 0)), ne(v("first"), "")),
       "配置尾帧必须同时配置首帧",
     ),
@@ -628,9 +621,9 @@ const videoSpec = {
         mimes: videoMimes,
         minDurationMs: iff(is("i2v"), 2000, 1000),
         maxDurationMs: iff(is("i2v"), 10000, 30000),
-        minSide: iff(and(family("wan27"), is("r2v")), 240, 0),
-        maxSide: iff(and(family("wan27"), is("r2v")), 4096, 0),
-        maxAspect: iff(and(family("wan27"), is("r2v")), 8, 0),
+        minSide: iff(family("wan27"), 240, 0),
+        maxSide: iff(family("wan27"), 4096, 0),
+        maxAspect: iff(family("wan27"), 8, 0),
         allowData: family("wan30"),
         allowedOrigins: iff(family("wan30"), ["oss://dashscope-instant"], []),
       }),
@@ -746,4 +739,26 @@ const videoSpec = {
   notes:
     "精确支持 Wan 2.7 七个主线/快照 ID、HappyHorse 1.1 三个 ID、wan3.0-video。未登记模型拒绝。保留首尾帧、续写、参考媒体、驱动音频、智能时长及各自输入限制。异步轮询间隔 15 秒；UNKNOWN 视为终态失败；结果 URL 临时有效，宿主立即物化。",
 };
+// All Qwen transports reuse the native semantic contract; only wire encoding,
+// endpoint and asynchronous lifecycle differ.
+const nativeImageBody = imageSpec.create.body;
+imageSpec.variables.push(variable("requestMode", co(v("meta.request_mode"), "sync")));
+imageSpec.validations.push(rule(inside(v("requestMode"), ["sync", "async", "openai"]), "未知图片请求方式"));
+imageSpec.create.pathTemplate = choice([
+  [eq(v("requestMode"), "async"), "/api/v1/services/aigc/image-generation/generation"],
+  [eq(v("requestMode"), "openai"), "/compatible-mode/v1/images/generations"],
+], imageSpec.create.path);
+imageSpec.create.headers = { "X-DashScope-Async": iff(eq(v("requestMode"), "async"), "enable") };
+imageSpec.create.body = iff(eq(v("requestMode"), "openai"), {
+  model: v("model"), prompt: v("prompt"), image: omit(map(v("images"), "m", co(ref("m.dataUrl"), ref("m.url")))),
+  ...nativeImageBody.parameters, size: op("$replace", co(v("size"), "auto"), "*", "x"),
+}, nativeImageBody);
+imageSpec.poll = { ...commonPath, method: "GET", path: "/api/v1/tasks/{{taskId}}" };
+imageSpec.pollIntervalMs = 10000;
+imageSpec.response.taskId = co(ref("response.output.task_id"), ref("taskId"));
+imageSpec.response.status = choice([[eq(upper(ref("response.output.task_status")), "UNKNOWN"), "failed"]], co(ref("response.output.task_status"), "succeeded"));
+imageSpec.response.images = cat(imageSpec.response.images, map(ref("response.output.results"), "m", ref("m.url")), map(ref("response.data"), "m", ref("m.url")));
+imageSpec.response.errorPaths.push("error.code", "error.type");
+imageSpec.response.messagePaths.push("error.message");
+imageSpec.notes += " 支持 request_mode=sync/async/openai，默认 sync。异步使用专属 image-generation 端点与 10 秒轮询；兼容接口使用字母 x 和 image 数组。";
 export default [imageSpec, videoSpec];

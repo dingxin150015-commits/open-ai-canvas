@@ -26,7 +26,7 @@ export type PublicLogicalModel = {
     capability: CapabilitySpec["capability"];
     sortOrder: number;
     pricePolicy: "channel" | "unified";
-    billingMode: "fixed_request" | "per_second" | "token";
+    billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
     unitPriceMicrocredits: number;
     inputPriceMicrocredits: number;
     outputPriceMicrocredits: number;
@@ -43,7 +43,7 @@ export type PublicLogicalModelPriceTier = {
     selector: Record<string, string>;
     resolution: string;
     videoSeconds: number;
-    billingMode: "fixed_request" | "per_second" | "token";
+    billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
     unitPriceMicrocredits: number;
     inputTokenPriceMicrocredits: number;
     outputTokenPriceMicrocredits: number;

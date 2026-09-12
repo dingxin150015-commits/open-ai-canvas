@@ -72,7 +72,8 @@ export function expandCreationPrompt(prompt: string, references: CreationReferen
 
     const contexts: string[] = [];
     const mediaMappings: string[] = [];
-    const attachmentPositions = new Map(attachments.map((attachment, index) => [attachment.id, index + 1]));
+    const counts = { image: 0, video: 0, audio: 0, file: 0 };
+    const attachmentPositions = new Map(attachments.map((attachment) => [attachment.id, ++counts[creationAttachmentKind(attachment)]]));
     references.forEach((reference) => {
         if (reference.attachmentId) {
             const position = attachmentPositions.get(reference.attachmentId);

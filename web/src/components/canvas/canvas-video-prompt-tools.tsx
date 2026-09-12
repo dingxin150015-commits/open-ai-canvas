@@ -1,5 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { videoFrameRoles } from "@/lib/bailian-generation";
 import { Check, ChevronDown, Image as ImageIcon } from "lucide-react";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
@@ -20,6 +21,7 @@ type CompactMenuItem = {
 };
 
 type CanvasVideoPromptToolsProps = {
+    model?: string;
     metadata?: CanvasNodeMetadata;
     frameOptions: VideoFrameOption[];
     onMetadataChange: (patch: Partial<CanvasNodeMetadata>) => void;
@@ -33,7 +35,8 @@ const MENU_MARGIN = 8;
 const MENU_ITEM_HEIGHT = 28;
 const CONTROL_TEXT_STYLE: CSSProperties = { fontFamily: "inherit", fontSize: 11, fontWeight: 400, letterSpacing: 0, lineHeight: 1 };
 
-export function CanvasVideoPromptTools({ metadata, frameOptions, onMetadataChange, referenceMode = "frames", referenceSummary }: CanvasVideoPromptToolsProps) {
+export function CanvasVideoPromptTools({ model = "", metadata, frameOptions, onMetadataChange, referenceMode = "frames", referenceSummary }: CanvasVideoPromptToolsProps) {
+    const roles = videoFrameRoles(model);
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const startFrame = metadata?.videoStartFrameNodeId || EMPTY_FRAME_VALUE;
     const endFrame = metadata?.videoEndFrameNodeId || EMPTY_FRAME_VALUE;
@@ -45,11 +48,9 @@ export function CanvasVideoPromptTools({ metadata, frameOptions, onMetadataChang
 
     if (referenceMode === "all") {
         const summary = referenceSummary
-            ? [
-                  referenceSummary.imageCount ? `${referenceSummary.imageCount} 图` : "",
-                  referenceSummary.videoCount ? `${referenceSummary.videoCount} 视频` : "",
-                  referenceSummary.audioCount ? `${referenceSummary.audioCount} 音频` : "",
-              ].filter(Boolean).join(" · ")
+            ? [referenceSummary.imageCount ? `${referenceSummary.imageCount} 图` : "", referenceSummary.videoCount ? `${referenceSummary.videoCount} 视频` : "", referenceSummary.audioCount ? `${referenceSummary.audioCount} 音频` : ""]
+                  .filter(Boolean)
+                  .join(" · ")
             : "";
         return (
             <div
@@ -67,17 +68,19 @@ export function CanvasVideoPromptTools({ metadata, frameOptions, onMetadataChang
         );
     }
 
-    if (!frameOptions.length) return null;
+    const invalidFrame = (startFrame !== EMPTY_FRAME_VALUE && (!roles.first || !frameOptions.some((item) => item.nodeId === startFrame))) || (endFrame !== EMPTY_FRAME_VALUE && (!roles.last || !frameOptions.some((item) => item.nodeId === endFrame)));
+    if (!frameOptions.length && !invalidFrame) return null;
 
     return (
-        <div
-            className="grid min-w-0 grid-cols-2 items-center gap-1"
-            data-canvas-no-zoom
-            onMouseDown={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
-        >
-            <FrameMenu label="首帧" value={startFrame} options={frameOptions} theme={theme} onChange={(value) => setFrame("videoStartFrameNodeId", value)} />
-            <FrameMenu label="尾帧" value={endFrame} options={frameOptions} theme={theme} onChange={(value) => setFrame("videoEndFrameNodeId", value)} />
+        <div className="grid min-w-0 grid-cols-2 items-center gap-1" data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+            {roles.first ? <FrameMenu label="首帧" value={startFrame} options={frameOptions} theme={theme} onChange={(value) => setFrame("videoStartFrameNodeId", value)} /> : null}
+            {roles.last ? <FrameMenu label="尾帧" value={endFrame} options={frameOptions} theme={theme} onChange={(value) => setFrame("videoEndFrameNodeId", value)} /> : null}
+            {!roles.first && !roles.last ? <span>普通参考素材（此模型不支持指定首尾帧）</span> : null}
+            {invalidFrame ? (
+                <button type="button" className="col-span-2 text-sm" onClick={() => onMetadataChange({ videoStartFrameNodeId: undefined, videoEndFrameNodeId: undefined })}>
+                    旧首尾帧设置已失效，点击清除后重新选择
+                </button>
+            ) : null}
         </div>
     );
 }
@@ -85,19 +88,7 @@ export function CanvasVideoPromptTools({ metadata, frameOptions, onMetadataChang
 function FrameMenu({ label, value, options, theme, onChange }: { label: string; value: string; options: VideoFrameOption[]; theme: CanvasTheme; onChange: (value: string) => void }) {
     const selected = options.find((item) => item.nodeId === value);
     const items = [{ value: EMPTY_FRAME_VALUE, label: "不指定" }, ...options.map((option) => ({ value: option.nodeId, label: `${option.label} · ${option.title}`, previewUrl: option.previewUrl }))];
-    return (
-        <CompactMenuButton
-            theme={theme}
-            title={label}
-            label={selected?.label || label}
-            icon={<ImageIcon className="size-3.5 shrink-0 opacity-90" />}
-            value={value}
-            items={items}
-            menuWidth={220}
-            maxMenuHeight={208}
-            onSelect={onChange}
-        />
-    );
+    return <CompactMenuButton theme={theme} title={label} label={selected?.label || label} icon={<ImageIcon className="size-3.5 shrink-0 opacity-90" />} value={value} items={items} menuWidth={220} maxMenuHeight={208} onSelect={onChange} />;
 }
 
 function CompactMenuButton({

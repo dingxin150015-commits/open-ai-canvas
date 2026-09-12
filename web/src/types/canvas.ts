@@ -334,6 +334,7 @@ export type CanvasNodeMetadata = {
     videoCameraMoveId?: string;
     videoCameraMovePrompt?: string;
     videoStartFrameNodeId?: string;
+    generationOptions?: import("@/lib/bailian-generation").BailianGenerationOptions;
     videoEndFrameNodeId?: string;
     videoFrameSourceNodeId?: string;
     videoFrameTimeMs?: number;

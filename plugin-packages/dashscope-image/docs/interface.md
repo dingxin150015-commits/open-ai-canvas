@@ -8,7 +8,7 @@
 - 默认 Base URL：`https://dashscope.aliyuncs.com/compatible-mode/v1`。
 - 鉴权驱动：`bearer`。
 - 创建：`POST /api/v1/services/aigc/multimodal-generation/generation`。
-- 生命周期：同步响应。
+- 查询：`GET /api/v1/tasks/{{taskId}}`。
 
 ## 配置字段
 
@@ -37,17 +37,11 @@
 | `create.method` | `"POST"` |
 | `create.path` | `"/api/v1/services/aigc/multimodal-generation/generation"` |
 | `create.contentType` | `"application/json"` |
-| `create.body.model` | `{"$ref":"vars.model"}` |
-| `create.body.input.messages[0].role` | `"user"` |
-| `create.body.input.messages[0].content` | `{"$concatArrays":[{"$map":{"from":{"$ref":"vars.images"},"as":"m","in":{"image":{"$coalesce":[{"$ref":"m.dataUrl"},{"$ref":"m.url"}]}}}},[{"text":{"$ref":"vars.prompt"}}]]}` |
-| `create.body.parameters.n` | `{"$ref":"vars.count"}` |
-| `create.body.parameters.size` | `{"$ref":"vars.size"}` |
-| `create.body.parameters.prompt_extend` | `{"$ref":"vars.extend"}` |
-| `create.body.parameters.enable_thinking` | `{"$ref":"vars.thinking"}` |
-| `create.body.parameters.prompt_extend_mode` | `{"$if":{"condition":{"$ref":"vars.extend"},"then":{"$ref":"vars.extendMode"},"else":null}}` |
-| `create.body.parameters.watermark` | `{"$ref":"vars.watermark"}` |
-| `create.body.parameters.negative_prompt` | `{"$omitEmpty":{"$ref":"vars.negative"}}` |
-| `create.body.parameters.seed` | `{"$ref":"vars.seed"}` |
+| `create.body` | `{"$if":{"condition":{"$eq":[{"$ref":"vars.requestMode"},"openai"]},"then":{"model":{"$ref":"vars.model"},"prompt":{"$ref":"vars.prompt"},"image":{"$omitEmpty":{"$map":{"from":{"$ref":"vars.images"},"as":"m","in":{"$coalesce":[{"$ref":"m.dataUrl"},{"$ref":"m.url"}]}}}},"n":{"$ref":"vars.count"},"size":{"$replace":[{"$coalesce":[{"$ref":"vars.size"},"auto"]},"*","x"]},"prompt_extend":{"$ref":"vars.extend"},"enable_thinking":{"$ref":"vars.thinking"},"prompt_extend_mode":{"$if":{"condition":{"$ref":"vars.extend"},"then":{"$ref":"vars.extendMode"},"else":null}},"watermark":{"$ref":"vars.watermark"},"negative_prompt":{"$omitEmpty":{"$ref":"vars.negative"}},"seed":{"$ref":"vars.seed"}},"else":{"model":{"$ref":"vars.model"},"input":{"messages":[{"role":"user","content":{"$concatArrays":[{"$map":{"from":{"$ref":"vars.images"},"as":"m","in":{"image":{"$coalesce":[{"$ref":"m.dataUrl"},{"$ref":"m.url"}]}}}},[{"text":{"$ref":"vars.prompt"}}]]}}]},"parameters":{"n":{"$ref":"vars.count"},"size":{"$ref":"vars.size"},"prompt_extend":{"$ref":"vars.extend"},"enable_thinking":{"$ref":"vars.thinking"},"prompt_extend_mode":{"$if":{"condition":{"$ref":"vars.extend"},"then":{"$ref":"vars.extendMode"},"else":null}},"watermark":{"$ref":"vars.watermark"},"negative_prompt":{"$omitEmpty":{"$ref":"vars.negative"}},"seed":{"$ref":"vars.seed"}}}}}` |
+| `create.headers.X-DashScope-Async` | `{"$if":{"condition":{"$eq":[{"$ref":"vars.requestMode"},"async"]},"then":"enable","else":null}}` |
+| `poll.method` | `"GET"` |
+| `poll.path` | `"/api/v1/tasks/{{taskId}}"` |
+| `poll.contentType` | `"application/json"` |
 
 ## Provider 扩展键
 
@@ -60,15 +54,19 @@
 | 映射位置 | 上游路径或转换表达式 |
 | --- | --- |
 | `response.strict` | `true` |
-| `response.status` | `"succeeded"` |
-| `response.images` | `{"$flatten":{"$map":{"from":{"$ref":"response.output.choices"},"as":"c","in":{"$map":{"from":{"$ref":"c.message.content"},"as":"m","in":{"$ref":"m.image"}}}}}}` |
+| `response.status` | `{"$switch":{"cases":[{"when":{"$eq":[{"$upper":{"$trim":{"$ref":"response.output.task_status"}}},"UNKNOWN"]},"then":"failed"}],"default":{"$coalesce":[{"$ref":"response.output.task_status"},"succeeded"]}}}` |
+| `response.images` | `{"$concatArrays":[{"$flatten":{"$map":{"from":{"$ref":"response.output.choices"},"as":"c","in":{"$map":{"from":{"$ref":"c.message.content"},"as":"m","in":{"$ref":"m.image"}}}}}},{"$map":{"from":{"$ref":"response.output.results"},"as":"m","in":{"$ref":"m.url"}}},{"$map":{"from":{"$ref":"response.data"},"as":"m","in":{"$ref":"m.url"}}}]}` |
 | `response.usage` | `{"$ref":"response.usage"}` |
 | `response.errorPaths[0]` | `"code"` |
 | `response.errorPaths[1]` | `"output.code"` |
+| `response.errorPaths[2]` | `"error.code"` |
+| `response.errorPaths[3]` | `"error.type"` |
 | `response.messagePaths[0]` | `"message"` |
 | `response.messagePaths[1]` | `"output.message"` |
+| `response.messagePaths[2]` | `"error.message"` |
 | `response.resultEphemeral` | `true` |
 | `response.resultAnonymous` | `true` |
+| `response.taskId` | `{"$coalesce":[{"$ref":"response.output.task_id"},{"$ref":"taskId"}]}` |
 
 ## 响应与错误
 
@@ -76,7 +74,7 @@
 
 ## 兼容边界
 
-仅支持 qwen-image-3.0-pro。同步文生图与 1–3 图编辑；不支持蒙版或质量参数。auto 省略尺寸；内部比例和像素在插件中规范化。保留账号区域主机和路径前缀。宿主负责 SSRF 防护、凭证、计费及持久化。
+仅支持 qwen-image-3.0-pro。同步文生图与 1–3 图编辑；不支持蒙版或质量参数。auto 省略尺寸；内部比例和像素在插件中规范化。保留账号区域主机和路径前缀。宿主负责 SSRF 防护、凭证、计费及持久化。 支持 request_mode=sync/async/openai，默认 sync。异步使用专属 image-generation 端点与 10 秒轮询；兼容接口使用字母 x 和 image 数组。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
 ## Manifest 完整接口定义
@@ -88,7 +86,7 @@
   "apiVersion": "yingce.plugin/v3",
   "id": "dashscope-image",
   "name": "DashScope Qwen Image",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "Alibaba Cloud / 影策",
   "description": "DashScope Qwen Image 独立请求协议插件。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
@@ -401,8 +399,20 @@
                 ""
               ]
             }
+          },
+          {
+            "name": "requestMode",
+            "value": {
+              "$coalesce": [
+                {
+                  "$ref": "vars.meta.request_mode"
+                },
+                "sync"
+              ]
+            }
           }
         ],
+        "pollIntervalMs": 10000,
         "validations": [
           {
             "assert": {
@@ -700,6 +710,21 @@
               }
             },
             "message": "参考图片不符合限制"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$ref": "vars.requestMode"
+                },
+                [
+                  "sync",
+                  "async",
+                  "openai"
+                ]
+              ]
+            },
+            "message": "未知图片请求方式"
           }
         ],
         "create": {
@@ -711,122 +736,327 @@
           "path": "/api/v1/services/aigc/multimodal-generation/generation",
           "contentType": "application/json",
           "body": {
-            "model": {
-              "$ref": "vars.model"
-            },
-            "input": {
-              "messages": [
-                {
-                  "role": "user",
-                  "content": {
-                    "$concatArrays": [
-                      {
-                        "$map": {
-                          "from": {
-                            "$ref": "vars.images"
-                          },
-                          "as": "m",
-                          "in": {
-                            "image": {
-                              "$coalesce": [
-                                {
-                                  "$ref": "m.dataUrl"
-                                },
-                                {
-                                  "$ref": "m.url"
-                                }
-                              ]
-                            }
-                          }
-                        }
+            "$if": {
+              "condition": {
+                "$eq": [
+                  {
+                    "$ref": "vars.requestMode"
+                  },
+                  "openai"
+                ]
+              },
+              "then": {
+                "model": {
+                  "$ref": "vars.model"
+                },
+                "prompt": {
+                  "$ref": "vars.prompt"
+                },
+                "image": {
+                  "$omitEmpty": {
+                    "$map": {
+                      "from": {
+                        "$ref": "vars.images"
                       },
-                      [
-                        {
-                          "text": {
-                            "$ref": "vars.prompt"
+                      "as": "m",
+                      "in": {
+                        "$coalesce": [
+                          {
+                            "$ref": "m.dataUrl"
+                          },
+                          {
+                            "$ref": "m.url"
                           }
-                        }
-                      ]
-                    ]
+                        ]
+                      }
+                    }
                   }
+                },
+                "n": {
+                  "$ref": "vars.count"
+                },
+                "size": {
+                  "$replace": [
+                    {
+                      "$coalesce": [
+                        {
+                          "$ref": "vars.size"
+                        },
+                        "auto"
+                      ]
+                    },
+                    "*",
+                    "x"
+                  ]
+                },
+                "prompt_extend": {
+                  "$ref": "vars.extend"
+                },
+                "enable_thinking": {
+                  "$ref": "vars.thinking"
+                },
+                "prompt_extend_mode": {
+                  "$if": {
+                    "condition": {
+                      "$ref": "vars.extend"
+                    },
+                    "then": {
+                      "$ref": "vars.extendMode"
+                    },
+                    "else": null
+                  }
+                },
+                "watermark": {
+                  "$ref": "vars.watermark"
+                },
+                "negative_prompt": {
+                  "$omitEmpty": {
+                    "$ref": "vars.negative"
+                  }
+                },
+                "seed": {
+                  "$ref": "vars.seed"
                 }
-              ]
-            },
-            "parameters": {
-              "n": {
-                "$ref": "vars.count"
               },
-              "size": {
-                "$ref": "vars.size"
-              },
-              "prompt_extend": {
-                "$ref": "vars.extend"
-              },
-              "enable_thinking": {
-                "$ref": "vars.thinking"
-              },
-              "prompt_extend_mode": {
-                "$if": {
-                  "condition": {
+              "else": {
+                "model": {
+                  "$ref": "vars.model"
+                },
+                "input": {
+                  "messages": [
+                    {
+                      "role": "user",
+                      "content": {
+                        "$concatArrays": [
+                          {
+                            "$map": {
+                              "from": {
+                                "$ref": "vars.images"
+                              },
+                              "as": "m",
+                              "in": {
+                                "image": {
+                                  "$coalesce": [
+                                    {
+                                      "$ref": "m.dataUrl"
+                                    },
+                                    {
+                                      "$ref": "m.url"
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          [
+                            {
+                              "text": {
+                                "$ref": "vars.prompt"
+                              }
+                            }
+                          ]
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "parameters": {
+                  "n": {
+                    "$ref": "vars.count"
+                  },
+                  "size": {
+                    "$ref": "vars.size"
+                  },
+                  "prompt_extend": {
                     "$ref": "vars.extend"
                   },
-                  "then": {
-                    "$ref": "vars.extendMode"
+                  "enable_thinking": {
+                    "$ref": "vars.thinking"
                   },
-                  "else": null
+                  "prompt_extend_mode": {
+                    "$if": {
+                      "condition": {
+                        "$ref": "vars.extend"
+                      },
+                      "then": {
+                        "$ref": "vars.extendMode"
+                      },
+                      "else": null
+                    }
+                  },
+                  "watermark": {
+                    "$ref": "vars.watermark"
+                  },
+                  "negative_prompt": {
+                    "$omitEmpty": {
+                      "$ref": "vars.negative"
+                    }
+                  },
+                  "seed": {
+                    "$ref": "vars.seed"
+                  }
                 }
-              },
-              "watermark": {
-                "$ref": "vars.watermark"
-              },
-              "negative_prompt": {
-                "$omitEmpty": {
-                  "$ref": "vars.negative"
+              }
+            }
+          },
+          "pathTemplate": {
+            "$switch": {
+              "cases": [
+                {
+                  "when": {
+                    "$eq": [
+                      {
+                        "$ref": "vars.requestMode"
+                      },
+                      "async"
+                    ]
+                  },
+                  "then": "/api/v1/services/aigc/image-generation/generation"
+                },
+                {
+                  "when": {
+                    "$eq": [
+                      {
+                        "$ref": "vars.requestMode"
+                      },
+                      "openai"
+                    ]
+                  },
+                  "then": "/compatible-mode/v1/images/generations"
                 }
-              },
-              "seed": {
-                "$ref": "vars.seed"
+              ],
+              "default": "/api/v1/services/aigc/multimodal-generation/generation"
+            }
+          },
+          "headers": {
+            "X-DashScope-Async": {
+              "$if": {
+                "condition": {
+                  "$eq": [
+                    {
+                      "$ref": "vars.requestMode"
+                    },
+                    "async"
+                  ]
+                },
+                "then": "enable",
+                "else": null
               }
             }
           }
         },
+        "poll": {
+          "basePathSuffixes": [
+            "/compatible-mode/v1",
+            "/api/v1"
+          ],
+          "method": "GET",
+          "path": "/api/v1/tasks/{{taskId}}"
+        },
         "response": {
           "strict": true,
-          "status": "succeeded",
+          "status": {
+            "$switch": {
+              "cases": [
+                {
+                  "when": {
+                    "$eq": [
+                      {
+                        "$upper": {
+                          "$trim": {
+                            "$ref": "response.output.task_status"
+                          }
+                        }
+                      },
+                      "UNKNOWN"
+                    ]
+                  },
+                  "then": "failed"
+                }
+              ],
+              "default": {
+                "$coalesce": [
+                  {
+                    "$ref": "response.output.task_status"
+                  },
+                  "succeeded"
+                ]
+              }
+            }
+          },
           "images": {
-            "$flatten": {
-              "$map": {
-                "from": {
-                  "$ref": "response.output.choices"
-                },
-                "as": "c",
-                "in": {
+            "$concatArrays": [
+              {
+                "$flatten": {
                   "$map": {
                     "from": {
-                      "$ref": "c.message.content"
+                      "$ref": "response.output.choices"
                     },
-                    "as": "m",
+                    "as": "c",
                     "in": {
-                      "$ref": "m.image"
+                      "$map": {
+                        "from": {
+                          "$ref": "c.message.content"
+                        },
+                        "as": "m",
+                        "in": {
+                          "$ref": "m.image"
+                        }
+                      }
                     }
                   }
                 }
+              },
+              {
+                "$map": {
+                  "from": {
+                    "$ref": "response.output.results"
+                  },
+                  "as": "m",
+                  "in": {
+                    "$ref": "m.url"
+                  }
+                }
+              },
+              {
+                "$map": {
+                  "from": {
+                    "$ref": "response.data"
+                  },
+                  "as": "m",
+                  "in": {
+                    "$ref": "m.url"
+                  }
+                }
               }
-            }
+            ]
           },
           "usage": {
             "$ref": "response.usage"
           },
           "errorPaths": [
             "code",
-            "output.code"
+            "output.code",
+            "error.code",
+            "error.type"
           ],
           "messagePaths": [
             "message",
-            "output.message"
+            "output.message",
+            "error.message"
           ],
           "resultEphemeral": true,
-          "resultAnonymous": true
+          "resultAnonymous": true,
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.output.task_id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          }
         }
       }
     ]

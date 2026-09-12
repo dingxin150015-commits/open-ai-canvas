@@ -95,7 +95,7 @@
   "apiVersion": "yingce.plugin/v3",
   "id": "dashscope-video",
   "name": "DashScope Wan / HappyHorse Video",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "Alibaba Cloud / 影策",
   "description": "DashScope Wan / HappyHorse Video 独立请求协议插件。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
@@ -1801,62 +1801,6 @@
                   "$not": {
                     "$and": [
                       {
-                        "$eq": [
-                          {
-                            "$ref": "vars.family"
-                          },
-                          "wan27"
-                        ]
-                      },
-                      {
-                        "$not": {
-                          "$eq": [
-                            {
-                              "$ref": "vars.kind"
-                            },
-                            "r2v"
-                          ]
-                        }
-                      }
-                    ]
-                  }
-                },
-                {
-                  "$lte": [
-                    {
-                      "$sum": {
-                        "$map": {
-                          "from": {
-                            "$ref": "vars.audios"
-                          },
-                          "as": "m",
-                          "in": {
-                            "$ref": "m.metadata.durationMs"
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "$multiply": [
-                        {
-                          "$ref": "vars.duration"
-                        },
-                        1000
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            "message": "驱动音频不能长于输出视频"
-          },
-          {
-            "assert": {
-              "$or": [
-                {
-                  "$not": {
-                    "$and": [
-                      {
                         "$ne": [
                           {
                             "$ref": "vars.last"
@@ -2552,23 +2496,11 @@
                 "minSide": {
                   "$if": {
                     "condition": {
-                      "$and": [
+                      "$eq": [
                         {
-                          "$eq": [
-                            {
-                              "$ref": "vars.family"
-                            },
-                            "wan27"
-                          ]
+                          "$ref": "vars.family"
                         },
-                        {
-                          "$eq": [
-                            {
-                              "$ref": "vars.kind"
-                            },
-                            "r2v"
-                          ]
-                        }
+                        "wan27"
                       ]
                     },
                     "then": 240,
@@ -2578,23 +2510,11 @@
                 "maxSide": {
                   "$if": {
                     "condition": {
-                      "$and": [
+                      "$eq": [
                         {
-                          "$eq": [
-                            {
-                              "$ref": "vars.family"
-                            },
-                            "wan27"
-                          ]
+                          "$ref": "vars.family"
                         },
-                        {
-                          "$eq": [
-                            {
-                              "$ref": "vars.kind"
-                            },
-                            "r2v"
-                          ]
-                        }
+                        "wan27"
                       ]
                     },
                     "then": 4096,
@@ -2604,23 +2524,11 @@
                 "maxAspect": {
                   "$if": {
                     "condition": {
-                      "$and": [
+                      "$eq": [
                         {
-                          "$eq": [
-                            {
-                              "$ref": "vars.family"
-                            },
-                            "wan27"
-                          ]
+                          "$ref": "vars.family"
                         },
-                        {
-                          "$eq": [
-                            {
-                              "$ref": "vars.kind"
-                            },
-                            "r2v"
-                          ]
-                        }
+                        "wan27"
                       ]
                     },
                     "then": 8,

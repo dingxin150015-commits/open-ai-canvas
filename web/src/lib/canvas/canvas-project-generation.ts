@@ -219,6 +219,7 @@ export function audioExtension(mimeType?: string) {
 
 export function buildImageGenerationMetadata(type: CanvasImageGenerationType, config: AiConfig, count: number, references: ReferenceImage[]): CanvasNodeMetadata {
     return {
+        generationOptions: config.generationOptions,
         ...generationWorkflowMetadata(config),
         generationType: type,
         model: config.model,
@@ -437,6 +438,7 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
     };
     const requestedConfig: AiConfig = {
         ...config,
+        generationOptions: node?.metadata?.generationOptions,
         quality: node?.metadata?.quality ?? workflowParameterValue("quality") ?? config.quality ?? defaultConfig.quality,
         size: workflowProvider === "model" ? (node?.metadata?.size ?? config.size ?? defaultConfig.size) : workflowOutputSize || node?.metadata?.size || config.size || defaultConfig.size,
         transparentBackground: node?.metadata?.transparentBackground ?? config.transparentBackground ?? defaultConfig.transparentBackground,

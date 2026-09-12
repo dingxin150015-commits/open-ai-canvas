@@ -12,6 +12,8 @@ func ValidateChannelModelPrice(billingMode string, capability string, protocol m
 	case "per_second":
 		// 按秒计费：0 表示免费，负数无效。
 		return unitPrice >= 0
+	case "per_second_usage":
+		return capability == "video" && string(protocol) == "dashscope-video" && unitPrice >= 0
 	case "token":
 		if capability == "video" {
 			return protocol == model.ChannelInterfaceVolcengineArkVideo && inputPrice >= 0 && outputPrice >= 0 && cachedPrice >= 0

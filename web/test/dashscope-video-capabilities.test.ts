@@ -9,11 +9,11 @@ describe("DashScope model-specific video capabilities", () => {
         const r2v = defaultModelCapabilityConfig("dashscope-video", "wan2.7-r2v").video!;
         expect(t2v.references.maxImages).toBe(0);
         expect(t2v.references.maxAudios).toBe(1);
-        expect(t2v.references.audioMustFitOutput).toBe(true);
+        expect(t2v.references.audioMustFitOutput).toBe(false);
         expect(t2v.resolutions).toEqual(["720p", "1080p"]);
         expect(i2v.references.maxImages).toBe(2);
         expect(i2v.references.maxVideos).toBe(1);
-        expect(i2v.references.audioMustFitOutput).toBe(true);
+        expect(i2v.references.audioMustFitOutput).toBe(false);
         expect(i2v.references.maxVisualReferences).toBe(2);
         expect(i2v.ratios).toEqual(["adaptive"]);
         expect(i2v.operations).toContain("extend");

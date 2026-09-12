@@ -389,7 +389,7 @@ export type ModelChannel = {
         capability: ModelCapability;
         protocol?: ModelProtocol;
         pricePolicy?: "channel" | "unified";
-        billingMode: "fixed_request" | "per_second" | "token";
+        billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
         unitPriceMicrocredits: number;
         inputTokenPriceMicrocredits?: number;
         outputTokenPriceMicrocredits?: number;
@@ -409,6 +409,7 @@ export type ModelChannel = {
 };
 
 export type AiConfig = {
+    generationOptions?: import("@/lib/bailian-generation").BailianGenerationOptions;
     channelMode: "remote" | "local";
     baseUrl: string;
     apiKey: string;

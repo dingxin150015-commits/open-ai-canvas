@@ -112,7 +112,7 @@ func TestBailianPluginRejectsUnsupportedRequests(t *testing.T) {
 		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "happyhorse-1.1-i2v"}},
 		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "wan3.0-video-prime"}},
 		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "wan3.0-video", VideoSeconds: "3.5"}},
-		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "wan2.7-t2v", VideoSeconds: "5"}, ReferenceAudios: []providerMedia{{URL: "https://example.com/a.wav", MimeType: "audio/wav", DurationMs: 6000}}},
+		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "wan2.7-t2v", VideoSeconds: "5"}, ReferenceAudios: []providerMedia{{URL: "https://example.com/a.wav", MimeType: "audio/wav", DurationMs: 31000}}},
 		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "wan2.7-r2v", VideoSeconds: "11"}, ReferenceVideos: []providerMedia{{URL: "https://example.com/a.mp4", MimeType: "video/mp4", DurationMs: 3000}}},
 		{Mode: "video", Prompt: "fixture", Config: providerConfig{Model: "wan3.0-video", VideoSeconds: "25"}, ReferenceVideos: []providerMedia{{URL: "https://example.com/a.mp4", MimeType: "video/mp4", DurationMs: 8000}}},
 	}

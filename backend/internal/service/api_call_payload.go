@@ -15,6 +15,19 @@ import (
 const maxAPICallPayloadBytes = 128 << 10
 const maxAPICallPayloadSourceBytes = 1 << 20
 
+func providerRequestIDFromHeader(header http.Header) string {
+	value := strings.TrimSpace(header.Get("X-Request-Id"))
+	if value == "" || len(value) > 160 {
+		return ""
+	}
+	for _, char := range value {
+		if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || char == '-' || char == '_' || char == '.' || char == ':') {
+			return ""
+		}
+	}
+	return value
+}
+
 // SanitizeAPICallPayload 保留排障所需报文，同时阻止密钥和大段内嵌媒体进入日志库。
 func SanitizeAPICallPayload(data []byte, contentType string) string {
 	if len(data) == 0 {

@@ -1028,6 +1028,17 @@ func (s *Service) enrichAPICallLogPayload(log *model.ApiCallLog, payload map[str
 	}
 	usage, _ := payload["usage"].(map[string]any)
 	if usage != nil {
+		// Provider duration is metering, not HTTP latency. Keep fractional seconds
+		// in milliseconds and only accept finite, positive terminal usage.
+		output, _ := payload["output"].(map[string]any)
+		if log.Capability == "video" && strings.EqualFold(stringField(output, "task_status"), "SUCCEEDED") && (strings.Contains(log.Path, "/api/v1/tasks/") || isWan27ReadyVideoModel(log.Model) || isHappyHorse11ReadyVideoModel(log.Model) || isWan30VideoModel(log.Model)) {
+			log.UsageDurationMs = providerUsageMilliseconds(usage["duration"])
+			log.InputVideoDurationMs = providerUsageMilliseconds(usage["input_video_duration"])
+			log.OutputVideoDurationMs = providerUsageMilliseconds(usage["output_video_duration"])
+			if log.UsageDurationMs > 0 {
+				log.UsageAvailable = true
+			}
+		}
 		inputTokens, inputAvailable := firstInt64Value(usage, "input_tokens", "prompt_tokens")
 		outputTokens, outputAvailable := firstInt64Value(usage, "output_tokens", "completion_tokens")
 		if inputAvailable {

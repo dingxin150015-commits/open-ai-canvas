@@ -79,7 +79,8 @@ export function validateChannelModelPrices(values: Pick<ChannelModelFormValues, 
         const fail = (text: string) => {
             throw new Error(`价格档 ${index + 1}：${text}`);
         };
-        if (!["fixed_request", "per_second", "token"].includes(tier.billingMode)) fail("请选择计费方式");
+        if (!["fixed_request", "per_second", "per_second_usage", "token"].includes(tier.billingMode)) fail("请选择计费方式");
+        if (tier.billingMode === "per_second_usage" && (capability !== "video" || protocol !== "dashscope-video")) fail("实际时长计费仅支持百炼视频协议");
         if (tier.billingMode === "per_second" && capability !== "video") fail("按秒计费仅支持视频，请重新选择计费方式并核对价格");
         if (tier.billingMode === "token" && !modelProtocolSupportsTokenBilling(capability, protocol)) fail("当前协议不支持 Token 计费，请重新选择计费方式并核对价格");
         if (tier.matchMode === "advanced") {

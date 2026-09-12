@@ -7,7 +7,9 @@ description: 影策统一插件系统的扩展边界、Manifest 合同与 Eagle 
 
 ## 百炼声明式协议与通用引擎扩展
 
-这些扩展使用包合同 `yingce.plugin/v3`，两个百炼包版本为 `3.0.0`，旧引擎会在加载时明确拒绝，避免忽略新变量后发送残缺请求。已有 v1/v2 包继续使用原合同。后台插件中心的展示对象仍使用既有归一化视图，包内 Manifest 才是执行合同真相。
+这些扩展使用包合同 `yingce.plugin/v3`，本轮两个百炼候选包版本为 `3.1.0`，旧引擎会在加载时明确拒绝，避免忽略新变量后发送残缺请求。已有 v1/v2 包继续使用原合同。后台插件中心的展示对象仍使用既有归一化视图，包内 Manifest 才是执行合同真相。
+
+图片插件通过 `request_mode` 选择 `sync`（默认）、`async`、`openai`，共用模型/参数校验。异步走 `/api/v1/services/aigc/image-generation/generation` 与 10 秒任务轮询；OpenAI 兼容走 `/compatible-mode/v1/images/generations`，尺寸改用 `x`，自动尺寸为 `auto`，参考图片使用 `image` 数组。响应解包与匿名结果下载仍由统一引擎完成，不引入并行宿主 Provider。同步多图建议预留至少 10 分钟任务时间，实际超时以管理员策略为准。
 
 `dashscope-image` 与 `dashscope-video` 通过正式 `.yingce-plugin` 包安装，分别承接 Qwen Image 3.0 Pro，以及已登记的 Wan 2.7、HappyHorse 1.1、Wan 3.0 模型。模型 ID、校验与线协议位于 `plugin-packages/bailian-specs.mjs`，由目录生成器产出 Manifest 和完整接口文档。原 Provider 仅保留为 `_legacy_test.go` 对照夹具，不进入服务器二进制。产品能力画像仍用于 UI、报价和任务准入，不负责组装上游请求。
 

@@ -9,6 +9,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { generationInputMentionLabel, normalizeGenerationNodeMentionTokens, type NodeGenerationInput } from "./canvas-node-generation";
 import { CanvasVideoPromptTools } from "./canvas-video-prompt-tools";
+import { BailianGenerationOptionsPanel } from "@/components/bailian-generation-options";
 import { CanvasPresetPicker, type CanvasPromptPreset } from "./canvas-preset-picker";
 import type { CanvasGenerationMode, CanvasNodeMetadata, CanvasWorkspaceMode } from "@/types/canvas";
 
@@ -177,6 +178,7 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
             {generationMode === "video" && onMetadataChange && !simpleMode ? (
                 <div className="mb-3 rounded-lg px-2 py-2" style={{ background: theme.node.fill }}>
                     <CanvasVideoPromptTools
+                        model={metadata?.model}
                         metadata={metadata}
                         frameOptions={videoFrameOptions}
                         referenceMode={workflowVideoReferenceMode ? "all" : "frames"}
@@ -188,6 +190,9 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
                         onMetadataChange={onMetadataChange}
                     />
                 </div>
+            ) : null}
+            {onMetadataChange && !isCanvasWorkflowProvider(metadata) ? (
+                <BailianGenerationOptionsPanel model={metadata?.model || ""} value={metadata?.generationOptions} imageCount={videoFrameOptions.length} onChange={(generationOptions) => onMetadataChange({ generationOptions })} />
             ) : null}
             <div className="canvas-config-composer-editor relative rounded-lg" style={{ background: theme.node.fill }}>
                 {!value.trim() ? (

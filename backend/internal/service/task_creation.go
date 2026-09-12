@@ -17,9 +17,6 @@ func (s *Service) CreateTask(userID string, req CreateTaskRequest) (*model.Task,
 		return nil, &AppError{Status: 503, Code: 503, Message: "服务正在维护，暂不接受新的生成任务", Retryable: true}
 	}
 	prompt := strings.TrimSpace(req.Prompt)
-	if prompt == "" {
-		return nil, errors.New("prompt is required")
-	}
 	taskType := strings.TrimSpace(req.Type)
 	if err := validateTaskType(taskType); err != nil {
 		return nil, err
@@ -53,6 +50,9 @@ func (s *Service) CreateTask(userID string, req CreateTaskRequest) (*model.Task,
 		}
 	}
 
+	if prompt == "" && !bailianTaskAllowsEmptyPrompt(normalizedInput) {
+		return nil, errors.New("prompt is required")
+	}
 	if strings.HasPrefix(taskType, "video_") && !hasExecutableProviderVideoConfig(normalizedInput) {
 		if mode, _ := normalizedInput["mode"].(string); mode != "video" {
 			return nil, errors.New("视频任务必须使用 video 模式")

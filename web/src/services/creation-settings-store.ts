@@ -10,6 +10,7 @@ export type CreationSettingsDraftIdentity = {
     operation: string;
 };
 export type CreationSettingsDraft = {
+    generationOptions?: import("@/lib/bailian-generation").BailianGenerationOptions;
     ratio: string;
     seconds?: string;
     quality?: string;
@@ -75,6 +76,7 @@ export function parseCreationSettingsDraftDocument(value: string | null): Creati
 
 function normalizeCreationSettingsDraft(draft: Partial<CreationSettingsDraft>): CreationSettingsDraft {
     return {
+        ...(draft.generationOptions && typeof draft.generationOptions === "object" ? { generationOptions: draft.generationOptions } : {}),
         ratio: boundedString(draft.ratio),
         ...(boundedString(draft.seconds) ? { seconds: boundedString(draft.seconds) } : {}),
         ...(boundedString(draft.quality) ? { quality: boundedString(draft.quality) } : {}),

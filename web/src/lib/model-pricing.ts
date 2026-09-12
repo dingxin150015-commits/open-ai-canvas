@@ -1,5 +1,6 @@
 import { logicalIntentCompatibilityError, modelCompatibilityError, modelRequestOptions, resolveVideoOperation, type ModelRequirements } from "@/lib/model-selection";
 import { videoResolutionComparisonKey } from "@/lib/video-generation-options";
+import { bailianVideoOperation } from "@/lib/bailian-generation";
 import { buildImageResolutionOptions, imageResolutionOption } from "@/lib/image-resolution-tiers";
 import type { ModelRequestIntent } from "@/services/api/logical-models";
 import { modelOptionName, resolveModelChannel, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
@@ -9,7 +10,7 @@ export type ModelPriceTier = NonNullable<NonNullable<AiConfig["channels"][number
 type ModelCreditCost = {
     model: string;
     pricePolicy?: "channel" | "unified";
-    billingMode: "fixed_request" | "per_second" | "token";
+    billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
     unitPriceMicrocredits: number;
     logicalPriceTiers?: ModelPriceTier[];
 };
@@ -23,13 +24,13 @@ export function requestCreditCost(options: { channelMode: string; modelCosts?: M
         const tiers = priceTiersForCurrentSelection(cost.logicalPriceTiers || [], options.capability, options.config, options.requirements);
         if (!tiers.length) return null;
         const first = tiers[0];
-        if (!first || first.billingMode === "token") return null;
+        if (!first || first.billingMode === "token" || first.billingMode === "per_second_usage") return null;
         // 同一精确规格可能来自多个逻辑路由；只有价格一致时才可在客户端安全展示。
         if (tiers.some((tier) => tier.billingMode !== first.billingMode || tier.unitPriceMicrocredits !== first.unitPriceMicrocredits)) return null;
         return creditAmount(first.billingMode, first.unitPriceMicrocredits, options.count, options.seconds);
     }
     // Token 订单由服务端按请求体预授权并在 usage 返回后结算，前端不展示无依据的固定价格。
-    if (cost.billingMode === "token") return null;
+    if (cost.billingMode === "token" || cost.billingMode === "per_second_usage") return null;
     return creditAmount(cost.billingMode, cost.unitPriceMicrocredits, options.count, options.seconds);
 }
 
@@ -62,6 +63,8 @@ export function priceTierSummaryLabel(tiers: ModelPriceTier[]) {
     const perSecondValues = unitPrices("per_second");
     if (fixedRequestValues.length) return formatPriceRange(fixedRequestValues, "积分");
     if (perSecondValues.length) return formatPriceRange(perSecondValues, "积分/秒");
+    const meteredValues = unitPrices("per_second_usage");
+    if (meteredValues.length) return formatPriceRange(meteredValues, "积分/实际计费秒（预估后结算）");
     return tiers.some((tier) => tier.billingMode === "token") ? "按量预估" : "未配置";
 }
 
@@ -115,7 +118,12 @@ function modelQuoteIntent(config: AiConfig, capability: ModelCapability, require
     const input = requirements?.input;
     const intent: ModelRequestIntent = {
         capability,
-        operation: capability === "image" ? imagePriceOperation(requirements) : capability === "video" && input ? resolveVideoOperation(input, requirements?.videoOperation) : requirements?.videoOperation,
+        operation:
+            capability === "image"
+                ? imagePriceOperation(requirements)
+                : capability === "video" && input
+                  ? (bailianVideoOperation(config.model, input.videoCount, input.audioCount) ?? resolveVideoOperation(input, requirements?.videoOperation))
+                  : requirements?.videoOperation,
         inputs: {
             image: (input?.imageCount || 0) + (input?.characterCount || 0),
             video: input?.videoCount || 0,

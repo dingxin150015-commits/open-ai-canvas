@@ -367,7 +367,7 @@ func wan27VideoCapabilityConfig(kind string) *VideoCapabilityConfig {
 		profile.References.MaxAudios = 1
 		profile.References.MaxAudioBytes = 15 * 1024 * 1024
 		profile.References.MaxAudioDuration = 30
-		profile.References.AudioMustFitOutput = true
+		profile.References.AudioMustFitOutput = false
 		profile.Operations = []string{"text_to_video", "audio_to_video"}
 		profile.DefaultOperation = "text_to_video"
 	case "i2v":
@@ -381,7 +381,7 @@ func wan27VideoCapabilityConfig(kind string) *VideoCapabilityConfig {
 		profile.References.MaxAudios = 1
 		profile.References.MaxAudioBytes = 15 * 1024 * 1024
 		profile.References.MaxAudioDuration = 30
-		profile.References.AudioMustFitOutput = true
+		profile.References.AudioMustFitOutput = false
 		profile.Ratios = []string{"adaptive"}
 		profile.DefaultRatio = "adaptive"
 		profile.Operations = []string{"image_to_video", "extend", "reference_to_video", "audio_to_video"}
@@ -517,6 +517,11 @@ func NormalizeModelCapabilityConfigForModel(capability string, protocol string, 
 }
 
 func applyModelSpecificVideoCapability(profile *VideoCapabilityConfig, protocol string, modelName string) *VideoCapabilityConfig {
+	if profile != nil && isWan27ReadyVideoModel(modelName) {
+		value := *profile
+		value.References.AudioMustFitOutput = false
+		profile = &value
+	}
 	if profile == nil || model.ChannelInterfaceType(strings.TrimSpace(protocol)) != model.ChannelInterfaceAgnesVideo {
 		return profile
 	}

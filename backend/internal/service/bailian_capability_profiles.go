@@ -147,6 +147,28 @@ func isHappyHorse11ReadyVideoModel(value string) bool { return happyHorse11Video
 
 const wan30VideoModel = "wan3.0-video"
 
+// Resolve the actual routed model before allowing a media-only request. Normal
+// capability admission still validates all reference counts and permissions.
+func bailianTaskAllowsEmptyPrompt(input map[string]any) bool {
+	if input["mode"] != "video" {
+		return false
+	}
+	config, _ := input["config"].(map[string]any)
+	name, _ := config["model"].(string)
+	providerName, _ := config["providerModelKey"].(string)
+	resolved := firstNonEmpty(providerName, name)
+	images, _ := input["referenceImages"].([]any)
+	videos, _ := input["referenceVideos"].([]any)
+	if happyHorse11VideoKind(resolved) == "i2v" {
+		return len(images) == 1 && len(videos) == 0
+	}
+	return wan27VideoKind(resolved) == "i2v" && len(images)+len(videos) > 0
+}
+
+func bailianOptionalPromptModel(name string) bool {
+	return wan27VideoKind(name) == "i2v" || happyHorse11VideoKind(name) == "i2v"
+}
+
 func isWan30VideoModel(value string) bool {
 	return strings.EqualFold(strings.TrimPrefix(strings.TrimSpace(value), "models/"), wan30VideoModel)
 }

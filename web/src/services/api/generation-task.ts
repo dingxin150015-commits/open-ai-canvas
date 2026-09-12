@@ -5,6 +5,7 @@ import { createGenerationTask, waitForGenerationTask, type GenerationTask } from
 import { LOCAL_DREAMINA_WAIT_STOPPED_CODE, LocalDreaminaGenerationClientError, runLocalDreaminaGenerationTask, type LocalDreaminaGenerationInput, type LocalDreaminaGenerationTask } from "@/services/local-dreamina-generation";
 import { isLocalDreaminaBackgroundTask, localDreaminaTaskId, projectLocalDreaminaTask, stripLocalDreaminaTaskPrefix } from "@/services/local-dreamina-task-projection";
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
+import { bailianModelKind, bailianReferencePrompt, bailianVideoOperation, validateBailianOptions, validateBailianFrames } from "@/lib/bailian-generation";
 import { grokImagePromptLimitError } from "@/lib/grok-image-prompt-limit";
 import { resolveGenerationWorkflowExecution, type GenerationWorkflowExecution } from "@/lib/generation-workflow-execution";
 import { resolveVideoOperation } from "@/lib/model-selection";
@@ -312,8 +313,10 @@ async function runLocalDreaminaGeneration(options: BackendGenerationTaskOptions,
     }
 }
 
-function generationOperation(options: BackendGenerationTaskOptions) {
+function generationOperation(options: BackendGenerationTaskOptions, nativeModel = true) {
     if (options.mode !== "video") return options.mode;
+    const nativeOperation = bailianVideoOperation(options.config.model, options.referenceVideos?.length ?? 0, options.referenceAudios?.length ?? 0);
+    if (nativeModel && nativeOperation) return nativeOperation;
     return resolveVideoOperation(
         {
             textCount: 0,
@@ -447,20 +450,25 @@ async function createAndWaitGenerationTask(options: BackendGenerationTaskOptions
 
 async function createBackendGenerationTask(options: BackendGenerationTaskOptions, prepared: PreparedGenerationReferences, dependencies: GenerationTaskDependencies) {
     const { projectId, mode, prompt, config, metadata, onTaskUpdate } = options;
-    const videoOperation = generationOperation(options);
     const workflow = resolveGenerationWorkflowExecution(config, mode);
+    if (!workflow) {
+        validateBailianOptions({ ...config.generationOptions, ...metadata }, config.model, prepared.referenceImages.length);
+        if (mode === "video") validateBailianFrames(config.model, prepared.referenceImages, prepared.referenceVideos.length, prepared.referenceAudios.length, metadata);
+    }
+    const wirePrompt = workflow ? prompt : bailianReferencePrompt(prompt, config.model, prepared.referenceImages, typeof metadata?.videoStartFrameNodeId === "string" ? metadata.videoStartFrameNodeId : undefined);
+    const videoOperation = generationOperation(options, !workflow);
     const logicalModelId = workflow ? "" : logicalModelIDForConfig(config);
     const task = await dependencies.createTask({
         ...(projectId ? { projectId } : {}),
         type: `canvas_${mode}`,
         operation: mode === "video" ? videoOperation : mode,
-        prompt,
+        prompt: wirePrompt,
         ...(workflow ? { provider: workflow.provider } : {}),
         model: workflow?.taskModel || config.model,
         ...(logicalModelId ? { logicalModelId } : {}),
         input: {
             mode,
-            prompt,
+            prompt: wirePrompt,
             ...(workflow ? { execution: workflowPublicExecution(workflow) } : {}),
             config: backendProviderConfig(config, mode),
             capabilityOptions: logicalModelId ? logicalCapabilityOptions(config, mode) : undefined,
@@ -470,7 +478,7 @@ async function createBackendGenerationTask(options: BackendGenerationTaskOptions
             referenceVideos: prepared.referenceVideos,
             referenceAudios: prepared.referenceAudios,
             mask: prepared.mask,
-            metadata: generationMetadata(config, metadata),
+            metadata: generationMetadata(workflow ? { ...config, generationOptions: undefined } : config, !workflow && mode === "video" && bailianModelKind(config.model) ? { ...metadata, videoEditOperation: videoOperation } : metadata),
         },
     });
     onTaskUpdate?.(task);
@@ -478,6 +486,7 @@ async function createBackendGenerationTask(options: BackendGenerationTaskOptions
 }
 
 function generationMetadata(config: AiConfig, metadata?: Record<string, unknown>) {
+    metadata = { ...config.generationOptions, ...metadata };
     const channel = resolveModelChannel(config, config.model);
     const model = modelOptionName(config.model);
     const modelCost = channel.modelCosts?.find((item) => item.model === model);
@@ -486,7 +495,12 @@ function generationMetadata(config: AiConfig, metadata?: Record<string, unknown>
     if (!protocol || !defaults || !Object.keys(defaults).length) return metadata;
     const existing = metadata?.providerOptions && typeof metadata.providerOptions === "object" && !Array.isArray(metadata.providerOptions) ? (metadata.providerOptions as Record<string, unknown>) : {};
     const namespace = existing[protocol] && typeof existing[protocol] === "object" && !Array.isArray(existing[protocol]) ? (existing[protocol] as Record<string, unknown>) : {};
-    return { ...metadata, providerOptions: { ...existing, [protocol]: { ...defaults, ...namespace } } };
+    const explicit = Object.fromEntries(["seed", "negative_prompt", "prompt_extend", "prompt_extend_mode", "enable_thinking", "watermark", "request_mode"].filter((key) => metadata?.[key] !== undefined).map((key) => [key, metadata![key]]));
+    if (explicit.prompt_extend === false) {
+        explicit.prompt_extend_mode = null;
+        explicit.enable_thinking = false;
+    }
+    return { ...metadata, providerOptions: { ...existing, [protocol]: { ...defaults, ...namespace, ...explicit } } };
 }
 
 async function prepareBackendMediaReference(media: ReferenceVideo | ReferenceAudio) {

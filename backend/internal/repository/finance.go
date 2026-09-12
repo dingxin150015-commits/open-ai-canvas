@@ -656,6 +656,7 @@ func (r *Repository) TaskHasSuccessfulBillableCall(taskID string) (bool, error) 
 }
 
 type BillingUsage struct {
+	DurationMs   int64
 	InputTokens  int64
 	OutputTokens int64
 	CachedTokens int64
@@ -677,7 +678,7 @@ func billingUsage(db *gorm.DB, orderID string) (*BillingUsage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BillingUsage{InputTokens: log.InputTokens, OutputTokens: log.OutputTokens, CachedTokens: log.CachedTokens}, nil
+	return &BillingUsage{DurationMs: log.UsageDurationMs, InputTokens: log.InputTokens, OutputTokens: log.OutputTokens, CachedTokens: log.CachedTokens}, nil
 }
 
 func (r *Repository) RecordBillingResolution(id string, actorUserID string, note string) error {
@@ -741,7 +742,7 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 		if order.Status == model.BillingStatusRefunded {
 			return errors.New("billing order already refunded")
 		}
-		if order.BillingMode == "token" && !zeroPricedTokenOrder(order) {
+		if (order.BillingMode == "token" && !zeroPricedTokenOrder(order)) || order.BillingMode == "per_second_usage" {
 			usage, err := billingUsage(tx, id)
 			if err != nil {
 				return err
@@ -752,6 +753,9 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 				reserved = order.AmountMicrocredits
 			}
 			actual, err := tokenUsageAmount(order, usage)
+			if order.BillingMode == "per_second_usage" {
+				actual, err = durationUsageAmount(order, usage)
+			}
 			if err != nil {
 				return err
 			}
@@ -781,6 +785,9 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 				"actual_amount_microcredits": actual, "refunded_amount_microcredits": refund,
 				"input_tokens": usage.InputTokens, "output_tokens": usage.OutputTokens, "cached_tokens": usage.CachedTokens,
 				"usage_available": true}
+			if order.BillingMode == "per_second_usage" {
+				updates["usage_duration_ms"] = usage.DurationMs
+			}
 			if providerRequestID != "" {
 				updates["provider_request_id"] = providerRequestID
 			}
@@ -826,6 +833,10 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 		}
 		now := time.Now()
 		orderUpdates := map[string]any{"status": model.BillingStatusSettled, "actual_amount_microcredits": order.AmountMicrocredits, "settled_at": &now, "updated_at": now}
+		if usage, usageErr := billingUsage(tx, id); usageErr == nil && usage.DurationMs > 0 {
+			orderUpdates["usage_duration_ms"] = usage.DurationMs
+			orderUpdates["usage_available"] = true
+		}
 		if providerRequestID != "" {
 			orderUpdates["provider_request_id"] = providerRequestID
 		}
@@ -890,7 +901,7 @@ func (r *Repository) RestoreRefundedBillingOrder(id string, providerRequestID st
 
 		actual := order.AmountMicrocredits
 		var usage *BillingUsage
-		if order.BillingMode == "token" {
+		if order.BillingMode == "token" || order.BillingMode == "per_second_usage" {
 			if zeroPricedTokenOrder(order) {
 				actual = 0
 			} else {
@@ -900,6 +911,9 @@ func (r *Repository) RestoreRefundedBillingOrder(id string, providerRequestID st
 					return err
 				}
 				actual, err = tokenUsageAmount(order, usage)
+				if order.BillingMode == "per_second_usage" {
+					actual, err = durationUsageAmount(order, usage)
+				}
 				if err != nil {
 					return err
 				}
@@ -941,6 +955,7 @@ func (r *Repository) RestoreRefundedBillingOrder(id string, providerRequestID st
 			orderUpdates["provider_request_id"] = providerRequestID
 		}
 		if usage != nil {
+			orderUpdates["usage_duration_ms"] = usage.DurationMs
 			orderUpdates["input_tokens"] = usage.InputTokens
 			orderUpdates["output_tokens"] = usage.OutputTokens
 			orderUpdates["cached_tokens"] = usage.CachedTokens

@@ -436,7 +436,7 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
 }
 
-function wan27VideoKind(model: string) {
+export function wan27VideoKind(model: string) {
     if (["wan2.7-t2v", "wan2.7-t2v-2026-06-12", "wan2.7-t2v-2026-04-25"].includes(model)) return "t2v";
     if (["wan2.7-i2v", "wan2.7-i2v-2026-04-25"].includes(model)) return "i2v";
     if (["wan2.7-r2v", "wan2.7-r2v-2026-06-12"].includes(model)) return "r2v";
@@ -453,7 +453,7 @@ function applyWan27VideoCapability(video: VideoCapabilityConfig, kind: string) {
     video.generateAudio = { supported: false, default: false };
     video.watermark = { supported: true, default: false };
     if (kind === "t2v") {
-        Object.assign(video.references, { maxAudios: 1, maxAudioBytes: 15 * 1024 * 1024, maxAudioDurationSeconds: 30, audioMustFitOutput: true });
+        Object.assign(video.references, { maxAudios: 1, maxAudioBytes: 15 * 1024 * 1024, maxAudioDurationSeconds: 30, audioMustFitOutput: false });
         video.operations = ["text_to_video", "audio_to_video"];
         video.defaultOperation = "text_to_video";
     } else if (kind === "i2v") {
@@ -468,7 +468,7 @@ function applyWan27VideoCapability(video: VideoCapabilityConfig, kind: string) {
             maxAudios: 1,
             maxAudioBytes: 15 * 1024 * 1024,
             maxAudioDurationSeconds: 30,
-            audioMustFitOutput: true,
+            audioMustFitOutput: false,
         });
         video.ratios = ["adaptive"];
         video.defaultRatio = "adaptive";
@@ -493,7 +493,7 @@ function applyWan27VideoCapability(video: VideoCapabilityConfig, kind: string) {
     }
 }
 
-function happyHorse11VideoKind(model: string) {
+export function happyHorse11VideoKind(model: string) {
     if (model === "happyhorse-1.1-t2v") return "t2v";
     if (model === "happyhorse-1.1-i2v") return "i2v";
     if (model === "happyhorse-1.1-r2v") return "r2v";
@@ -552,6 +552,7 @@ export function modelCapabilityConfigFor(config: { channels: Array<{ id: string;
     const capabilityConfig = normalizeModelCapabilityConfig(cost.capabilityConfig);
     const text = capabilityConfig.text ? { ...fallback.text!, ...capabilityConfig.text, references: { ...fallback.text!.references, ...capabilityConfig.text.references } } : fallback.text;
     const video = capabilityConfig.video ? { ...fallback.video!, ...capabilityConfig.video, references: { ...fallback.video!.references, ...capabilityConfig.video.references } } : fallback.video;
+    if (video && wan27VideoKind(modelName)) video.references.audioMustFitOutput = false;
     const configuredImage = capabilityConfig.image;
 
     const image = configuredImage

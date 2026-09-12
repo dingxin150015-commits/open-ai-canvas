@@ -78,12 +78,19 @@ export function PriceTierFields({
                 </div>
                 <div className="admin-price-tier-block admin-price-tier-billing-block">
                     <div className="admin-price-tier-billing-grid">
-                        <Form.Item className="admin-price-tier-billing-mode mb-0" name={[index, "billingMode"]} label="计费方式" rules={[{ required: true }]}>
+                        <Form.Item
+                            className="admin-price-tier-billing-mode mb-0"
+                            name={[index, "billingMode"]}
+                            label="计费方式"
+                            rules={[{ required: true }]}
+                            extra={billingMode === "per_second_usage" ? "按实际计费时长结算，先预扣估算额，取得用量后退补差额；缺少用量时进入人工核对。既有价格不会自动切换。" : undefined}
+                        >
                             <Segmented
                                 className="w-full"
                                 options={[
                                     { label: "按次", value: "fixed_request" },
                                     { label: "按秒", value: "per_second", disabled: !isVideo },
+                                    { label: "实际时长", value: "per_second_usage", disabled: !isVideo || protocol !== "dashscope-video" },
                                     { label: "Token", value: "token", disabled: !tokenEnabled },
                                 ]}
                             />
@@ -107,7 +114,12 @@ export function PriceTierFields({
                                 </div>
                             )
                         ) : (
-                            <Form.Item className="admin-price-tier-unit-price mb-0" name={[index, "unitPrice"]} label={billingMode === "per_second" ? "每秒消耗积分" : "每次消耗积分"} rules={[{ required: true, message: "请输入积分价格" }]}>
+                            <Form.Item
+                                className="admin-price-tier-unit-price mb-0"
+                                name={[index, "unitPrice"]}
+                                label={billingMode === "per_second" || billingMode === "per_second_usage" ? "每秒消耗积分" : "每次消耗积分"}
+                                rules={[{ required: true, message: "请输入积分价格" }]}
+                            >
                                 <InputNumber className="w-full" min={0} max={1_000_000} precision={6} step={0.1} />
                             </Form.Item>
                         )}

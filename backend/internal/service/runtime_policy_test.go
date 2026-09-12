@@ -25,6 +25,19 @@ func TestVideoTaskTimeoutHasFiveMinuteSafetyFloor(t *testing.T) {
 	}
 }
 
+func TestQwenCompatibleImageTimeoutDefaultPreservesExplicitPolicy(t *testing.T) {
+	policy := defaultRuntimePolicy()
+	if policy.Task.ImageTimeoutMinutes != 15 || policy.Task.TextTimeoutMinutes != 8 || policy.Task.AudioTimeoutMinutes != 8 || policy.Task.VideoTimeoutMinutes != 30 {
+		t.Fatalf("unexpected defaults: %#v", policy.Task)
+	}
+	if err := json.Unmarshal([]byte(`{"task":{"imageTimeoutMinutes":8}}`), &policy); err != nil {
+		t.Fatal(err)
+	}
+	if got := taskExecutionTimeoutWithPolicy("canvas_image", policy.Task); got != 8*time.Minute {
+		t.Fatalf("explicit timeout changed: %s", got)
+	}
+}
+
 func TestOnlyResumableNewAPIChannel2VideoDeadlinesStayRunning(t *testing.T) {
 	svc := &Service{}
 	input, err := json.Marshal(canvasGenerationInput{Mode: "video", Config: providerConfig{BaseURL: "https://example.com", InterfaceType: string(model.ChannelInterfaceNewAPIChannel2)}})

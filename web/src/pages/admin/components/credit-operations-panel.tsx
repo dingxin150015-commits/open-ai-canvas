@@ -332,7 +332,10 @@ export default function CreditOperationsPanel({ users, activeOperation, onOperat
                         </div>
                     </div>
                 ) : (
-                    <span className="tabular-nums">{order.status === "settled" ? formatCredits(order.actualAmountMicrocredits) : "--"}</span>
+                    <div className="tabular-nums">
+                        <div>{order.status === "settled" ? formatCredits(order.actualAmountMicrocredits) : order.billingMode === "per_second_usage" ? "等待实际时长结算" : "--"}</div>
+                        {order.usageDurationMs ? <small>上游计费时长 {order.usageDurationMs / 1000} 秒</small> : null}
+                    </div>
                 ),
         },
         {

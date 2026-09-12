@@ -349,14 +349,14 @@ func (s *Service) processCanvasGenerationTask(ctx context.Context, userID string
 		}
 		input.Prompt = compiled.Content
 	}
-	if strings.TrimSpace(input.Prompt) == "" {
-		return nil, errors.New("prompt is required")
-	}
 	config, err := s.resolveProviderConfig(input.Config)
 	if err != nil {
 		return nil, err
 	}
 	input.Config = config
+	if strings.TrimSpace(input.Prompt) == "" && !(input.Mode == "video" && bailianOptionalPromptModel(input.Config.Model)) {
+		return nil, errors.New("prompt is required")
+	}
 	ctx = withProviderOutboundPolicy(ctx, input.Config)
 	var textPublisher *taskTextStreamPublisher
 	if input.Mode == "text" && strings.HasPrefix(taskType, "canvas_text") {
@@ -2630,7 +2630,7 @@ func protocolRequestFromInput(input canvasGenerationInput) protocol.GenerationRe
 		"lastFrameID":           metadataString(input.Metadata, "videoEndFrameNodeId"),
 	}
 	generationMetadata := make(map[string]any)
-	for _, key := range []string{"seed", "negative_prompt", "prompt_extend", "prompt_extend_mode", "enable_thinking", "watermark"} {
+	for _, key := range []string{"seed", "negative_prompt", "prompt_extend", "prompt_extend_mode", "enable_thinking", "watermark", "request_mode"} {
 		if value, ok := input.Metadata[key]; ok {
 			generationMetadata[key] = value
 		}
@@ -5324,6 +5324,12 @@ func doBinaryWithConsumer(req *http.Request, onChunk func(string, []byte)) ([]by
 		return nil, "", err
 	}
 	defer resp.Body.Close()
+	if id := providerRequestIDFromHeader(resp.Header); id != "" {
+		if metadata, ok := req.Context().Value(providerAnalyticsKey{}).(providerAnalyticsContext); ok && metadata.ProviderRequestID == "" {
+			metadata.ProviderRequestID = id
+			req = req.WithContext(context.WithValue(req.Context(), providerAnalyticsKey{}, metadata))
+		}
+	}
 	if resp.ContentLength > responseLimit {
 		err = fmt.Errorf("上游响应超过 %s 限制", formatStorageLimit(responseLimit))
 		recordProviderRequest(req, startedAt, resp.StatusCode, nil, err)

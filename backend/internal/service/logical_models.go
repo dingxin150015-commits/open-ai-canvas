@@ -1132,7 +1132,7 @@ func computeModelPriceDisplay(model model.LogicalModel, priceTiers []PublicLogic
 
 // getTierDisplayPrice 获取价格档的展示价格
 func getTierDisplayPrice(tier PublicLogicalModelPriceTier) int64 {
-	if tier.BillingMode == "fixed_request" || tier.BillingMode == "per_second" {
+	if tier.BillingMode == "fixed_request" || tier.BillingMode == "per_second" || tier.BillingMode == "per_second_usage" {
 		return tier.UnitPriceMicrocredits
 	}
 	// Token 计费返回输出价格（如果有）

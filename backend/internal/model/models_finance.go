@@ -62,6 +62,7 @@ type BillingOrder struct {
 	OutputTokens                 int64         `json:"outputTokens"`
 	CachedTokens                 int64         `json:"cachedTokens"`
 	UsageAvailable               bool          `json:"usageAvailable"`
+	UsageDurationMs              int64         `json:"usageDurationMs"`
 	Status                       BillingStatus `json:"status" gorm:"index;size:24"`
 	ProviderRequestID            string        `json:"providerRequestId,omitempty" gorm:"index;size:160"`
 	Error                        string        `json:"error,omitempty" gorm:"size:1000"`

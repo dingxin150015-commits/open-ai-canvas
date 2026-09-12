@@ -19,6 +19,8 @@ import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { CanvasVideoPromptTools } from "./canvas-video-prompt-tools";
+import { optionalVideoPrompt } from "@/lib/bailian-generation";
+import { BailianGenerationOptionsPanel } from "@/components/bailian-generation-options";
 import { CanvasPresetPicker, type CanvasPromptPreset } from "./canvas-preset-picker";
 import { CanvasPortraitTexturePopover } from "./canvas-portrait-texture-popover";
 import { CanvasPromptOptimizerDrawer } from "./canvas-prompt-optimizer-drawer";
@@ -152,7 +154,7 @@ export function CanvasNodePromptPanel({
     const credits = quoteError ? null : (quotedCredits ?? configuredCredits);
     const activeReferenceCount = activeReferences.length;
     const videoFrameOptions = resolvedMentionReferences.filter((item) => item.active && item.kind === "image").map((item) => ({ nodeId: item.nodeId, label: item.label, title: item.title, previewUrl: item.previewUrl }));
-    const hasVideoPromptTools = mode === "video" && !simpleMode && videoFrameOptions.length > 0;
+    const hasVideoPromptTools = mode === "video" && !simpleMode && (videoFrameOptions.length > 0 || Boolean(node.metadata?.videoStartFrameNodeId || node.metadata?.videoEndFrameNodeId));
     const monochromeAccent = theme.node.activeStroke;
     const composerTokens = {
         "--canvas-composer-surface": theme.node.panel,
@@ -172,7 +174,8 @@ export function CanvasNodePromptPanel({
     const expandedPromptBounds = promptEditorBounds(true, activeReferenceCount > 0);
     const composerHeight = clampPromptHeight(manualPromptHeight ?? promptContentHeight + (activeReferenceCount ? PROMPT_REFERENCE_SHELF_HEIGHT : 0), promptBounds);
     const expandedComposerHeight = clampPromptHeight(manualExpandedPromptHeight ?? expandedPromptContentHeight + (activeReferenceCount ? PROMPT_REFERENCE_SHELF_HEIGHT : 0), expandedPromptBounds);
-    const isSubmitDisabled = !isRunning && !prompt.trim();
+    const promptOptional = mode === "video" && optionalVideoPrompt(config.model, requirements.input?.imageCount ?? 0, requirements.input?.videoCount ?? 0);
+    const isSubmitDisabled = !isRunning && !prompt.trim() && !promptOptional;
     const canExpandPrompt = mode === "image" || mode === "video";
     const canOptimizePrompt = Boolean(promptOptimizerProvider) && canExpandPrompt;
     const isPortraitTexture = mode === "image" && Boolean(node.metadata?.portraitTexture);
@@ -243,7 +246,7 @@ export function CanvasNodePromptPanel({
 
     const submit = () => {
         const text = prompt.trim();
-        if (!text || isRunning) return false;
+        if ((!text && !promptOptional) || isRunning) return false;
         onGenerate(node.id, mode, text);
         return true;
     };
@@ -448,6 +451,9 @@ export function CanvasNodePromptPanel({
                 {renderComposerHeader(false)}
 
                 {renderPromptEditor(false)}
+                {(config.taskWorkflowProvider || "model") === "model" ? (
+                    <BailianGenerationOptionsPanel model={config.model} value={node.metadata?.generationOptions} imageCount={requirements.input?.imageCount ?? 0} onChange={(generationOptions) => onConfigChange(node.id, { generationOptions })} />
+                ) : null}
 
                 {/* B区 参数区（对应 #98 决策2：默认折叠，手风琴展开）*/}
                 {hasVideoPromptTools ? (
@@ -466,7 +472,7 @@ export function CanvasNodePromptPanel({
                         </button>
                         {paramsExpanded ? (
                             <div className="pt-1">
-                                <CanvasVideoPromptTools metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
+                                <CanvasVideoPromptTools model={config.model} metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
                             </div>
                         ) : null}
                     </div>
@@ -496,7 +502,7 @@ export function CanvasNodePromptPanel({
                         {renderPromptEditor(true)}
                         {hasVideoPromptTools ? (
                             <div className="canvas-node-composer-parameters shrink-0">
-                                <CanvasVideoPromptTools metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
+                                <CanvasVideoPromptTools model={config.model} metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
                             </div>
                         ) : null}
                         <div className="shrink-0">{renderComposerControls(true)}</div>

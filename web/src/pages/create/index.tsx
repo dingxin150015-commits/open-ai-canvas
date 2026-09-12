@@ -1,4 +1,8 @@
 import { ImageSizePicker } from "@/components/image-size-picker";
+import { BailianGenerationOptionsPanel } from "@/components/bailian-generation-options";
+import type { BailianGenerationOptions } from "@/lib/bailian-generation";
+import { CanvasVideoPromptTools } from "@/components/canvas/canvas-video-prompt-tools";
+import { bailianModelKind, optionalVideoPrompt, videoAttachmentLimit, videoAttachmentError } from "@/lib/bailian-generation";
 import { imageResolutionUsesQuality } from "@/lib/image-size-presets";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { App, Button, Drawer, Dropdown, Modal, Popover, Spin } from "antd";
@@ -119,7 +123,17 @@ type CreationRuntime = Awaited<ReturnType<typeof loadCreationRuntime>>;
 
 type CreationMode = "text" | "image" | "video";
 type CreationStatus = "streaming" | "pending" | "done" | "error" | "cancelled";
-type CreationSettings = { ratio: string; seconds: string; quality: string; videoQuality: string; count: string; videoGenerateAudio?: boolean; videoWatermark?: boolean };
+type CreationSettings = {
+    ratio: string;
+    seconds: string;
+    quality: string;
+    videoQuality: string;
+    count: string;
+    videoGenerateAudio?: boolean;
+    videoWatermark?: boolean;
+    generationOptions?: BailianGenerationOptions;
+    frameSelection?: { videoStartFrameNodeId?: string; videoEndFrameNodeId?: string };
+};
 type CreationRetryContext = GenerationRetryContext & { retryContextsByBatchIndex?: GenerationRetryContext[] };
 
 // —— 设备级 UI 偏好（仅当前浏览器；storage 不可用时自动降级为会话内默认）——
@@ -296,6 +310,9 @@ export default function CreatePage() {
     const [count, setCount] = useState(String(Math.max(1, Math.min(4, Number(config.count) || 1))));
     const [videoGenerateAudio, setVideoGenerateAudio] = useState(config.videoGenerateAudio === "true");
     const [videoWatermark, setVideoWatermark] = useState(config.videoWatermark === "true");
+    const [generationOptions, setGenerationOptions] = useState<BailianGenerationOptions>({});
+    const [frameSelection, setFrameSelection] = useState<{ videoStartFrameNodeId?: string; videoEndFrameNodeId?: string }>({});
+    const restoredSettingsRef = useRef<{ key: string; settings: CreationSettings } | undefined>(undefined);
     const [settingsReady, setSettingsReady] = useState(false);
     const [textStreaming, setTextStreaming] = useState(() => readComposerPref(TEXT_STREAMING_PREF_KEY, true));
     const [textThinking, setTextThinking] = useState(() => readComposerPref(TEXT_THINKING_PREF_KEY, false));
@@ -381,7 +398,7 @@ export default function CreatePage() {
     const settingsDraftKey = settingsDraftIdentity ? creationSettingsDraftKey(settingsDraftIdentity) : "text";
     const settingsDraftPersistenceKey = `${creationSettingsScope}\0${settingsDraftKey}`;
     const settingsDraftReadyKeyRef = useRef("");
-    const maxReferences = mode === "video" ? (videoProfile.operations.includes("image_to_video") ? videoProfile.references.maxImages : 0) : mode === "image" ? imageProfile.references.maxImages : 6;
+    const maxReferences = mode === "video" ? videoAttachmentLimit(videoProfile) : mode === "image" ? imageProfile.references.maxImages : 6;
     const referenceImageSize = useMemo(() => {
         const imageAttachments = attachments.filter(isImageAttachment);
         if (imageAttachments.length !== 1) return undefined;
@@ -440,6 +457,13 @@ export default function CreatePage() {
             })
             .then((draft) => {
                 if (cancelled) return;
+                const restored = restoredSettingsRef.current?.key === creationSettingsDraftKey(settingsDraftIdentity!) ? restoredSettingsRef.current.settings : undefined;
+                if (restored) {
+                    draft = { ...draft, ...restored };
+                    restoredSettingsRef.current = undefined;
+                }
+                setGenerationOptions(draft?.generationOptions ?? {});
+                setFrameSelection(restored?.frameSelection ?? {});
                 if (mode === "image") {
                     const saved = useCreationPreferencesStore.getState().preferences.image;
                     const normalized = normalizeImageValue(imageProfile, {
@@ -462,7 +486,7 @@ export default function CreatePage() {
                     setVideoQuality(normalized.resolution.replace(/p$/i, ""));
                     setVideoGenerateAudio(videoProfile.generateAudio.supported ? (draft?.videoGenerateAudio ?? videoProfile.generateAudio.default) : false);
                     setVideoWatermark(videoProfile.watermark.supported ? (draft?.videoWatermark ?? videoProfile.watermark.default) : false);
-                    const referenceLimit = videoProfile.operations.includes("image_to_video") ? videoProfile.references.maxImages : 0;
+                    const referenceLimit = videoAttachmentLimit(videoProfile);
                     if (attachments.length > referenceLimit) setAttachments((current) => current.slice(0, referenceLimit));
                 }
                 settingsDraftReadyKeyRef.current = settingsDraftPersistenceKey;
@@ -475,11 +499,11 @@ export default function CreatePage() {
 
     useEffect(() => {
         if (!settingsDraftIdentity || settingsDraftReadyKeyRef.current !== settingsDraftPersistenceKey) return;
-        const draft = mode === "image" ? { ratio, quality, count } : { ratio, seconds, videoQuality, videoGenerateAudio, videoWatermark };
+        const draft = mode === "image" ? { ratio, quality, count, generationOptions } : { ratio, seconds, videoQuality, videoGenerateAudio, videoWatermark, generationOptions };
         void saveCreationSettingsDraft(settingsDraftIdentity, draft, creationSettingsScope).catch((error) => {
             console.warn("创作设置草稿保存失败", error);
         });
-    }, [count, creationSettingsScope, mode, quality, ratio, seconds, settingsDraftIdentity, settingsDraftPersistenceKey, videoGenerateAudio, videoQuality, videoWatermark]);
+    }, [count, creationSettingsScope, mode, quality, ratio, seconds, settingsDraftIdentity, settingsDraftPersistenceKey, videoGenerateAudio, videoQuality, videoWatermark, generationOptions]);
 
     useEffect(() => {
         const reconciled = reconcileCreationAttachmentLimit(attachments, mentionReferences, maxReferences);
@@ -487,6 +511,15 @@ export default function CreatePage() {
         setAttachments(reconciled.attachments);
         if (reconciled.removedReferences.length) setPrompt((current) => removeCreationReferenceTokens(current, reconciled.removedReferences));
     }, [attachments, maxReferences, mentionReferences]);
+
+    useEffect(() => {
+        const ids = new Set(attachments.map((item) => item.id));
+        setFrameSelection((current) => {
+            const first = current.videoStartFrameNodeId && ids.has(current.videoStartFrameNodeId) ? current.videoStartFrameNodeId : undefined;
+            const last = current.videoEndFrameNodeId && ids.has(current.videoEndFrameNodeId) ? current.videoEndFrameNodeId : undefined;
+            return first === current.videoStartFrameNodeId && last === current.videoEndFrameNodeId ? current : { videoStartFrameNodeId: first, videoEndFrameNodeId: last };
+        });
+    }, [attachments]);
 
     useEffect(() => {
         let cancelled = false;
@@ -707,9 +740,12 @@ export default function CreatePage() {
             toast.warning(mode === "image" ? "当前图片模型不支持参考图" : "当前模型不支持图生视频");
             return;
         }
-        const next = Array.from(files)
-            .filter((file) => creationFileAccepted(mode, file))
-            .slice(0, Math.max(0, maxReferences - attachments.length));
+        const next = Array.from(files).filter((file) => creationFileAccepted(mode, file));
+        const attachmentError = mode === "video" ? videoAttachmentError(videoProfile, [...attachments, ...next].map(creationAttachmentKind)) : "";
+        if (attachmentError || attachments.length + next.length > maxReferences) {
+            toast.warning(attachmentError || `最多支持 ${maxReferences} 个参考素材`);
+            return;
+        }
         if (!next.length) return;
         void Promise.allSettled(
             next.map(async (file) => {
@@ -751,7 +787,13 @@ export default function CreatePage() {
             return external ? [creationAttachmentFromExternalAsset(external)] : [];
         });
         if (!next.length) return;
-        setAttachments((current) => [...current.filter((item) => !next.some((candidate) => candidate.id === item.id)), ...next].slice(0, maxReferences));
+        const merged = [...attachments.filter((item) => !next.some((candidate) => candidate.id === item.id)), ...next];
+        const error = mode === "video" ? videoAttachmentError(videoProfile, merged.map(creationAttachmentKind)) : "";
+        if (error || merged.length > maxReferences) {
+            toast.warning(error || `最多支持 ${maxReferences} 个参考素材`);
+            return;
+        }
+        setAttachments(merged);
         setLibraryOpen(false);
     };
 
@@ -794,6 +836,10 @@ export default function CreatePage() {
         attachmentsRef.current = result.attachments;
         setPrompt(result.prompt);
         setAttachments(result.attachments);
+        setFrameSelection((current) => ({
+            videoStartFrameNodeId: current.videoStartFrameNodeId === targetAttachmentId ? replacement.id : current.videoStartFrameNodeId,
+            videoEndFrameNodeId: current.videoEndFrameNodeId === targetAttachmentId ? replacement.id : current.videoEndFrameNodeId,
+        }));
         return true;
     }, []);
 
@@ -836,7 +882,9 @@ export default function CreatePage() {
             if (retryLockKey) retryPreparingRef.current.delete(retryLockKey);
         };
         const text = prompt.trim();
-        if (!text || busy || !activeConversation) {
+        const media = splitCreationAttachments(attachments);
+        const promptOptional = mode === "video" && optionalVideoPrompt(selectedModel, media.referenceImages.length, media.referenceVideos.length);
+        if ((!text && !promptOptional) || busy || !activeConversation) {
             releaseRetryLock();
             return;
         }
@@ -855,10 +903,16 @@ export default function CreatePage() {
             releaseRetryLock();
             return;
         }
-        const settings = { ratio, seconds, quality, videoQuality, count, videoGenerateAudio, videoWatermark };
+        const settings = { ratio, seconds, quality, videoQuality, count, videoGenerateAudio, videoWatermark, generationOptions, frameSelection };
         const references = selectedCreationReferences(text, mentionReferences);
         // 后端对图片和视频使用不同的参考字段；这里先拆分，避免媒体类型在写入任务时被误判。
         const { referenceImages, referenceVideos, referenceAudios } = splitCreationAttachments(attachments);
+        const mediaError = mode === "video" ? videoAttachmentError(videoProfile, attachments.map(creationAttachmentKind)) : "";
+        if (mediaError) {
+            toast.error(mediaError);
+            releaseRetryLock();
+            return;
+        }
         const videoOperation = inferVideoOperation({
             textCount: text ? 1 : 0,
             imageCount: referenceImages.length,
@@ -882,7 +936,7 @@ export default function CreatePage() {
             return;
         }
         const expandedPrompt = skillExecution.prompt;
-        const referenceMetadata = skillExecution.metadata;
+        const referenceMetadata = { ...skillExecution.metadata, ...generationOptions, ...frameSelection };
         followLatestMessageRef.current = true;
         const userMessage = newMessage("user", text, { mode, model: selectedModel, attachments, references, settings });
         const assistantMessage = newMessage("assistant", "", {
@@ -919,7 +973,7 @@ export default function CreatePage() {
         };
         updateActive((conversation) => ({
             ...conversation,
-            title: conversation.messages.length ? conversation.title : text.slice(0, 24),
+            title: conversation.messages.length ? conversation.title : text.slice(0, 24) || "图生视频",
             updatedAt: new Date().toISOString(),
             messages: [...conversation.messages, userMessage, assistantMessage],
         }));
@@ -978,12 +1032,12 @@ export default function CreatePage() {
                     runtime.runBackendGenerationTaskBatch({
                         mode: "image",
                         prompt: expandedPrompt,
-                        config: { ...requestConfig, count: "1" },
+                        config: { ...requestConfig, count: generationOptions.nativeBatch ? String(taskCount) : "1" },
                         referenceImages,
                         signal: requestLifecycle.signal,
                         metadata: { source: "create-page", conversationId: activeConversation.id, messageId: assistantMessage.id, ...referenceMetadata },
                         onTaskUpdate: bindTask,
-                        count: taskCount,
+                        count: generationOptions.nativeBatch ? 1 : taskCount,
                         ...retryContext,
                     }),
                 );
@@ -1189,6 +1243,17 @@ export default function CreatePage() {
     const restoreMessageDraft = (item: CreationMessage) => {
         const nextMode = item.mode || "text";
         const nextSettings = item.settings;
+        if (nextSettings && nextMode !== "text" && item.model) {
+            const media = splitCreationAttachments(item.attachments ?? []);
+            const operation =
+                nextMode === "image"
+                    ? media.referenceImages.length
+                        ? "image_edit"
+                        : "text_to_image"
+                    : inferVideoOperation({ textCount: 0, imageCount: media.referenceImages.length, videoCount: media.referenceVideos.length, audioCount: media.referenceAudios.length, characterCount: 0 });
+            const key = creationSettingsDraftKey({ mode: nextMode, model: item.model, operation });
+            restoredSettingsRef.current = key !== (settingsDraftIdentity ? creationSettingsDraftKey(settingsDraftIdentity) : "") ? { key, settings: nextSettings } : undefined;
+        }
         selectMode(nextMode);
         setPrompt(item.content);
         setAttachments(item.attachments ? [...item.attachments] : []);
@@ -1202,13 +1267,15 @@ export default function CreatePage() {
         setCount(nextSettings.count);
         if (typeof nextSettings.videoGenerateAudio === "boolean") setVideoGenerateAudio(nextSettings.videoGenerateAudio);
         if (typeof nextSettings.videoWatermark === "boolean") setVideoWatermark(nextSettings.videoWatermark);
+        setGenerationOptions(nextSettings.generationOptions ?? {});
+        setFrameSelection(nextSettings.frameSelection ?? {});
         if (nextMode === "image") rememberImageSettings({ ratio: nextSettings.ratio, quality: nextSettings.quality, count: nextSettings.count });
         if (nextMode === "video") rememberVideoSettings({ ratio: nextSettings.ratio, seconds: nextSettings.seconds, videoQuality: nextSettings.videoQuality });
     };
 
     const retryFailedMessage = async (item: CreationMessage, index: number) => {
         const previous = item.role === "assistant" ? activeConversation?.messages[index - 1] : item;
-        if (!previous?.content || busy) return;
+        if (!previous || (!previous.content && !previous.attachments?.length) || busy) return;
         const retryOf = item.taskIds?.[0];
         const restoreForRetry = () => {
             followLatestMessageRef.current = true;
@@ -1244,7 +1311,7 @@ export default function CreatePage() {
 
     const createVariant = (item: CreationMessage, index: number) => {
         const previous = item.role === "assistant" ? activeConversation?.messages[index - 1] : item;
-        if (!previous?.content || busy) return;
+        if (!previous || (!previous.content && !previous.attachments?.length) || busy) return;
         restoreMessageDraft(previous);
     };
 
@@ -1292,6 +1359,10 @@ export default function CreatePage() {
         videoWatermark,
         onVideoGenerateAudioChange: setVideoGenerateAudio,
         onVideoWatermarkChange: setVideoWatermark,
+        generationOptions,
+        onGenerationOptionsChange: setGenerationOptions,
+        frameSelection,
+        onFrameSelectionChange: (patch: typeof frameSelection) => setFrameSelection((current) => ({ ...current, ...patch })),
         settingsReady,
         ratio,
         setRatio: setComposerRatio,
@@ -2185,6 +2256,10 @@ function CreationAttachmentThumbnail({ item, onPreview, onRemove }: { item: Crea
 }
 
 type ComposerProps = {
+    generationOptions: BailianGenerationOptions;
+    onGenerationOptionsChange: (value: BailianGenerationOptions) => void;
+    frameSelection: { videoStartFrameNodeId?: string; videoEndFrameNodeId?: string };
+    onFrameSelectionChange: (patch: { videoStartFrameNodeId?: string; videoEndFrameNodeId?: string }) => void;
     variant: "empty" | "thread";
     mode: CreationMode;
     prompt: string;
@@ -2252,7 +2327,9 @@ function CreationComposer(props: ComposerProps) {
     const previousAttachmentCountRef = useRef(0);
     const interactionBusy = props.busy || props.referenceReplacementBusy;
     const hasWork = interactionBusy || props.generationActive;
-    const canSubmit = Boolean(props.prompt.trim()) && !interactionBusy && props.settingsReady;
+    const promptOptional =
+        props.mode === "video" && optionalVideoPrompt(props.model, props.attachments.filter((item) => creationAttachmentKind(item) === "image").length, props.attachments.filter((item) => creationAttachmentKind(item) === "video").length);
+    const canSubmit = (Boolean(props.prompt.trim()) || promptOptional) && !interactionBusy && props.settingsReady;
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const priceChannel = resolveModelChannel(props.config, props.model);
     const canOptimizePrompt = Boolean(props.promptOptimizerProvider) && (props.mode === "image" || props.mode === "video");
@@ -2261,7 +2338,7 @@ function CreationComposer(props: ComposerProps) {
         channelMode: priceChannel.scope === "system" ? "remote" : "local",
         modelCosts: priceChannel.modelCosts,
         model: modelOptionName(props.model),
-        count: props.mode === "image" ? props.count : 1,
+        count: props.mode === "image" && !props.generationOptions.nativeBatch ? props.count : 1,
         seconds: props.mode === "video" ? props.seconds : 1,
     });
     const showCost = creditsEnabled && credits !== null;
@@ -2272,7 +2349,7 @@ function CreationComposer(props: ComposerProps) {
     const placeholder = props.mode === "text" ? "描述你的故事、角色或想继续讨论的创意" : props.mode === "image" ? "描述画面、人物、场景、构图与风格" : "描述镜头内容、运动、光线与节奏";
     const emptyPlaceholder = "输入你的镜头、画面或故事。也可以添加参考图开始创作";
     const imageReferencesSupported = props.imageProfile.references.maxImages > 0;
-    const referencesSupported = props.mode === "image" ? imageReferencesSupported : props.mode !== "video" || props.videoProfile.operations.includes("image_to_video");
+    const referencesSupported = props.mode === "image" ? imageReferencesSupported : props.mode !== "video" || videoAttachmentLimit(props.videoProfile) > 0;
     const canAddMoreReferences = referencesSupported && props.attachments.length < props.maxReferences;
     const addReferenceLabel = interactionBusy ? (props.referenceReplacementBusy ? "正在替换参考图" : "生成中暂不能添加参考内容") : canAddMoreReferences ? "添加更多参考内容" : `已达到当前模型的参考内容上限（${props.maxReferences} 个）`;
     const referenceCounts = useMemo(
@@ -2545,6 +2622,34 @@ function CreationComposer(props: ComposerProps) {
                         variant="creation"
                     />
                     {props.mode === "video" || (props.mode === "image" && imageSettingsSupported) ? <GenerationSettingsMenu {...props} /> : null}
+                    {props.mode !== "text" && bailianModelKind(props.model) ? (
+                        <Popover
+                            trigger="click"
+                            content={
+                                <div className="w-72">
+                                    <BailianGenerationOptionsPanel
+                                        showBatchControl
+                                        model={props.model}
+                                        value={props.generationOptions}
+                                        imageCount={props.attachments.filter((item) => creationAttachmentKind(item) === "image").length}
+                                        onChange={props.onGenerationOptionsChange}
+                                    />
+                                </div>
+                            }
+                        >
+                            <button type="button" className="creation-chat-control">
+                                高级参数
+                            </button>
+                        </Popover>
+                    ) : null}
+                    {props.mode === "video" ? (
+                        <CanvasVideoPromptTools
+                            model={props.model}
+                            metadata={props.frameSelection}
+                            frameOptions={props.attachments.filter((item) => creationAttachmentKind(item) === "image").map((item, index) => ({ nodeId: item.id, label: `图片${index + 1}`, title: item.name, previewUrl: item.previewUrl }))}
+                            onMetadataChange={props.onFrameSelectionChange}
+                        />
+                    ) : null}
                     {props.mode === "video" ? <DurationMenu profile={props.videoProfile} seconds={props.seconds} onChange={props.setSeconds} /> : null}
                     {props.mode === "text" ? (
                         <>

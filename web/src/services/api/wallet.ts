@@ -62,7 +62,7 @@ export type ChannelModel = {
     catalogVersion?: string;
     supportedOperations?: string[];
     documentationPaths?: string[];
-    billingMode: "fixed_request" | "per_second" | "token";
+    billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
     unitPriceMicrocredits: number;
     inputTokenPriceMicrocredits: number;
     outputTokenPriceMicrocredits: number;
@@ -102,7 +102,7 @@ export type ChannelModelPriceTier = {
     resolution: string;
     videoSeconds: number;
     providerModelKey: string;
-    billingMode: "fixed_request" | "per_second" | "token";
+    billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
     unitPriceMicrocredits: number;
     inputTokenPriceMicrocredits: number;
     outputTokenPriceMicrocredits: number;
@@ -214,6 +214,7 @@ export type AdminRedeemCodePage = {
 };
 
 export type BillingOrder = {
+    usageDurationMs?: number;
     id: string;
     userId: string;
     taskId?: string;
@@ -221,7 +222,7 @@ export type BillingOrder = {
     model: string;
     capability: string;
     scene: string;
-    billingMode: "fixed_request" | "per_second" | "token";
+    billingMode: "fixed_request" | "per_second" | "per_second_usage" | "token";
     unitPriceMicrocredits: number;
     multiplierBasisPoints: number;
     quantity: number;

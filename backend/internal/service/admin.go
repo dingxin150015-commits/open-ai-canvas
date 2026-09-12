@@ -728,6 +728,9 @@ func (s *Service) mergeVideoAPICallLog(log model.ApiCallLog) (bool, error) {
 	}
 	if log.UsageAvailable {
 		root.UsageAvailable = true
+		root.UsageDurationMs = log.UsageDurationMs
+		root.InputVideoDurationMs = log.InputVideoDurationMs
+		root.OutputVideoDurationMs = log.OutputVideoDurationMs
 		root.InputTokens = log.InputTokens
 		root.OutputTokens = log.OutputTokens
 		root.CachedTokens = log.CachedTokens

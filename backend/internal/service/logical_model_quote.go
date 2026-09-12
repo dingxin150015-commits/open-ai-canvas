@@ -77,7 +77,7 @@ func (s *Service) QuoteSystemChannelModel(channelModelID string, intent ModelReq
 		BillingMode:        order.BillingMode,
 		Quantity:           order.Quantity,
 		AmountMicrocredits: order.AmountMicrocredits,
-		Estimated:          order.BillingMode == "token",
+		Estimated:          order.BillingMode == "token" || order.BillingMode == "per_second_usage",
 	}, nil
 }
 
@@ -113,7 +113,7 @@ func (s *Service) QuoteLogicalModel(logicalModelID string, intent ModelRequestIn
 			BillingMode:        order.BillingMode,
 			Quantity:           order.Quantity,
 			AmountMicrocredits: order.AmountMicrocredits,
-			Estimated:          order.BillingMode == "token",
+			Estimated:          order.BillingMode == "token" || order.BillingMode == "per_second_usage",
 		}, nil
 	}
 

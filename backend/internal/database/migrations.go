@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 8
+const CurrentSchemaVersion int64 = 9
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -54,6 +54,11 @@ var schemaMigrations = []migration{
 	{version: 6, name: "resource_playback_variant", checksum: resourcePlaybackChecksum, apply: migrateSchemaV6},
 	{version: 7, name: "asset_library_folders", checksum: assetLibraryFoldersChecksum, apply: migrateSchemaV7},
 	{version: 8, name: "logical_model_active_code", checksum: logicalModelActiveCodeChecksum, apply: migrateSchemaV8},
+	{version: 9, name: "provider_duration_metering", checksum: "sha256:provider-duration-metering-v9-20260912", apply: migrateSchemaV9},
+}
+
+func migrateSchemaV9(tx *gorm.DB) error {
+	return tx.AutoMigrate(&model.ApiCallLog{}, &model.BillingOrder{})
 }
 
 func migrationsForDatabase(db *gorm.DB) ([]migration, error) {

@@ -590,7 +590,7 @@ func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, ide
 	amount := int64(0)
 	switch tier.BillingMode {
 	case "fixed_request":
-	case "per_second":
+	case "per_second", "per_second_usage":
 		if item.Capability != "video" || capability != "video" {
 			return nil, BadAuthRequest("按秒计费仅适用于视频生成")
 		}
@@ -598,6 +598,14 @@ func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, ide
 			return nil, BadAuthRequest("视频生成时长无效，无法按秒计费")
 		}
 		quantity = requestedQuantity
+		if tier.BillingMode == "per_second_usage" {
+			if string(item.Protocol) != "dashscope-video" {
+				return nil, BadAuthRequest("当前协议不支持实际时长结算")
+			}
+			if len(intents) > 0 && intents[0].Inputs["video"] > 0 && wan27VideoKind(firstNonEmpty(tier.ProviderModelKey, item.ProviderModelKey, item.ModelKey)) == "r2v" {
+				quantity += 5
+			}
+		}
 	case "token":
 		if !supportsTokenBilling(item.Capability, item.Protocol) || item.Capability != capability {
 			return nil, BadAuthRequest("Token 计费仅支持文本生成和火山方舟视频生成")

@@ -680,14 +680,17 @@ func normalizeChannelModelTierSelector(capability string, input ChannelModelPric
 }
 
 func validateChannelModelTierPricing(capability string, protocol model.ChannelInterfaceType, billingMode string, input ChannelModelPriceTierRequest) error {
-	if billingMode != "fixed_request" && billingMode != "per_second" && billingMode != "token" {
+	if billingMode != "fixed_request" && billingMode != "per_second" && billingMode != "per_second_usage" && billingMode != "token" {
 		return BadAuthRequest("模型计费方式仅支持按次、按秒或 Token")
 	}
-	if billingMode == "per_second" && capability != "video" {
+	if (billingMode == "per_second" || billingMode == "per_second_usage") && capability != "video" {
 		return BadAuthRequest("只有视频模型可以按秒计费")
 	}
 	if billingMode == "token" && !supportsTokenBilling(capability, protocol) {
 		return BadAuthRequest("Token 计费仅支持文本模型和火山方舟视频协议")
+	}
+	if billingMode == "per_second_usage" && string(protocol) != "dashscope-video" {
+		return BadAuthRequest("实际时长计费目前仅支持已提供时长计量的百炼视频插件")
 	}
 	if input.UnitPriceMicrocredits < 0 || input.InputTokenPriceMicrocredits < 0 || input.OutputTokenPriceMicrocredits < 0 || input.CachedTokenPriceMicrocredits < 0 {
 		return BadAuthRequest("模型积分价格不能小于 0")

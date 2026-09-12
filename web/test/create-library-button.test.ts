@@ -166,7 +166,8 @@ describe("creation library button", () => {
         expect(source).toContain("operation: settingsOperation");
         expect(source).toContain("videoGenerateAudio: String(videoProfile.generateAudio.supported && videoGenerateAudio)");
         expect(source).toContain("videoWatermark: String(videoProfile.watermark.supported && videoWatermark)");
-        expect(source).toContain("const canSubmit = Boolean(props.prompt.trim()) && !interactionBusy && props.settingsReady");
+        expect(source).toContain("const canSubmit = (Boolean(props.prompt.trim()) || promptOptional) && !interactionBusy && props.settingsReady");
+        expect(source).toContain('props.mode === "video" && optionalVideoPrompt');
     });
 
     test("omits stale video ratios when the selected capability declares no size", () => {

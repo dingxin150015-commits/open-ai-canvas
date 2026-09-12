@@ -139,4 +139,8 @@ type ApiCallLog struct {
 	ResponseBody        string        `json:"responseBody,omitempty" gorm:"type:text"`
 	StartedAt           time.Time     `json:"startedAt"`
 	CreatedAt           time.Time     `json:"createdAt" gorm:"index;index:idx_api_logs_user_created,priority:2;index:idx_api_logs_channel_created,priority:2;index:idx_api_logs_model_created,priority:2;index:idx_api_logs_status_created,priority:2"`
+
+	UsageDurationMs       int64 `json:"usageDurationMs"`
+	InputVideoDurationMs  int64 `json:"inputVideoDurationMs"`
+	OutputVideoDurationMs int64 `json:"outputVideoDurationMs"`
 }

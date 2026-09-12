@@ -1,5 +1,9 @@
 # 当前状态
 
+## 当前：百炼七模型源码预验证通过，待部署
+
+见 `BAILIAN_FULL_CAPABILITIES_20260912.md`。在 13ff9e42 上完成前后端入口、参数、媒体和计量策略；Backend 全量、Web 1632 全量/类型/构建、测试镜像源码一致性通过。候选增加 Schema 9、默认图片超时 15 分钟。当前生产仍为上一轮 Schema 8，尚未部署本轮代码；Edge 和真实生成未执行。
+
 ## 最新：百炼完整声明式插件已部署，等待用户 Edge 确认
 
 正确基线 `d9fec0f4`，部署提交 `8dcdfd5d`，独立修复工作树 `.local/worktrees/dashscope-plugins`。两个协议已通过正式声明式 v3 插件进入统一生命周期；最终 Linux CGO 全量、断网克隆双启动与实际保留卷部署前后数据核对通过。Backend `45b8cc449d3c` 为 `v1.2.7+dingxin.1.bailian / 8dcdfd5d`，healthy、restart 0、schema 8/8；Web 容器未变，模型/价格/启用状态未改写。旧工作树宿主注入补丁已归档撤销。当前 `bailian_declarative_deployed_preverified_edge_pending`，详细证据和 Edge 清单见 `BAILIAN_PLUGIN_MIGRATION_20260911.md`。未执行浏览器步骤或真实付费生成。

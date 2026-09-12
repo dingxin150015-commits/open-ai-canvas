@@ -83,6 +83,9 @@ export type ApiCallLog = {
     outputTokens: number;
     cachedTokens: number;
     usageAvailable: boolean;
+    usageDurationMs?: number;
+    inputVideoDurationMs?: number;
+    outputVideoDurationMs?: number;
     mediaCount: number;
     mediaPreviewUrl?: string;
     mediaPreviewKind?: "image" | "video";

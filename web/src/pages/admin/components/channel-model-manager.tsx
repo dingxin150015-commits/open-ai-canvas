@@ -519,7 +519,7 @@ function priceTierLabel(tier: ChannelModelPriceTier) {
     ].filter(Boolean);
     const spec = specParts.length ? specParts.join(" / ") : "默认规格";
     if (tier.billingMode === "token") return `${spec} · ${formatCredits(tier.outputTokenPriceMicrocredits)} / 百万 Token`;
-    return `${spec} · ${formatCredits(tier.unitPriceMicrocredits)} 积分 / ${tier.billingMode === "per_second" ? "秒" : "次"}`;
+    return `${spec} · ${formatCredits(tier.unitPriceMicrocredits)} 积分 / ${tier.billingMode === "per_second_usage" ? "实际计费秒" : tier.billingMode === "per_second" ? "秒" : "次"}`;
 }
 
 function operationLabel(operation: string) {
