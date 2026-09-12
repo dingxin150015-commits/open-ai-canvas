@@ -1,6 +1,24 @@
 import { wan27VideoKind, happyHorse11VideoKind, type VideoCapabilityConfig } from "./model-capabilities";
+import type { AiConfig } from "@/stores/use-config-store";
+
+export function declaredGenerationContract(config: Pick<AiConfig, "channels" | "model">, model = config.model): string | undefined {
+    const separator = model.indexOf("::");
+    const channelId = separator >= 0 ? model.slice(0, separator) : "";
+    const name = separator >= 0 ? model.slice(separator + 2) : model;
+    const channel = config.channels.find((item) => item.id === channelId) ?? config.channels.find((item) => item.models.includes(name));
+    const cost = channel?.modelCosts?.find((item) => item.model === name);
+    const direct = cost?.capabilityConfig?.generationContract;
+    if (direct && bailianModelKind(direct)) return direct;
+    const values = cost?.logicalCapabilitySpec?.options?.generationContract?.values;
+    return values?.length === 1 && typeof values[0] === "string" && bailianModelKind(values[0]) ? values[0] : undefined;
+}
+
+export function bailianContractModel(config: Pick<AiConfig, "channels" | "model">, model = config.model) {
+    return declaredGenerationContract(config, model) ?? model;
+}
 
 export type BailianGenerationOptions = {
+    contractKind?: string;
     seed?: string | number;
     negative_prompt?: string;
     prompt_extend?: boolean;
@@ -16,7 +34,9 @@ export function bailianReferencePrompt(prompt: string, model: string, images: { 
     if (kind !== "happyhorse-1.1-r2v" && kind !== "wan2.7-r2v") return prompt;
     let referenceIndex = 0;
     const labels = images.map((image) => (kind === "wan2.7-r2v" && image.id === firstFrameID ? "首帧" : kind.startsWith("happyhorse") ? `[Image ${++referenceIndex}]` : `Image ${++referenceIndex}`));
-    return prompt.replace(/@(图片|视频)(\d+)(?!\d)/g, (token, type: string, index: string) => (type === "图片" ? (labels[Number(index) - 1] ?? token) : kind === "wan2.7-r2v" ? `Video ${index}` : token));
+    const label = (type: string, index: string, fallback: string) => (type === "图片" ? (labels[Number(index) - 1] ?? fallback) : kind === "wan2.7-r2v" ? "Video " + index : fallback);
+    const mapped = prompt.replace(/^(- )(@(图片|视频)(\d+))：参考(?:图片|视频) \d+$/gm, (_match, prefix: string, token: string, type: string, index: string) => prefix + token + "：" + label(type, index, token));
+    return mapped.replace(/@(图片|视频)(\d+)(?!\d)/g, (token, type: string, index: string) => label(type, index, token));
 }
 
 export function validateBailianOptions(options: BailianGenerationOptions, model: string, imageCount: number) {

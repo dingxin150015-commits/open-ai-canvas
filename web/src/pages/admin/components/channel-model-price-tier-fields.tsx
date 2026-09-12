@@ -83,7 +83,7 @@ export function PriceTierFields({
                             name={[index, "billingMode"]}
                             label="计费方式"
                             rules={[{ required: true }]}
-                            extra={billingMode === "per_second_usage" ? "按实际计费时长结算，先预扣估算额，取得用量后退补差额；缺少用量时进入人工核对。既有价格不会自动切换。" : undefined}
+                            extra={billingMode === "per_second_usage" ? "按实际计费时长结算，先预扣估算额，取得用量后退还差额；缺少用量或超出预扣时转人工核对，不自动超额补扣。既有价格不会自动切换。" : undefined}
                         >
                             <Segmented
                                 className="w-full"

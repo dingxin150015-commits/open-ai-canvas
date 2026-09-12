@@ -728,6 +728,15 @@ func (r *Repository) MarkBillingUncertain(id string, errorText string) error {
 }
 
 func (r *Repository) SettleBillingOrder(id string, providerRequestID string) error {
+	return r.settleBillingOrder(id, providerRequestID, false)
+}
+
+// Only the admin review service may use this path after explicit confirmation.
+func (r *Repository) SettleReviewedDurationBillingOrder(id string, providerRequestID string) error {
+	return r.settleBillingOrder(id, providerRequestID, true)
+}
+
+func (r *Repository) settleBillingOrder(id string, providerRequestID string, reviewedDuration bool) error {
 	var observedUsage *BillingUsage
 	var observedActual int64
 	observedActualAvailable := false
@@ -735,6 +744,9 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 		var order model.BillingOrder
 		if err := tx.First(&order, "id = ?", id).Error; err != nil {
 			return err
+		}
+		if reviewedDuration && order.BillingMode != "per_second_usage" {
+			return errors.New("reviewed duration settlement requires duration billing")
 		}
 		if order.Status == model.BillingStatusSettled {
 			return nil
@@ -755,6 +767,9 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 			actual, err := tokenUsageAmount(order, usage)
 			if order.BillingMode == "per_second_usage" {
 				actual, err = durationUsageAmount(order, usage)
+				if err == nil && !reviewedDuration {
+					err = checkDurationReservation(order, actual)
+				}
 			}
 			if err != nil {
 				return err
@@ -763,17 +778,22 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 			observedActualAvailable = true
 			refund := max(reserved-actual, int64(0))
 			supplement := max(actual-reserved, int64(0))
-			updated := tx.Model(&model.CreditAccount{}).
-				Where("user_id = ? AND reserved_microcredits >= ?", order.UserID, reserved).
-				Updates(map[string]any{
-					"available_microcredits": gorm.Expr("available_microcredits + ?", refund-supplement),
-					"reserved_microcredits":  gorm.Expr("reserved_microcredits - ?", reserved),
-					"version":                gorm.Expr("version + 1"), "updated_at": time.Now(),
-				})
+			accountQuery := tx.Model(&model.CreditAccount{}).Where("user_id = ? AND reserved_microcredits >= ?", order.UserID, reserved)
+			if reviewedDuration && supplement > 0 {
+				accountQuery = accountQuery.Where("available_microcredits >= ?", supplement)
+			}
+			updated := accountQuery.Updates(map[string]any{
+				"available_microcredits": gorm.Expr("available_microcredits + ?", refund-supplement),
+				"reserved_microcredits":  gorm.Expr("reserved_microcredits - ?", reserved),
+				"version":                gorm.Expr("version + 1"), "updated_at": time.Now(),
+			})
 			if updated.Error != nil {
 				return updated.Error
 			}
 			if updated.RowsAffected != 1 {
+				if reviewedDuration && supplement > 0 {
+					return ErrInsufficientCredits
+				}
 				return errors.New("reserved credit balance is inconsistent")
 			}
 			var account model.CreditAccount
@@ -863,6 +883,9 @@ func (r *Repository) SettleBillingOrder(id string, providerRequestID string) err
 			"input_tokens": observedUsage.InputTokens, "output_tokens": observedUsage.OutputTokens,
 			"cached_tokens": observedUsage.CachedTokens, "usage_available": true, "updated_at": time.Now(),
 		}
+		if observedUsage.DurationMs > 0 {
+			updates["usage_duration_ms"] = observedUsage.DurationMs
+		}
 		if observedActualAvailable {
 			updates["actual_amount_microcredits"] = observedActual
 		}
@@ -913,6 +936,9 @@ func (r *Repository) RestoreRefundedBillingOrder(id string, providerRequestID st
 				actual, err = tokenUsageAmount(order, usage)
 				if order.BillingMode == "per_second_usage" {
 					actual, err = durationUsageAmount(order, usage)
+					if err == nil {
+						err = checkDurationReservation(order, actual)
+					}
 				}
 				if err != nil {
 					return err

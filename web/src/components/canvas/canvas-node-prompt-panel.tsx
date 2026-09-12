@@ -19,7 +19,7 @@ import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { CanvasVideoPromptTools } from "./canvas-video-prompt-tools";
-import { optionalVideoPrompt } from "@/lib/bailian-generation";
+import { bailianContractModel, optionalVideoPrompt } from "@/lib/bailian-generation";
 import { BailianGenerationOptionsPanel } from "@/components/bailian-generation-options";
 import { CanvasPresetPicker, type CanvasPromptPreset } from "./canvas-preset-picker";
 import { CanvasPortraitTexturePopover } from "./canvas-portrait-texture-popover";
@@ -125,6 +125,7 @@ export function CanvasNodePromptPanel({
         ),
     };
     const config = buildNodeConfig(globalConfig, node, mode, requirements);
+    const contractModel = bailianContractModel(config);
     const resolvedRequirements: ModelRequirements = {
         ...requirements,
         options: modelRequestOptions(config, mode),
@@ -174,7 +175,7 @@ export function CanvasNodePromptPanel({
     const expandedPromptBounds = promptEditorBounds(true, activeReferenceCount > 0);
     const composerHeight = clampPromptHeight(manualPromptHeight ?? promptContentHeight + (activeReferenceCount ? PROMPT_REFERENCE_SHELF_HEIGHT : 0), promptBounds);
     const expandedComposerHeight = clampPromptHeight(manualExpandedPromptHeight ?? expandedPromptContentHeight + (activeReferenceCount ? PROMPT_REFERENCE_SHELF_HEIGHT : 0), expandedPromptBounds);
-    const promptOptional = mode === "video" && optionalVideoPrompt(config.model, requirements.input?.imageCount ?? 0, requirements.input?.videoCount ?? 0);
+    const promptOptional = mode === "video" && optionalVideoPrompt(contractModel, requirements.input?.imageCount ?? 0, requirements.input?.videoCount ?? 0);
     const isSubmitDisabled = !isRunning && !prompt.trim() && !promptOptional;
     const canExpandPrompt = mode === "image" || mode === "video";
     const canOptimizePrompt = Boolean(promptOptimizerProvider) && canExpandPrompt;
@@ -452,7 +453,7 @@ export function CanvasNodePromptPanel({
 
                 {renderPromptEditor(false)}
                 {(config.taskWorkflowProvider || "model") === "model" ? (
-                    <BailianGenerationOptionsPanel model={config.model} value={node.metadata?.generationOptions} imageCount={requirements.input?.imageCount ?? 0} onChange={(generationOptions) => onConfigChange(node.id, { generationOptions })} />
+                    <BailianGenerationOptionsPanel model={contractModel} value={node.metadata?.generationOptions} imageCount={requirements.input?.imageCount ?? 0} onChange={(generationOptions) => onConfigChange(node.id, { generationOptions })} />
                 ) : null}
 
                 {/* B区 参数区（对应 #98 决策2：默认折叠，手风琴展开）*/}
@@ -472,7 +473,7 @@ export function CanvasNodePromptPanel({
                         </button>
                         {paramsExpanded ? (
                             <div className="pt-1">
-                                <CanvasVideoPromptTools model={config.model} metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
+                                <CanvasVideoPromptTools model={contractModel} metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
                             </div>
                         ) : null}
                     </div>
@@ -502,7 +503,7 @@ export function CanvasNodePromptPanel({
                         {renderPromptEditor(true)}
                         {hasVideoPromptTools ? (
                             <div className="canvas-node-composer-parameters shrink-0">
-                                <CanvasVideoPromptTools model={config.model} metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
+                                <CanvasVideoPromptTools model={contractModel} metadata={node.metadata} frameOptions={videoFrameOptions} onMetadataChange={(patch) => onConfigChange(node.id, patch)} />
                             </div>
                         ) : null}
                         <div className="shrink-0">{renderComposerControls(true)}</div>

@@ -5,7 +5,7 @@ import { createGenerationTask, waitForGenerationTask, type GenerationTask } from
 import { LOCAL_DREAMINA_WAIT_STOPPED_CODE, LocalDreaminaGenerationClientError, runLocalDreaminaGenerationTask, type LocalDreaminaGenerationInput, type LocalDreaminaGenerationTask } from "@/services/local-dreamina-generation";
 import { isLocalDreaminaBackgroundTask, localDreaminaTaskId, projectLocalDreaminaTask, stripLocalDreaminaTaskPrefix } from "@/services/local-dreamina-task-projection";
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
-import { bailianModelKind, bailianReferencePrompt, bailianVideoOperation, validateBailianOptions, validateBailianFrames } from "@/lib/bailian-generation";
+import { bailianContractModel, declaredGenerationContract, bailianModelKind, bailianReferencePrompt, bailianVideoOperation, validateBailianOptions, validateBailianFrames } from "@/lib/bailian-generation";
 import { grokImagePromptLimitError } from "@/lib/grok-image-prompt-limit";
 import { resolveGenerationWorkflowExecution, type GenerationWorkflowExecution } from "@/lib/generation-workflow-execution";
 import { resolveVideoOperation } from "@/lib/model-selection";
@@ -450,12 +450,15 @@ async function createAndWaitGenerationTask(options: BackendGenerationTaskOptions
 
 async function createBackendGenerationTask(options: BackendGenerationTaskOptions, prepared: PreparedGenerationReferences, dependencies: GenerationTaskDependencies) {
     const { projectId, mode, prompt, config, metadata, onTaskUpdate } = options;
+    const contractModel = bailianContractModel(config);
     const workflow = resolveGenerationWorkflowExecution(config, mode);
     if (!workflow) {
-        validateBailianOptions({ ...config.generationOptions, ...metadata }, config.model, prepared.referenceImages.length);
-        if (mode === "video") validateBailianFrames(config.model, prepared.referenceImages, prepared.referenceVideos.length, prepared.referenceAudios.length, metadata);
+        if ((mode === "image" || mode === "video") && config.generationOptions?.contractKind && config.generationOptions.contractKind !== bailianModelKind(contractModel)) throw new Error("生成合同已变化，请先清除旧专属参数");
+        if ((mode === "image" || mode === "video") && Object.keys(config.generationOptions ?? {}).length > 0 && !bailianModelKind(contractModel)) throw new Error("生成合同已变化，请清除旧专属参数或拆分不同合同的逻辑模型");
+        validateBailianOptions({ ...config.generationOptions, ...metadata }, contractModel, prepared.referenceImages.length);
+        if (mode === "video") validateBailianFrames(contractModel, prepared.referenceImages, prepared.referenceVideos.length, prepared.referenceAudios.length, metadata);
     }
-    const wirePrompt = workflow ? prompt : bailianReferencePrompt(prompt, config.model, prepared.referenceImages, typeof metadata?.videoStartFrameNodeId === "string" ? metadata.videoStartFrameNodeId : undefined);
+    const wirePrompt = workflow ? prompt : bailianReferencePrompt(prompt, contractModel, prepared.referenceImages, typeof metadata?.videoStartFrameNodeId === "string" ? metadata.videoStartFrameNodeId : undefined);
     const videoOperation = generationOperation(options, !workflow);
     const logicalModelId = workflow ? "" : logicalModelIDForConfig(config);
     const task = await dependencies.createTask({
@@ -478,7 +481,7 @@ async function createBackendGenerationTask(options: BackendGenerationTaskOptions
             referenceVideos: prepared.referenceVideos,
             referenceAudios: prepared.referenceAudios,
             mask: prepared.mask,
-            metadata: generationMetadata(workflow ? { ...config, generationOptions: undefined } : config, !workflow && mode === "video" && bailianModelKind(config.model) ? { ...metadata, videoEditOperation: videoOperation } : metadata),
+            metadata: generationMetadata(workflow ? { ...config, generationOptions: undefined } : config, !workflow && mode === "video" && bailianModelKind(contractModel) ? { ...metadata, videoEditOperation: videoOperation } : metadata),
         },
     });
     onTaskUpdate?.(task);
@@ -568,6 +571,7 @@ export function backendProviderConfig(config: AiConfig, mode: BackendGenerationM
     const workflow = resolveGenerationWorkflowExecution(config, mode);
     if (workflow) return workflowProviderConfig(config, requestConfig, workflow);
     const generationOptions = {
+        generationContract: declaredGenerationContract(config),
         size: config.size,
         quality: config.quality,
         transparentBackground: config.transparentBackground,
@@ -661,6 +665,8 @@ function logicalCapabilityOptions(config: AiConfig, mode: BackendGenerationMode)
               : mode === "audio"
                 ? { audioVoice: config.audioVoice, audioFormat: config.audioFormat, audioSpeed: Number(config.audioSpeed) }
                 : {};
+    const contract = declaredGenerationContract(config);
+    if (contract && (mode === "image" || mode === "video")) candidates.generationContract = contract;
     return Object.fromEntries(Object.entries(candidates).filter(([key]) => Boolean(spec?.options?.[key])));
 }
 

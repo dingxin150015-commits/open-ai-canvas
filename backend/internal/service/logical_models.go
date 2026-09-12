@@ -170,6 +170,7 @@ func publicLogicalModel(cached cachedLogicalModel, available bool) PublicLogical
 		routeSpecs = append(routeSpecs, route.CapabilitySpec)
 	}
 	productSpec := capabilitySpecWithRoutePresets(cached.ProductSpec, routeSpecs)
+	productSpec = withRouteGenerationContract(productSpec, cached.Routes)
 	profiles := make([]CapabilitySpec, 0, len(cached.Routes))
 	seen := make(map[string]bool, len(cached.Routes))
 	for _, route := range cached.Routes {
@@ -773,6 +774,9 @@ func channelModelCapabilitySpec(channelModel model.ChannelModel) (CapabilitySpec
 	spec, err := CapabilitySpecFromModelCapabilityConfig(config, normalizeCapability(channelModel.Capability))
 	if err != nil {
 		return CapabilitySpec{}, err
+	}
+	if contract := bailianGenerationContract(string(channelModel.Protocol), firstNonEmpty(channelModel.ProviderModelKey, channelModel.ModelKey)); contract != "" {
+		spec.Options["generationContract"] = OptionConstraint{Values: []any{contract}}
 	}
 	return capabilitySpecWithPriceTiers(spec, channelModel), nil
 }

@@ -2,7 +2,7 @@ import { ImageSizePicker } from "@/components/image-size-picker";
 import { BailianGenerationOptionsPanel } from "@/components/bailian-generation-options";
 import type { BailianGenerationOptions } from "@/lib/bailian-generation";
 import { CanvasVideoPromptTools } from "@/components/canvas/canvas-video-prompt-tools";
-import { bailianModelKind, optionalVideoPrompt, videoAttachmentLimit, videoAttachmentError } from "@/lib/bailian-generation";
+import { bailianContractModel, bailianModelKind, optionalVideoPrompt, videoAttachmentLimit, videoAttachmentError } from "@/lib/bailian-generation";
 import { imageResolutionUsesQuality } from "@/lib/image-size-presets";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { App, Button, Drawer, Dropdown, Modal, Popover, Spin } from "antd";
@@ -883,7 +883,7 @@ export default function CreatePage() {
         };
         const text = prompt.trim();
         const media = splitCreationAttachments(attachments);
-        const promptOptional = mode === "video" && optionalVideoPrompt(selectedModel, media.referenceImages.length, media.referenceVideos.length);
+        const promptOptional = mode === "video" && optionalVideoPrompt(bailianContractModel(config, selectedModel), media.referenceImages.length, media.referenceVideos.length);
         if ((!text && !promptOptional) || busy || !activeConversation) {
             releaseRetryLock();
             return;
@@ -988,6 +988,7 @@ export default function CreatePage() {
         const normalizedVideo = mode === "video" ? normalizeVideoValue(videoProfile, { seconds, ratio, resolution: videoQuality }) : undefined;
         const requestConfig = {
             ...config,
+            generationOptions: mode === "text" ? undefined : generationOptions,
             model: selectedModel,
             imageModel: selectedModel,
             videoModel: selectedModel,
@@ -2314,6 +2315,7 @@ type ComposerProps = {
 type CreationReferenceFilter = "all" | "image" | "video" | "audio" | "file";
 
 function CreationComposer(props: ComposerProps) {
+    const contractModel = bailianContractModel(props.config, props.model);
     const [previewUrl, setPreviewUrl] = useState("");
     const [previewType, setPreviewType] = useState<"image" | "video">("image");
     const [promptOptimizerOpen, setPromptOptimizerOpen] = useState(false);
@@ -2328,7 +2330,7 @@ function CreationComposer(props: ComposerProps) {
     const interactionBusy = props.busy || props.referenceReplacementBusy;
     const hasWork = interactionBusy || props.generationActive;
     const promptOptional =
-        props.mode === "video" && optionalVideoPrompt(props.model, props.attachments.filter((item) => creationAttachmentKind(item) === "image").length, props.attachments.filter((item) => creationAttachmentKind(item) === "video").length);
+        props.mode === "video" && optionalVideoPrompt(contractModel, props.attachments.filter((item) => creationAttachmentKind(item) === "image").length, props.attachments.filter((item) => creationAttachmentKind(item) === "video").length);
     const canSubmit = (Boolean(props.prompt.trim()) || promptOptional) && !interactionBusy && props.settingsReady;
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const priceChannel = resolveModelChannel(props.config, props.model);
@@ -2622,14 +2624,14 @@ function CreationComposer(props: ComposerProps) {
                         variant="creation"
                     />
                     {props.mode === "video" || (props.mode === "image" && imageSettingsSupported) ? <GenerationSettingsMenu {...props} /> : null}
-                    {props.mode !== "text" && bailianModelKind(props.model) ? (
+                    {props.mode !== "text" && (bailianModelKind(contractModel) || Object.keys(props.generationOptions).length > 0) ? (
                         <Popover
                             trigger="click"
                             content={
                                 <div className="w-72">
                                     <BailianGenerationOptionsPanel
                                         showBatchControl
-                                        model={props.model}
+                                        model={contractModel}
                                         value={props.generationOptions}
                                         imageCount={props.attachments.filter((item) => creationAttachmentKind(item) === "image").length}
                                         onChange={props.onGenerationOptionsChange}
@@ -2644,7 +2646,7 @@ function CreationComposer(props: ComposerProps) {
                     ) : null}
                     {props.mode === "video" ? (
                         <CanvasVideoPromptTools
-                            model={props.model}
+                            model={contractModel}
                             metadata={props.frameSelection}
                             frameOptions={props.attachments.filter((item) => creationAttachmentKind(item) === "image").map((item, index) => ({ nodeId: item.id, label: `图片${index + 1}`, title: item.name, previewUrl: item.previewUrl }))}
                             onMetadataChange={props.onFrameSelectionChange}

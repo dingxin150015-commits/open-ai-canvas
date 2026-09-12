@@ -84,6 +84,38 @@ func TestBailianEmptyPromptAdmissionRequiresMedia(t *testing.T) {
 	}
 }
 
+func TestBailianLogicalGenerationContractIsDerivedAndRouteBound(t *testing.T) {
+	for _, name := range []string{"qwen-image-3.0-pro", "happyhorse-1.1-i2v", "happyhorse-1.1-r2v", "happyhorse-1.1-t2v", "wan2.7-i2v", "wan2.7-r2v", "wan2.7-t2v"} {
+		protocolID, capability := "dashscope-video", "video"
+		if name == "qwen-image-3.0-pro" {
+			protocolID, capability = "dashscope-image", "image"
+		}
+		raw, _ := json.Marshal(DefaultModelCapabilityConfigForModel(protocolID, name))
+		spec, err := channelModelCapabilitySpec(model.ChannelModel{ModelKey: "private-sku", ProviderModelKey: name, Capability: capability, Protocol: model.ChannelInterfaceType(protocolID), CapabilityConfigJSON: string(raw)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		routes := []cachedLogicalRoute{{Route: model.LogicalModelRoute{Enabled: true, Weight: 1}, CapabilitySpec: spec}}
+		product := withRouteGenerationContract(CapabilitySpec{Capability: capability, Options: map[string]OptionConstraint{}}, routes)
+		values := product.Options["generationContract"].Values
+		if len(values) != 1 || values[0] != name {
+			t.Fatalf("%s contract: %#v", name, values)
+		}
+		if !MatchCapability(product, ModelRequestIntent{Capability: capability, Options: map[string]any{"generationContract": name}}).Matched {
+			t.Fatal("contract request rejected")
+		}
+		other := spec
+		other.Options = map[string]OptionConstraint{}
+		if MatchCapability(other, ModelRequestIntent{Capability: capability, Options: map[string]any{"generationContract": name}}).Matched {
+			t.Fatal("contract silently crossed route boundary")
+		}
+		routes = append(routes, cachedLogicalRoute{Route: model.LogicalModelRoute{Enabled: true, Weight: 1}, CapabilitySpec: other})
+		if len(withRouteGenerationContract(product, routes).Options["generationContract"].Values) != 0 {
+			t.Fatal("mixed routes advertised a common contract")
+		}
+	}
+}
+
 func TestBailianOpenAIHeaderRequestID(t *testing.T) {
 	if id := providerRequestIDFromHeader(http.Header{"X-Request-Id": []string{"req-qwen-1"}}); id != "req-qwen-1" {
 		t.Fatal(id)

@@ -1,6 +1,6 @@
 # 百炼七模型完整能力补齐
 
-状态：`source_preverified_deployment_pending`。这是 13ff9e42 / 8dcdfd5d 之后的新迭代，不沿用上一轮预验证结论作为本轮通过证明。
+状态：`source_preverified_deployment_pending`。主体 b9cb3534 与追加的超预扣人工核对、配置节点继承模型、系统/逻辑模型生成合同均已完成预验证。源码已冻结，尚未部署。
 
 ## 授权与基线
 
@@ -20,16 +20,20 @@
 - Qwen 原生同步、原生异步和 OpenAI 兼容仍通过同一个声明式插件；创作页可选原生单请求多图，默认独立任务行为不变。
 - 媒体引用按类型分别计数，HappyHorse R2V 转为原生 Image 标记；Wan R2V 首帧不占 reference_image 编号。续写视频增加尺寸与比例校验。
 - 修正错误的长音频拒绝规则和对应测试；新测试不只对照旧 Provider，还覆盖官网合同。
-- 新计费模式 `per_second_usage` 为百炼视频渠道规格的显式选项；保留 `per_second`/`fixed_request`，逻辑模型可通过渠道价格策略使用。预估后按可信终态 usage 退补差额，缺用量保持待核对；恢复与幂等也需验证。
+- 新计费模式 `per_second_usage` 为百炼视频渠道规格的显式选项；保留 `per_second`/`fixed_request`，逻辑模型可通过渠道价格策略使用。预估后按可信终态 usage 结算并退款；缺用量或实际费用超出预扣时转人工核对，不自动负余额补扣。旧 Token 策略不变。
 - Schema 9 `provider_duration_metering` 为 API 日志增加三种媒体计量时长，为订单增加实际计量时长，不修改旧迁移校验和。
 
 ## 验证进度
+
+- 超预扣人工结算使用已有管理员确认和必填核对依据入口，并原子检查余额足够；自动任务不得调用复核路径。
+- 逻辑模型使用内部 ID。运行时从有效线路导出公共 generationContract，前端据此开放专属控件并绑定请求合同；路由拒绝跨合同降级。不同合同混合线路不冒充单一合同，需拆分模型使用专属能力。不暴露渠道 ID、密钥或线路关系，不改写既有模型数据。
 
 - 第一轮干净类型检查发现 optional input 与 selectedModel 引用问题，已修正；第二轮类型通过。
 - 首批前端专项 34 项通过；后续修改仍需最终全量重验。
 - 最终 `.local/bailian-backend-release.log`：Linux CGO `go test -count=1 -run . ./...` 全量通过，service 254.539 秒。
 - 最终 `.local/bailian-web-release.log`：干净类型、34 专项、1632 全量（1627 + 隔离 5）、生产构建通过。
 - 测试镜像与最终工作树逐文件 SHA-256 比对：Backend/插件 31 文件、Web 25 文件完全一致；默认图片超时 15 分钟和空提示词媒体准入均已包含。
+- 上述为主体检查点。追加收口最终证据：`.local/bailian-backend-contract-final.log` 全量通过，service 328.882 秒；`.local/bailian-web-final-verified.log` 类型、35 专项、1633 全量（1628 + 隔离 5）及构建通过。Backend/插件 32 文件、Web 26 文件与测试镜像逐字节一致。
 - 全量中发现并修正 OpenAI 自动尺寸 nil 替换失败；旧前端“提示词必填/音频必须短于视频”断言按新合同更新后全量通过。
 - 未部署本轮代码；当前生产仍是上一轮 schema 8 / 8dcdfd5d。旧 Edge 清单不能验收本轮尚未部署内容。
 

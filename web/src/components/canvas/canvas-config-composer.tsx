@@ -14,6 +14,7 @@ import { CanvasPresetPicker, type CanvasPromptPreset } from "./canvas-preset-pic
 import type { CanvasGenerationMode, CanvasNodeMetadata, CanvasWorkspaceMode } from "@/types/canvas";
 
 type CanvasConfigComposerProps = {
+    model: string;
     value: string;
     inputs: NodeGenerationInput[];
     skillReferences?: CanvasResourceReference[];
@@ -43,7 +44,7 @@ type ComposerCandidate =
 
 export const CONFIG_REFERENCE_PATTERN = /@\[node:([^\]]+)\]|@(图片|视频|音频|文本|角色|绘图)(\d+)/g;
 
-export function CanvasConfigComposer({ value, inputs, skillReferences = [], generationMode, metadata, onChange, onMetadataChange, onClose, workspaceMode = "professional" }: CanvasConfigComposerProps) {
+export function CanvasConfigComposer({ model, value, inputs, skillReferences = [], generationMode, metadata, onChange, onMetadataChange, onClose, workspaceMode = "professional" }: CanvasConfigComposerProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const editorRef = useRef<HTMLDivElement>(null);
     const composingRef = useRef(false);
@@ -178,7 +179,7 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
             {generationMode === "video" && onMetadataChange && !simpleMode ? (
                 <div className="mb-3 rounded-lg px-2 py-2" style={{ background: theme.node.fill }}>
                     <CanvasVideoPromptTools
-                        model={metadata?.model}
+                        model={model}
                         metadata={metadata}
                         frameOptions={videoFrameOptions}
                         referenceMode={workflowVideoReferenceMode ? "all" : "frames"}
@@ -192,7 +193,7 @@ export function CanvasConfigComposer({ value, inputs, skillReferences = [], gene
                 </div>
             ) : null}
             {onMetadataChange && !isCanvasWorkflowProvider(metadata) ? (
-                <BailianGenerationOptionsPanel model={metadata?.model || ""} value={metadata?.generationOptions} imageCount={videoFrameOptions.length} onChange={(generationOptions) => onMetadataChange({ generationOptions })} />
+                <BailianGenerationOptionsPanel model={model} value={metadata?.generationOptions} imageCount={videoFrameOptions.length} onChange={(generationOptions) => onMetadataChange({ generationOptions })} />
             ) : null}
             <div className="canvas-config-composer-editor relative rounded-lg" style={{ background: theme.node.fill }}>
                 {!value.trim() ? (

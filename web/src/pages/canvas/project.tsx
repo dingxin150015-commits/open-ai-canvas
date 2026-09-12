@@ -83,7 +83,8 @@ import { canvasAssetHandoffAttempt, finalizeCanvasAssetHandoff, uninsertedCanvas
 import { batchSourceRestriction } from "@/lib/canvas/canvas-batch-connection";
 import { deriveStoryboardPipelineProgress } from "@/lib/canvas/canvas-storyboard-progress";
 import { CanvasAgentChangeToast, CanvasMergeStatusToast, CanvasUploadStatusToast } from "./canvas-project-feedback";
-import { backendProviderConfig, getGenerationCount } from "@/lib/canvas/canvas-project-generation";
+import { backendProviderConfig, buildGenerationConfig, getGenerationCount } from "@/lib/canvas/canvas-project-generation";
+import { bailianContractModel } from "@/lib/bailian-generation";
 import { cancelGenerationTask } from "@/services/api/task-center";
 import { CanvasTopBar, CanvasWorkspaceModeSwitch } from "./canvas-project-top-bar";
 import { canvasChromeLayout } from "@/lib/canvas/canvas-chrome-layout";
@@ -2001,6 +2002,7 @@ function InfiniteCanvasPage() {
             if (panelNode.type === CanvasNodeType.Script || panelNode.type === CanvasNodeType.Drawing) return null;
             return panelNode.type === CanvasNodeType.Config ? (
                 <CanvasConfigComposer
+                    model={bailianContractModel(buildGenerationConfig(effectiveConfig, panelNode, panelNode.metadata?.generationMode || "image"))}
                     value={panelNode.metadata?.composerContent ?? panelNode.metadata?.prompt ?? ""}
                     inputs={configInputsById.get(panelNode.id) || []}
                     skillReferences={skillMentionReferences}
@@ -2030,7 +2032,7 @@ function InfiniteCanvasPage() {
                 />
             );
         },
-        [configInputsById, handleConfigNodeChange, handleGenerateNode, handleNodePromptChange, handleRemoveNodeReference, mentionReferencesByNodeId, runningNodeId, skillMentionReferences, workspaceMode],
+        [configInputsById, effectiveConfig, handleConfigNodeChange, handleGenerateNode, handleNodePromptChange, handleRemoveNodeReference, mentionReferencesByNodeId, runningNodeId, skillMentionReferences, workspaceMode],
     );
 
     const renderCanvasNodeContent = useCallback(

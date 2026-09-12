@@ -99,3 +99,64 @@ func TestDurationBillingMissingUsageDoesNotSpendReservation(t *testing.T) {
 		t.Fatal("missing usage settled")
 	}
 }
+
+func TestDurationBillingExcessUsageCannotOverdrawAccount(t *testing.T) {
+	for _, restored := range []bool{false, true} {
+		repo, db := newRefundedBillingRecoveryRepository(t)
+		status := model.BillingStatusReserved
+		if restored {
+			status = model.BillingStatusRefunded
+		}
+		if err := db.Create(&model.CreditAccount{UserID: "user", AvailableMicrocredits: 0, ReservedMicrocredits: 1000000}).Error; err != nil {
+			t.Fatal(err)
+		}
+		order := model.BillingOrder{ID: "order", UserID: "user", IdempotencyKey: "cap", Status: status, Capability: "video", BillingMode: "per_second_usage", UnitPriceMicrocredits: 1000000, MultiplierBasisPoints: 10000, AmountMicrocredits: 1000000, ReservedAmountMicrocredits: 1000000}
+		if err := db.Create(&order).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Create(&model.ApiCallLog{ID: "usage", BillingOrderID: "order", Status: model.ApiCallStatusSucceeded, UsageAvailable: true, UsageDurationMs: 8250}).Error; err != nil {
+			t.Fatal(err)
+		}
+		var err error
+		if restored {
+			err = repo.RestoreRefundedBillingOrder("order", "provider")
+		} else {
+			err = repo.SettleBillingOrder("order", "provider")
+		}
+		if !errors.Is(err, ErrDurationReservationExceeded) {
+			t.Fatalf("expected spending cap: %v", err)
+		}
+		var account model.CreditAccount
+		if err := db.First(&account, "user_id = ?", "user").Error; err != nil {
+			t.Fatal(err)
+		}
+		if account.AvailableMicrocredits != 0 || account.ReservedMicrocredits != 1000000 {
+			t.Fatalf("balance changed: %#v", account)
+		}
+		var count int64
+		db.Model(&model.CreditLedgerEntry{}).Count(&count)
+		if count != 0 {
+			t.Fatalf("unexpected ledger count: %d", count)
+		}
+		if !restored {
+			if err := repo.SettleReviewedDurationBillingOrder("order", "provider"); !errors.Is(err, ErrInsufficientCredits) {
+				t.Fatalf("review overdraw allowed: %v", err)
+			}
+			if err := db.Model(&model.CreditAccount{}).Where("user_id = ?", "user").Update("available_microcredits", 10000000).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := repo.SettleReviewedDurationBillingOrder("order", "provider"); err != nil {
+				t.Fatal(err)
+			}
+			if err := repo.SettleReviewedDurationBillingOrder("order", "provider"); err != nil {
+				t.Fatal(err)
+			}
+			if err := db.First(&account, "user_id = ?", "user").Error; err != nil {
+				t.Fatal(err)
+			}
+			if account.AvailableMicrocredits != 2750000 || account.ReservedMicrocredits != 0 {
+				t.Fatalf("reviewed balance wrong: %#v", account)
+			}
+		}
+	}
+}

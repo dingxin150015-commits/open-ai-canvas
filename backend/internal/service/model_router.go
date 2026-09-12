@@ -443,6 +443,9 @@ func canonicalCapabilityOptionName(value string) string {
 }
 
 func isCapabilityOptionFor(capability string, name string) bool {
+	if name == "generationContract" {
+		return capability == "image" || capability == "video"
+	}
 	switch normalizeCapability(capability) {
 	case "image":
 		return name == "size" || name == "quality" || name == "transparentBackground" || name == "count"
@@ -626,6 +629,7 @@ func (s *Service) loadRouteCatalog() (*routeCatalogSnapshot, error) {
 			routeSpecs = append(routeSpecs, route.CapabilitySpec)
 		}
 		productSpec = capabilitySpecWithRoutePresets(productSpec, routeSpecs)
+		productSpec = withRouteGenerationContract(productSpec, cached.Routes)
 		defaults, defaultsErr := decodeLogicalDefaults(graph.Revision.DefaultOptionsJSON, productSpec)
 		if defaultsErr != nil {
 			log.Printf("logical model omitted from route catalog id=%s: invalid defaults: %v", item.ID, defaultsErr)
@@ -1095,7 +1099,7 @@ func (s *Service) switchTaskToNextRoute(task *model.Task, attempts []model.Route
 	}
 	intent := ModelRequestIntentFromTaskInput(input, task.Type, task.Operation)
 	intent.Options = mergeIntentDefaults(intent.Options, defaults)
-	if match := MatchCapability(productSpec, intent); !match.Matched {
+	if match := matchStoredProductCapability(productSpec, intent); !match.Matched {
 		return nil, BadAuthRequest("任务参数不再符合前台模型能力：" + strings.Join(match.Reasons, "；"))
 	}
 	routes, err := s.repo.LogicalModelRoutes(revision.ID, false)
@@ -1320,12 +1324,15 @@ func (s *Service) resolveArchivedTaskRoute(task *model.Task, intent ModelRequest
 		return nil, err
 	}
 	intent.Options = mergeIntentDefaults(intent.Options, defaults)
-	if match := MatchCapability(productSpec, intent); !match.Matched {
+	if match := matchStoredProductCapability(productSpec, intent); !match.Matched {
 		return nil, BadAuthRequest("历史任务不再符合前台模型能力：" + strings.Join(match.Reasons, "；"))
 	}
 	capabilitySpec, err := channelModelCapabilitySpec(*channelModel)
 	if err != nil || s.logicalRouteBlocked(cachedLogicalRoute{Route: *route, CapabilitySpec: capabilitySpec, ChannelModel: *channelModel}) {
 		return nil, BadAuthRequest("历史任务原模型供应线路暂不可用，无法重试")
+	}
+	if match := MatchCapability(capabilitySpec, intent); !match.Matched {
+		return nil, BadAuthRequest("历史任务原线路不再支持这组输入和生成合同")
 	}
 	var priceTier *model.ChannelModelPriceTier
 	if logicalModel.PricePolicy == "channel" {

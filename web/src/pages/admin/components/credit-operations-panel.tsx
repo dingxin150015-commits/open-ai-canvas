@@ -721,7 +721,11 @@ export default function CreditOperationsPanel({ users, activeOperation, onOperat
             >
                 {resolutionTarget ? (
                     <div className="admin-operation-confirmation">
-                        <p className="admin-operation-confirmation-copy">{resolutionTarget.action === "settle" ? "结算会依据订单计费方式确认实际费用；Token 订单可能退回差额，也可能补扣可用积分。" : "退回操作只会释放尚未结算订单的预授权积分。"}</p>
+                        <p className="admin-operation-confirmation-copy">
+                            {resolutionTarget.action === "settle"
+                                ? "结算会依据订单计费方式确认实际费用；Token 订单可能退回差额，也可能补扣可用积分。实际时长订单在管理员本次明确确认后可补扣超预授权差额，但账户可用余额必须足够。请先核对上游计费时长、单价与账单。"
+                                : "退回操作只会释放尚未结算订单的预授权积分。"}
+                        </p>
                         <dl className="admin-operation-confirmation-grid">
                             <div>
                                 <dt>订单数量</dt>

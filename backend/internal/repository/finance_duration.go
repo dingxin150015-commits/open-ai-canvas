@@ -6,6 +6,19 @@ import (
 	"math/big"
 )
 
+var ErrDurationReservationExceeded = errors.New("actual duration cost exceeds reserved amount; manual review required")
+
+func checkDurationReservation(order model.BillingOrder, actual int64) error {
+	reserved := order.ReservedAmountMicrocredits
+	if reserved <= 0 {
+		reserved = order.AmountMicrocredits
+	}
+	if reserved < 0 || actual > reserved {
+		return ErrDurationReservationExceeded
+	}
+	return nil
+}
+
 func durationUsageAmount(order model.BillingOrder, usage *BillingUsage) (int64, error) {
 	if usage == nil || usage.DurationMs <= 0 {
 		return 0, ErrBillingUsageUnavailable

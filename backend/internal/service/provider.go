@@ -36,22 +36,23 @@ import (
 var sseFrameBoundaryPattern = regexp.MustCompile(`\r?\n\r?\n`)
 
 type canvasGenerationInput struct {
-	Mode            string                 `json:"mode"`
-	Prompt          string                 `json:"prompt"`
-	Config          providerConfig         `json:"config"`
-	ReferenceImages []providerMedia        `json:"referenceImages"`
-	ReferenceVideos []providerMedia        `json:"referenceVideos"`
-	ReferenceAudios []providerMedia        `json:"referenceAudios"`
-	TextHistory     []providerTextMessage  `json:"textHistory"`
-	Mask            *providerMedia         `json:"mask"`
-	Metadata        map[string]interface{} `json:"metadata"`
-	AgentRequests   *agentToolRequests     `json:"agentRequests"`
-	TextOptions     canvasTextOptions      `json:"textOptions"`
-	ImageCapability *ImageCapabilityConfig `json:"-"`
-	StreamText      bool                   `json:"-"` // 分镜请求使用上游 SSE 保活；最终结构仍在流结束后统一校验。
-	MaxOutputTokens int                    `json:"-"`
-	OnTextDelta     func(string)           `json:"-"`
-	VideoCapability *VideoCapabilityConfig `json:"-"`
+	CapabilityOptions map[string]any         `json:"capabilityOptions"`
+	Mode              string                 `json:"mode"`
+	Prompt            string                 `json:"prompt"`
+	Config            providerConfig         `json:"config"`
+	ReferenceImages   []providerMedia        `json:"referenceImages"`
+	ReferenceVideos   []providerMedia        `json:"referenceVideos"`
+	ReferenceAudios   []providerMedia        `json:"referenceAudios"`
+	TextHistory       []providerTextMessage  `json:"textHistory"`
+	Mask              *providerMedia         `json:"mask"`
+	Metadata          map[string]interface{} `json:"metadata"`
+	AgentRequests     *agentToolRequests     `json:"agentRequests"`
+	TextOptions       canvasTextOptions      `json:"textOptions"`
+	ImageCapability   *ImageCapabilityConfig `json:"-"`
+	StreamText        bool                   `json:"-"` // 分镜请求使用上游 SSE 保活；最终结构仍在流结束后统一校验。
+	MaxOutputTokens   int                    `json:"-"`
+	OnTextDelta       func(string)           `json:"-"`
+	VideoCapability   *VideoCapabilityConfig `json:"-"`
 }
 
 type canvasTextOptions struct {
@@ -72,6 +73,7 @@ type providerTextMessage struct {
 }
 
 type providerConfig struct {
+	GenerationContract    string                 `json:"generationContract,omitempty"`
 	ChannelID             string                 `json:"channelId"`
 	ChannelModelKey       string                 `json:"channelModelKey,omitempty"`
 	PriceTierID           string                 `json:"priceTierId,omitempty"`
@@ -349,11 +351,21 @@ func (s *Service) processCanvasGenerationTask(ctx context.Context, userID string
 		}
 		input.Prompt = compiled.Content
 	}
+	expectedContract := input.Config.GenerationContract
 	config, err := s.resolveProviderConfig(input.Config)
 	if err != nil {
 		return nil, err
 	}
 	input.Config = config
+	if expected, _ := input.CapabilityOptions["generationContract"].(string); expected != "" {
+		if expectedContract != "" && expectedContract != expected {
+			return nil, errors.New("请求中的生成合同不一致")
+		}
+		expectedContract = expected
+	}
+	if expectedContract != "" && expectedContract != bailianGenerationContract(input.Config.InterfaceType, input.Config.Model) {
+		return nil, errors.New("模型生成合同已变化，请重新选择模型")
+	}
 	if strings.TrimSpace(input.Prompt) == "" && !(input.Mode == "video" && bailianOptionalPromptModel(input.Config.Model)) {
 		return nil, errors.New("prompt is required")
 	}

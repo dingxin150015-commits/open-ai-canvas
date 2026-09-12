@@ -2,6 +2,7 @@ import type { ModelProtocol, ModelProtocolWorkflow } from "@/lib/model-protocols
 import type { ImageResolutionOption } from "@/lib/image-resolution-tiers";
 
 export type ModelCapabilityConfig = {
+    generationContract?: string;
     version: number;
     text?: TextCapabilityConfig;
     image?: ImageCapabilityConfig;

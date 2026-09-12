@@ -1,6 +1,6 @@
 import { logicalIntentCompatibilityError, modelCompatibilityError, modelRequestOptions, resolveVideoOperation, type ModelRequirements } from "@/lib/model-selection";
 import { videoResolutionComparisonKey } from "@/lib/video-generation-options";
-import { bailianVideoOperation } from "@/lib/bailian-generation";
+import { bailianVideoOperation, declaredGenerationContract } from "@/lib/bailian-generation";
 import { buildImageResolutionOptions, imageResolutionOption } from "@/lib/image-resolution-tiers";
 import type { ModelRequestIntent } from "@/services/api/logical-models";
 import { modelOptionName, resolveModelChannel, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
@@ -82,7 +82,7 @@ export function modelQuoteRequest(config: AiConfig, value: string, capability?: 
     const modelID = cost?.logicalModelId || cost?.channelModelId;
     if (!modelID) return undefined;
     if (modelQuoteValidationError(config, value, capability, requirements)) return undefined;
-    return { modelID, intent: modelQuoteIntent(config, capability, requirements) };
+    return { modelID, intent: modelQuoteIntent({ ...config, model: value }, capability, requirements) };
 }
 
 export function modelQuoteValidationError(config: AiConfig, value: string, capability?: ModelCapability, requirements?: ModelRequirements): string {
@@ -90,7 +90,7 @@ export function modelQuoteValidationError(config: AiConfig, value: string, capab
     const channel = resolveModelChannel(config, value);
     if (channel.scope !== "system") return "";
     const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(value));
-    const intent = modelQuoteIntent(config, capability, requirements);
+    const intent = modelQuoteIntent({ ...config, model: value }, capability, requirements);
     const profiles = cost?.logicalCapabilityProfiles?.length ? cost.logicalCapabilityProfiles : cost?.logicalCapabilitySpec ? [cost.logicalCapabilitySpec] : [];
     if (profiles.length) {
         const errors = profiles.map((profile) => logicalIntentCompatibilityError(profile, intent));
@@ -131,6 +131,7 @@ function modelQuoteIntent(config: AiConfig, capability: ModelCapability, require
         },
         options: {
             ...modelRequestOptions(config, capability),
+            ...(declaredGenerationContract(config) ? { generationContract: declaredGenerationContract(config) } : {}),
             ...(requirements?.options || {}),
             ...(capability === "video" && requirements?.videoSeconds !== undefined && requirements.videoSeconds !== "" ? { videoSeconds: Number(requirements.videoSeconds) } : {}),
             ...(requirements?.imageSize ? { size: requirements.imageSize } : {}),

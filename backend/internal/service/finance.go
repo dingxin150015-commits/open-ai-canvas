@@ -374,7 +374,11 @@ func (s *Service) resolveBillingOrder(actor *model.User, id string, action strin
 	}
 	switch action {
 	case "settle":
-		err = s.SettleBilling(id, order.ProviderRequestID)
+		if order.BillingMode == "per_second_usage" {
+			err = s.repo.SettleReviewedDurationBillingOrder(id, order.ProviderRequestID)
+		} else {
+			err = s.SettleBilling(id, order.ProviderRequestID)
+		}
 	case "refund":
 		err = s.RefundBilling(id, note)
 	}

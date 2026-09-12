@@ -14,10 +14,11 @@ import (
 
 // ModelCapabilityConfig 是模型能力声明，不包含供应商字段名；协议适配器负责把统一参数映射到上游请求。
 type ModelCapabilityConfig struct {
-	Version int                    `json:"version"`
-	Text    *TextCapabilityConfig  `json:"text,omitempty"`
-	Image   *ImageCapabilityConfig `json:"image,omitempty"`
-	Video   *VideoCapabilityConfig `json:"video,omitempty"`
+	GenerationContract string                 `json:"generationContract,omitempty"`
+	Version            int                    `json:"version"`
+	Text               *TextCapabilityConfig  `json:"text,omitempty"`
+	Image              *ImageCapabilityConfig `json:"image,omitempty"`
+	Video              *VideoCapabilityConfig `json:"video,omitempty"`
 }
 
 type TextCapabilityConfig struct {
@@ -472,7 +473,11 @@ func effectiveChannelModelCapability(item *model.ChannelModel) (*ModelCapability
 		}
 		return nil, err
 	}
-	return NormalizeModelCapabilityConfigForModel(item.Capability, string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey), config)
+	result, err := NormalizeModelCapabilityConfigForModel(item.Capability, string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey), config)
+	if err == nil && result != nil {
+		result.GenerationContract = bailianGenerationContract(string(item.Protocol), firstNonEmpty(item.ProviderModelKey, item.ModelKey))
+	}
+	return result, err
 }
 
 func NormalizeModelCapabilityConfig(capability string, protocol string, input *ModelCapabilityConfig) (*ModelCapabilityConfig, error) {

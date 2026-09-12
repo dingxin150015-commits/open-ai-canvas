@@ -15,10 +15,27 @@ export function BailianGenerationOptionsPanel({
     onChange: (value: BailianGenerationOptions) => void;
 }) {
     const kind = bailianModelKind(model);
-    if (!kind) return null;
+    if (value.contractKind && value.contractKind !== kind)
+        return (
+            <p role="alert">
+                生成合同已变化，请先清除旧专属参数。
+                <button type="button" onClick={() => onChange({})}>
+                    清除旧参数
+                </button>
+            </p>
+        );
+    if (!kind)
+        return Object.keys(value).length ? (
+            <p role="alert">
+                生成合同已变化，旧专属参数不可用。
+                <button type="button" onClick={() => onChange({})}>
+                    清除旧参数
+                </button>
+            </p>
+        ) : null;
     const qwen = kind === "qwen";
     const extend = value.prompt_extend !== false;
-    const patch = (next: Partial<BailianGenerationOptions>) => onChange({ ...value, ...next });
+    const patch = (next: Partial<BailianGenerationOptions>) => onChange({ ...value, contractKind: kind, ...next });
     return (
         <details className="min-w-0 max-w-full space-y-2" data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()}>
             <summary className="cursor-pointer text-sm">高级生成参数</summary>

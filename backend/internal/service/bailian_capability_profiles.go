@@ -169,6 +169,71 @@ func bailianOptionalPromptModel(name string) bool {
 	return wan27VideoKind(name) == "i2v" || happyHorse11VideoKind(name) == "i2v"
 }
 
+func bailianGenerationContract(protocol, name string) string {
+	name = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(name), "models/"))
+	if protocol == "dashscope-image" && name == "qwen-image-3.0-pro" {
+		return name
+	}
+	if protocol != "dashscope-video" {
+		return ""
+	}
+	if kind := wan27VideoKind(name); kind != "" {
+		return "wan2.7-" + kind
+	}
+	if kind := happyHorse11VideoKind(name); kind != "" {
+		return "happyhorse-1.1-" + kind
+	}
+	return ""
+}
+
+// Public execution contracts do not identify supply routes. Only a common
+// contract across enabled routes may drive provider-specific UI controls.
+func withRouteGenerationContract(spec CapabilitySpec, routes []cachedLogicalRoute) CapabilitySpec {
+	result := spec
+	result.Options = make(map[string]OptionConstraint, len(spec.Options)+1)
+	for name, value := range spec.Options {
+		if name != "generationContract" {
+			result.Options[name] = value
+		}
+	}
+	contract := ""
+	for _, route := range routes {
+		if !route.Route.Enabled || route.Route.Weight <= 0 {
+			continue
+		}
+		values := route.CapabilitySpec.Options["generationContract"].Values
+		if len(values) != 1 {
+			return result
+		}
+		value, ok := values[0].(string)
+		if !ok || value == "" || (contract != "" && contract != value) {
+			return result
+		}
+		contract = value
+	}
+	if contract != "" {
+		result.Options["generationContract"] = OptionConstraint{Values: []any{contract}}
+	}
+	return result
+}
+
+// Persisted product snapshots predate derived execution contracts. Their
+// original constraints still apply; each candidate route must match the
+// unmodified intent, including the contract.
+func matchStoredProductCapability(spec CapabilitySpec, intent ModelRequestIntent) CapabilityMatch {
+	if _, exists := spec.Options["generationContract"]; exists {
+		return MatchCapability(spec, intent)
+	}
+	copyIntent := intent
+	copyIntent.Options = make(map[string]any, len(intent.Options))
+	for key, value := range intent.Options {
+		if key != "generationContract" {
+			copyIntent.Options[key] = value
+		}
+	}
+	return MatchCapability(spec, copyIntent)
+}
+
 func isWan30VideoModel(value string) bool {
 	return strings.EqualFold(strings.TrimPrefix(strings.TrimSpace(value), "models/"), wan30VideoModel)
 }
