@@ -413,6 +413,7 @@ add({
 
 add({
   id: "google-gemini-generate-content",
+  version: "4.0.1",
   providerId: "gemini-generate-content",
   name: "Google Gemini generateContent",
   vendor: "Google",
@@ -420,6 +421,7 @@ add({
   baseUrl: "https://generativelanguage.googleapis.com",
   auth: { type: "google-api-key", field: "apiKey" },
   params: textParams,
+  validations: [{ assert: { $eq: [{ $add: [len(ref("request.images")), len(ref("request.videos")), len(ref("request.audios"))] }, 0] }, message: "普通 Gemini 文本请求不支持媒体附件，请使用多模态 Agent 请求入口" }],
   create: jsonCreate("/v1beta/models/{{model}}:generateContent", {
     contents: map(ref("request.messages"), "message", {
       role: conditional(eq(ref("message.role"), "assistant"), "model", "user"),
@@ -2615,7 +2617,7 @@ for (const spec of specs) {
   if (["gemini-generate-content", "gemini-image", "gemini-veo", "chat-completion", "openai-response", "openai-image"].includes(spec.providerId)) {
     spec.modelContract = { mode: "compatible" };
   }
-  if (spec.modelContract) { spec.apiVersion = "yingce.plugin/v4"; spec.version = "4.0.0"; }
+  if (spec.modelContract) { spec.apiVersion = "yingce.plugin/v4"; spec.version = spec.version?.startsWith("4.") ? spec.version : "4.0.0"; }
 }
 
 function manifestFor(spec) {

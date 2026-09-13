@@ -61,6 +61,25 @@ func TestGeminiOrdinaryTextTaskUsesInstalledCreateContract(t *testing.T) {
 	if err != nil || calls != 1 || result["text"] != "fixture reply" {
 		t.Fatalf("ordinary Gemini task failed %#v %v (calls=%d)", result, err, calls)
 	}
+	for _, kind := range []string{"image", "video", "audio"} {
+		media := providerMedia{DataURL: "data:image/png;base64,AQ=="}
+		rejected := input
+		switch kind {
+		case "image":
+			rejected.ReferenceImages = []providerMedia{media}
+		case "video":
+			rejected.ReferenceVideos = []providerMedia{media}
+		case "audio":
+			rejected.ReferenceAudios = []providerMedia{media}
+		}
+		ctx := withProtocolRegistry(withProviderOutboundPolicy(context.Background(), rejected.Config), svc.protocolRegistry())
+		if _, err := runTextTask(ctx, rejected); err == nil {
+			t.Fatalf("ordinary text silently dropped %s", kind)
+		}
+		if calls != 1 {
+			t.Fatal("rejected media request contacted upstream")
+		}
+	}
 }
 
 func TestCatalogPaginationFailsAtomically(t *testing.T) {

@@ -98,7 +98,7 @@
   "apiVersion": "yingce.plugin/v4",
   "id": "google-gemini-generate-content",
   "name": "Google Gemini generateContent",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "author": "Google / 影策",
   "description": "Google Gemini generateContent 独立请求协议插件。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
@@ -212,6 +212,35 @@
         "modelContract": {
           "mode": "compatible"
         },
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$add": [
+                    {
+                      "$len": {
+                        "$ref": "request.images"
+                      }
+                    },
+                    {
+                      "$len": {
+                        "$ref": "request.videos"
+                      }
+                    },
+                    {
+                      "$len": {
+                        "$ref": "request.audios"
+                      }
+                    }
+                  ]
+                },
+                0
+              ]
+            },
+            "message": "普通 Gemini 文本请求不支持媒体附件，请使用多模态 Agent 请求入口"
+          }
+        ],
         "create": {
           "method": "POST",
           "path": "/v1beta/models/{{model}}:generateContent",
