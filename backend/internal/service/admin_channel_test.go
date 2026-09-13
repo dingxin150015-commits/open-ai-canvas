@@ -122,8 +122,8 @@ func TestPublicChannelHidesNonExecutableSystemModelsFromUsers(t *testing.T) {
 		{ID: "ready-unpriced", ModelKey: "ready-unpriced", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, SupportStatus: model.ChannelModelSupportReady, CapabilityConfigJSON: string(profile), Enabled: true, PriceConfigured: false, BillingMode: "fixed_request"},
 	}
 	userView := publicChannel(channel, false, items)
-	if len(userView.Models) != 1 || userView.Models[0] != "ready-free" {
-		t.Fatalf("user models = %v, want only explicit free ready model", userView.Models)
+	if len(userView.Models) != 2 || userView.Models[0] != "ready-free" || userView.Models[1] != "planned-priced" {
+		t.Fatalf("user models = %v, want both configured compatible models but not unpriced model", userView.Models)
 	}
 	adminView := publicChannel(channel, true, items)
 	if len(adminView.Models) != 3 {
@@ -279,7 +279,7 @@ func TestImportAdminChannelModelsEnrichesSelectedUntouchedModelIdempotently(t *t
 	if err := db.First(&enriched, "id = ?", existing.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if enriched.ProviderModelKey != "model-a" || enriched.Capability != "text" || enriched.Protocol != model.ChannelInterfaceChatCompletion || enriched.SupportStatus != model.ChannelModelSupportPlanned || enriched.CatalogSource != "upstream" {
+	if enriched.ProviderModelKey != "model-a" || enriched.Capability != "text" || enriched.Protocol != model.ChannelInterfaceChatCompletion || enriched.SupportStatus != model.ChannelModelSupportUnknown || enriched.CatalogSource != "upstream" {
 		t.Fatalf("enriched model = %#v", enriched)
 	}
 	firstUpdatedAt := enriched.UpdatedAt
@@ -467,6 +467,7 @@ func TestResolveProviderConfigMapsSKUToProviderModel(t *testing.T) {
 		ID: "model-1", ChannelID: channel.ID, ModelKey: "seedance-2-5-480p", ProviderModelKey: "doubao-seedance-2-5",
 		Capability: "video", Protocol: model.ChannelInterfaceVolcengineArkVideo, Enabled: true,
 	}
+	completeModelFixtureProfile(t, &item)
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}

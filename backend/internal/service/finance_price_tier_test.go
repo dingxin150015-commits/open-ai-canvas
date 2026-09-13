@@ -25,6 +25,7 @@ func TestImageSpecificationQuoteAgreesWithTaskBilling(t *testing.T) {
 		ID: "image-channel-model", ChannelID: "image-channel", ModelKey: "image-model", Capability: "image",
 		Protocol: model.ChannelInterfaceOpenAIImage, Enabled: true, PriceConfigured: true,
 	}
+	completeModelFixtureProfile(t, &channelModel)
 	for operationIndex, operation := range []string{"text_to_image", "image_to_image"} {
 		for index, quality := range []string{"1k", "2k", "4k"} {
 			selector := fmt.Sprintf(`{"operation":%q,"quality":%q}`, operation, quality)
@@ -92,6 +93,7 @@ func TestTaskBillingOrderMatchesSystemImagePriceTierFromRequestedSpec(t *testing
 		Capability: "image", Protocol: model.ChannelInterfaceOpenAIImage, BillingMode: "fixed_request",
 		PriceConfigured: true, Enabled: true, PriceVersion: 1,
 	}
+	completeModelFixtureProfile(t, &channelModel)
 	if err := db.Create(&channelModel).Error; err != nil {
 		t.Fatal(err)
 	}

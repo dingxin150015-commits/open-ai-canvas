@@ -911,8 +911,8 @@ func (s *Service) ValidateTaskCapability(input map[string]any) error {
 	if err != nil {
 		return BadAuthRequest("当前系统渠道模型未配置或已停用")
 	}
-	if item.SupportStatus != model.ChannelModelSupportReady {
-		return BadAuthRequest("当前系统渠道模型尚未完成可执行支持")
+	if err := s.requireChannelModelSupported(item); err != nil {
+		return err
 	}
 	profile, err := effectiveChannelModelCapability(item)
 	if taskInput.Mode == "image" {

@@ -165,26 +165,28 @@ type Parameter struct {
 }
 
 type Metadata struct {
-	PollIntervalMS          int          `json:"-"`
-	ID                      string       `json:"id"`
-	Version                 string       `json:"version"`
-	Name                    string       `json:"name"`
-	Vendor                  string       `json:"vendor"`
-	Description             string       `json:"description,omitempty"`
-	Categories              []Capability `json:"categories"`
-	Scopes                  []Surface    `json:"scopes"`
-	Parameters              []Parameter  `json:"parameters,omitempty"`
-	Create                  string       `json:"-"`
-	Poll                    string       `json:"-"`
-	Cancel                  string       `json:"-"`
-	ContentType             string       `json:"-"`
-	Documentation           string       `json:"documentation,omitempty"`
-	LegacyAliases           []string     `json:"-"`
-	Enabled                 bool         `json:"enabled"`
-	Installable             bool         `json:"installable"`
-	Execution               string       `json:"-"`
-	RequiresPublicMediaURLs bool         `json:"-"`
-	UnavailableReason       string       `json:"-"`
+	ModelContract           *ModelContract `json:"modelContract,omitempty"`
+	ModelCatalog            *ModelCatalog  `json:"modelCatalog,omitempty"`
+	PollIntervalMS          int            `json:"-"`
+	ID                      string         `json:"id"`
+	Version                 string         `json:"version"`
+	Name                    string         `json:"name"`
+	Vendor                  string         `json:"vendor"`
+	Description             string         `json:"description,omitempty"`
+	Categories              []Capability   `json:"categories"`
+	Scopes                  []Surface      `json:"scopes"`
+	Parameters              []Parameter    `json:"parameters,omitempty"`
+	Create                  string         `json:"-"`
+	Poll                    string         `json:"-"`
+	Cancel                  string         `json:"-"`
+	ContentType             string         `json:"-"`
+	Documentation           string         `json:"documentation,omitempty"`
+	LegacyAliases           []string       `json:"-"`
+	Enabled                 bool           `json:"enabled"`
+	Installable             bool           `json:"installable"`
+	Execution               string         `json:"-"`
+	RequiresPublicMediaURLs bool           `json:"-"`
+	UnavailableReason       string         `json:"-"`
 }
 
 // Manifest is the single plugin contract. A plugin may contribute providers,
@@ -328,6 +330,8 @@ type ManifestPaymentResponse struct {
 }
 
 type ManifestProvider struct {
+	ModelContract           *ModelContract         `json:"modelContract,omitempty"`
+	ModelCatalog            *ModelCatalog          `json:"modelCatalog,omitempty"`
 	Variables               []ManifestVariable     `json:"variables,omitempty"`
 	PollIntervalMS          int                    `json:"pollIntervalMs,omitempty"`
 	ID                      string                 `json:"id"`

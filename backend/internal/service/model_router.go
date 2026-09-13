@@ -608,7 +608,7 @@ func (s *Service) loadRouteCatalog() (*routeCatalogSnapshot, error) {
 		cached := cachedLogicalModel{Model: item, Revision: *graph.Revision, ProductSpec: productSpec, Defaults: map[string]any{}}
 		for _, route := range graph.Routes {
 			channelModel, ok := channelModelByID[route.ChannelModelID]
-			if !ok || !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady || !enabledSystemChannels[channelModel.ChannelID] {
+			if !ok || !channelModel.Enabled || !s.channelModelSupported(&channelModel) || !enabledSystemChannels[channelModel.ChannelID] {
 				continue
 			}
 			if item.PricePolicy == "unified" && item.BillingMode == "token" && !supportsTokenBilling(item.Capability, channelModel.Protocol) {
@@ -830,7 +830,7 @@ func matchSKUSelector(tier map[string]string, requested map[string]string) (bool
 }
 
 func (s *Service) logicalRouteBlocked(route cachedLogicalRoute) bool {
-	if !s.bailianModelProtocolAvailable(route.ChannelModel) {
+	if !s.channelModelSupported(&route.ChannelModel) {
 		return true
 	}
 	now := time.Now()
@@ -1033,7 +1033,7 @@ func (s *Service) routedModelForTaskSelection(task *model.Task) (*RoutedModel, e
 	if err != nil {
 		return nil, err
 	}
-	if !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady {
+	if !channelModel.Enabled || !s.channelModelSupported(channelModel) {
 		return nil, errors.New("任务使用的模型服务配置已失效")
 	}
 	if _, err := s.repo.SystemChannel(channelModel.ChannelID); err != nil {
@@ -1128,7 +1128,7 @@ func (s *Service) switchTaskToNextRoute(task *model.Task, attempts []model.Route
 	}
 	channelModelByID := make(map[string]model.ChannelModel, len(channelModels))
 	for _, channelModel := range channelModels {
-		if channelModel.Enabled && channelModel.SupportStatus == model.ChannelModelSupportReady && enabledSystemChannels[channelModel.ChannelID] && (logicalModel.PricePolicy != "channel" || channelModelHasActivePriceTier(channelModel)) {
+		if channelModel.Enabled && s.channelModelSupported(&channelModel) && enabledSystemChannels[channelModel.ChannelID] && (logicalModel.PricePolicy != "channel" || channelModelHasActivePriceTier(channelModel)) {
 			channelModelByID[channelModel.ID] = channelModel
 		}
 	}
@@ -1309,7 +1309,7 @@ func (s *Service) resolveArchivedTaskRoute(task *model.Task, intent ModelRequest
 		return nil, BadAuthRequest("历史任务原模型供应线路已失效，无法重试")
 	}
 	channelModel, err := s.repo.ChannelModel(task.ChannelModelID)
-	if err != nil || !channelModel.Enabled || channelModel.SupportStatus != model.ChannelModelSupportReady {
+	if err != nil || !channelModel.Enabled || !s.channelModelSupported(channelModel) {
 		return nil, BadAuthRequest("历史任务原模型服务已失效，无法重试")
 	}
 	if _, err := s.repo.SystemChannel(channelModel.ChannelID); err != nil {

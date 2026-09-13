@@ -21,8 +21,10 @@ func TestNormalizeTaskInputMakesTypedProviderConfigBillable(t *testing.T) {
 	}
 	channelModel := model.ChannelModel{
 		ID: "model-1", ChannelID: "channel-1", ModelKey: "text-model", Capability: "text",
+		Protocol:    model.ChannelInterfaceChatCompletion,
 		BillingMode: "fixed_request", UnitPriceMicrocredits: 100_000, PriceConfigured: true, Enabled: true,
 	}
+	completeModelFixtureProfile(t, &channelModel)
 	if err := db.Create(&channelModel).Error; err != nil {
 		t.Fatal(err)
 	}

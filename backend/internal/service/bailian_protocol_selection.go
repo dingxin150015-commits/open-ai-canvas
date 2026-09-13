@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"infinite-canvas/backend/internal/model"
 )
 
 // Old Wanx/Wan plugins are different contracts, not aliases. Other gateways
@@ -15,14 +14,4 @@ func validateBailianLegacyProtocol(key, id string) error {
 		return fmt.Errorf("该模型不能使用旧 Wanx/Wan 协议，请选择对应的 DashScope 专属插件")
 	}
 	return nil
-}
-
-func (s *Service) bailianModelProtocolAvailable(cm model.ChannelModel) bool {
-	if validateBailianLegacyProtocol(firstNonEmpty(cm.ProviderModelKey, cm.ModelKey), string(cm.Protocol)) != nil {
-		return false
-	}
-	if cm.Protocol == model.ChannelInterfaceDashScopeImage || cm.Protocol == model.ChannelInterfaceDashScopeVideo {
-		return s.protocolIsSelectable(string(cm.Protocol))
-	}
-	return true
 }

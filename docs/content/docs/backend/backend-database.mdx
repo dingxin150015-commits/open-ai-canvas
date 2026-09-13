@@ -126,14 +126,14 @@ description: 影策后端核心持久化表与状态边界
 
 | 字段                        | 说明                                              |
 | --------------------------- | ------------------------------------------------- |
-| `support_status`            | `ready`、`planned`、`unsupported` 或 `deprecated` |
+| `support_status`            | 目录评估：`unknown`、`ready`、`planned`、`unsupported` 或 `deprecated` |
 | `support_reason`            | 当前状态的可读原因                                |
 | `catalog_source`            | `manual`、`upstream` 或官方目录来源               |
 | `catalog_version`           | 目录版本，便于审计和幂等更新                      |
 | `supported_operations_json` | 官方声明并经项目识别的操作列表                    |
 | `documentation_paths_json`  | 生成该目录项的本地官方文档证据                    |
 
-只有 `ready` 模型能进入启用查询、定价/编辑、模型测试和逻辑模型线路。自动发现的新模型默认停用、未定价；`planned` 等状态只允许管理员查看。
+目录标记不再充当管理表单的只读开关。自动发现的新模型默认 `unknown`、停用、未定价；可编辑或保存停用草稿。启用、报价和执行由服务层根据持久能力配置、当前协议插件、模型合同和价格判断；明确不支持或废弃的记录仍不能执行。管理员返回的 `eligibility` 使用 `gorm:"-"`，不新增数据库字段；`unknown` 使用现有字符串列，不修改旧迁移校验和或自动重写存量状态。
 
 升级旧数据时，只有同时具备能力类型、协议和有效 `capability_config_json` 的人工配置才会标记为 `ready/manual`；缺失持久能力配置的记录即使已有能力/协议也标记为 `planned/legacy`。补齐仅作用于停用、未定价且没有能力配置的记录，并使用更新时间条件避免覆盖并发管理员保存。
 

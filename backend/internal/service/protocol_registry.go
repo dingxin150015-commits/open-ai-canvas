@@ -262,6 +262,7 @@ func (s *Service) InstallPlugin(data []byte, fileName string) (PluginView, error
 	plugin, err := s.pluginRuntime.install(data, fileName)
 	if err == nil {
 		s.refreshPaymentRegistry()
+		s.invalidateRouteCatalog()
 	}
 	return plugin, err
 }
@@ -338,6 +339,7 @@ func (s *Service) UninstallPlugin(id string) error {
 	err := s.pluginRuntime.uninstall(id)
 	if err == nil {
 		s.refreshPaymentRegistry()
+		s.invalidateRouteCatalog()
 	}
 	return err
 }

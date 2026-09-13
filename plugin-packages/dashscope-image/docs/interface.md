@@ -83,10 +83,10 @@
 
 ```json
 {
-  "apiVersion": "yingce.plugin/v3",
+  "apiVersion": "yingce.plugin/v4",
   "id": "dashscope-image",
   "name": "DashScope Qwen Image",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "author": "Alibaba Cloud / 影策",
   "description": "DashScope Qwen Image 独立请求协议插件。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
@@ -176,6 +176,55 @@
             "description": "画幅或尺寸"
           }
         ],
+        "modelContract": {
+          "mode": "exact",
+          "models": [
+            "qwen-image-3.0-pro"
+          ]
+        },
+        "modelCatalog": {
+          "hosts": [
+            "dashscope.aliyuncs.com",
+            "dashscope-intl.aliyuncs.com",
+            "dashscope-us.aliyuncs.com",
+            "maas.aliyuncs.com"
+          ],
+          "entries": [
+            {
+              "id": "qwen-image-3.0-pro",
+              "displayName": "通义千问图像 3.0 Pro",
+              "supportStatus": "ready",
+              "supportReason": "Qwen Image 3.0 同步文生图与 1-3 图编辑合同、严格序列化和回归测试已完成",
+              "supportedOperations": [
+                "text_to_image",
+                "image_edit"
+              ],
+              "documentationPaths": [
+                "api-reference/image-generation/qwen-text-to-image.md",
+                "api-reference/image-generation/qwen-image-editing.md"
+              ],
+              "catalogSource": "bailian-official-docs",
+              "catalogVersion": "2026-08-27",
+              "apiPath": "/api/v1/services/aigc/multimodal-generation/generation"
+            },
+            {
+              "id": "wan2.7-image-pro",
+              "displayName": "万相图像 2.7 Pro",
+              "supportStatus": "planned",
+              "supportReason": "Wan 2.7 Image 模型专属能力合同尚未完成",
+              "supportedOperations": [
+                "text_to_image",
+                "image_edit"
+              ],
+              "documentationPaths": [
+                "api-reference/image-generation/wan27-image-gen-edit/create-task.md"
+              ],
+              "catalogSource": "bailian-official-docs",
+              "catalogVersion": "2026-08-27",
+              "apiPath": "/api/v1/services/aigc/multimodal-generation/generation"
+            }
+          ]
+        },
         "variables": [
           {
             "name": "model",

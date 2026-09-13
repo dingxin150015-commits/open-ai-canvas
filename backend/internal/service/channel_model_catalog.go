@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"infinite-canvas/backend/internal/model"
 )
@@ -20,14 +21,17 @@ type ChannelModelsRequest struct {
 }
 
 type channelModelsPayload struct {
-	Data   []channelModelItem `json:"data"`
-	Models []channelModelItem `json:"models"`
-	Error  *providerError     `json:"error"`
-	Code   *int               `json:"code"`
-	Msg    string             `json:"msg"`
+	NextPageToken string             `json:"nextPageToken"`
+	Data          []channelModelItem `json:"data"`
+	Models        []channelModelItem `json:"models"`
+	Error         *providerError     `json:"error"`
+	Code          *int               `json:"code"`
+	Msg           string             `json:"msg"`
 }
 
 type channelModelItem struct {
+	GeminiDisplayName      string                        `json:"displayName"`
+	GenerationMethods      []string                      `json:"supportedGenerationMethods"`
 	ID                     string                        `json:"id"`
 	Name                   string                        `json:"name"`
 	DisplayName            string                        `json:"display_name"`
@@ -158,24 +162,9 @@ func (s *Service) FetchChannelModelCatalog(ctx context.Context, actor *model.Use
 	ApplyOutboundHeaders(request, headers)
 
 	// 只代理固定的模型目录 GET；用户密钥仅用于本次请求，不写入数据库或日志。
-	data, _, err := doBinary(request)
+	items, err := fetchChannelCatalogPages(request, apiFormat, doBinary)
 	if err != nil {
-		return nil, channelModelsUpstreamError(err)
-	}
-	var payload channelModelsPayload
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, WrapAppError(http.StatusBadGateway, "模型服务返回的不是有效 JSON", err)
-	}
-	if payload.Error != nil && strings.TrimSpace(payload.Error.Message) != "" {
-		return nil, NewAppError(http.StatusBadGateway, "模型服务返回失败，请检查渠道配置")
-	}
-	if payload.Code != nil && *payload.Code != 0 {
-		return nil, NewAppError(http.StatusBadGateway, "模型服务返回失败，请检查渠道配置")
-	}
-
-	items := payload.Data
-	if apiFormat == "gemini" {
-		items = payload.Models
+		return nil, err
 	}
 	seen := make(map[string]bool, len(items))
 	catalog := make([]ChannelModelCatalogItem, 0, len(items))
@@ -189,13 +178,13 @@ func (s *Service) FetchChannelModelCatalog(ctx context.Context, actor *model.Use
 		endpointTypes := normalizeCatalogEndpointTypes(item.SupportedEndpointTypes)
 		catalog = append(catalog, ChannelModelCatalogItem{
 			ID:                     name,
-			DisplayName:            strings.TrimSpace(item.DisplayName),
+			DisplayName:            strings.TrimSpace(firstNonEmpty(item.GeminiDisplayName, item.DisplayName)),
 			ProviderModelKey:       name,
 			ModelType:              modelType,
 			Protocol:               catalogProtocol(modelType, endpointTypes, apiFormat),
 			SupportedEndpointTypes: endpointTypes,
-			SupportStatus:          model.ChannelModelSupportPlanned,
-			SupportReason:          "上游目录未提供经过项目验证的执行器合同",
+			SupportStatus:          model.ChannelModelSupportUnknown,
+			SupportReason:          catalogConfigurationReason(item.GenerationMethods),
 			CatalogSource:          "upstream",
 			CatalogVersion:         "upstream",
 			DefaultParameters: ChannelModelCatalogDefaultParameters{
@@ -218,8 +207,62 @@ func (s *Service) FetchChannelModelCatalog(ctx context.Context, actor *model.Use
 	})
 	// 官方厂商 Manifest 是目录事实的一部分，不受实验插件开关控制；
 	// 支持状态仍会阻止未完成 Adapter 的模型被定价、启用或路由。
-	catalog = extendChannelModelCatalog(baseURL, apiFormat, headers, catalog)
+	catalog = extendChannelModelCatalogWithRegistry(s.protocolRegistry(), baseURL, catalog)
 	return catalog, nil
+}
+
+func catalogConfigurationReason(methods []string) string {
+	if len(methods) == 0 {
+		return "已发现，待管理员配置能力与请求协议"
+	}
+	return "上游方法：" + strings.Join(methods, "、") + "；请配置输出能力与协议"
+}
+
+// A listing is atomic: partial pages never reach catalog synchronization.
+func fetchChannelCatalogPages(request *http.Request, format string, fetch func(*http.Request) ([]byte, string, error)) ([]channelModelItem, error) {
+	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Minute)
+	defer cancel()
+	result := []channelModelItem{}
+	seen := map[string]bool{}
+	cursor := ""
+	for page := 0; page < 100; page++ {
+		next := request.Clone(ctx)
+		parsed := *request.URL
+		next.URL = &parsed
+		if cursor != "" {
+			query := next.URL.Query()
+			query.Set("pageToken", cursor)
+			next.URL.RawQuery = query.Encode()
+		}
+		data, _, err := fetch(next)
+		if err != nil {
+			return nil, channelModelsUpstreamError(err)
+		}
+		var payload channelModelsPayload
+		if err := json.Unmarshal(data, &payload); err != nil {
+			return nil, WrapAppError(http.StatusBadGateway, "模型目录响应无效，未导入部分结果", err)
+		}
+		if payload.Error != nil || (payload.Code != nil && *payload.Code != 0) {
+			return nil, NewAppError(http.StatusBadGateway, "模型目录拉取失败，未导入部分结果")
+		}
+		items := payload.Data
+		if format == "gemini" {
+			items = payload.Models
+		}
+		result = append(result, items...)
+		if len(result) > 10000 {
+			return nil, BadAuthRequest("模型目录超过数量上限，未导入部分结果")
+		}
+		cursor = strings.TrimSpace(payload.NextPageToken)
+		if format != "gemini" || cursor == "" {
+			return result, nil
+		}
+		if seen[cursor] || len(cursor) > 4096 {
+			return nil, BadAuthRequest("模型目录分页游标异常，未导入部分结果")
+		}
+		seen[cursor] = true
+	}
+	return nil, BadAuthRequest("模型目录超过分页上限，未导入部分结果")
 }
 
 func catalogProtocol(modelType string, endpointTypes []string, apiFormat string) string {

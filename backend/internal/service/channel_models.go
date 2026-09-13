@@ -19,6 +19,7 @@ import (
 )
 
 type ChannelModelRequest struct {
+	Draft                        bool                           `json:"draft"`
 	ModelKey                     string                         `json:"modelKey"`
 	ProviderModelKey             string                         `json:"providerModelKey"`
 	DisplayName                  string                         `json:"displayName"`
@@ -113,6 +114,8 @@ func (s *Service) AdminChannelModels(actor *model.User, channelID string) ([]mod
 	}
 	for index := range items {
 		populateChannelModelCatalogMetadata(&items[index])
+		eligibility := s.channelModelEligibility(&items[index])
+		items[index].Eligibility = &eligibility
 		if strings.TrimSpace(items[index].CapabilityConfigJSON) == "" {
 			continue
 		}
@@ -134,7 +137,14 @@ func (s *Service) AdminChannelModels(actor *model.User, channelID string) ([]mod
 }
 
 func (s *Service) SystemChannelModel(channelID string, modelKey string) (*model.ChannelModel, error) {
-	return s.repo.ChannelModelByKey(channelID, strings.TrimPrefix(strings.TrimSpace(modelKey), "models/"))
+	item, err := s.repo.ChannelModelByKey(channelID, strings.TrimPrefix(strings.TrimSpace(modelKey), "models/"))
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireChannelModelSupported(item); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 // SystemChannelHasProtocol 用于没有携带 model 字段的轮询请求：先确认渠道确实配置了该协议，
@@ -145,7 +155,7 @@ func (s *Service) SystemChannelHasProtocol(channelID string, protocol model.Chan
 		return false, err
 	}
 	for _, item := range items {
-		if item.Protocol == protocol {
+		if item.Protocol == protocol && s.channelModelSupported(&item) {
 			return true, nil
 		}
 	}
@@ -408,11 +418,9 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 		if lookupErr != nil {
 			return nil, lookupErr
 		}
-		if err := requireReadyChannelModel(existingItem); err != nil {
-			return nil, err
-		}
+		_ = existingItem // Existing discovery status does not prohibit editing configuration.
 	}
-	if capability == "text" || capability == "image" || capability == "video" {
+	if !req.Draft && (capability == "text" || capability == "image" || capability == "video") {
 		if _, err := NormalizeModelCapabilityConfigForModel(capability, string(protocol), providerModelKey, req.CapabilityConfig); err != nil {
 			return nil, err
 		}
@@ -433,7 +441,7 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 		}
 		item.PriceVersion++
 	} else {
-		item.SupportStatus = model.ChannelModelSupportReady
+		item.SupportStatus = model.ChannelModelSupportUnknown
 		item.CatalogSource = "manual"
 		item.CatalogVersion = "manual"
 		item.SupportedOperationsJSON = "[]"
@@ -449,7 +457,13 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 	item.Capability = capability
 	item.Protocol = protocol
 	s.applyChannelModelPriceTierSummary(item, tiers)
-	if capability == "text" || capability == "image" || capability == "video" {
+	if req.Draft {
+		encoded, encodeErr := json.Marshal(req.CapabilityConfig)
+		if encodeErr != nil {
+			return nil, encodeErr
+		}
+		item.CapabilityConfigJSON = string(encoded)
+	} else if capability == "text" || capability == "image" || capability == "video" {
 		capabilityConfig, normalizeErr := NormalizeModelCapabilityConfigForModel(capability, string(protocol), providerModelKey, req.CapabilityConfig)
 		if normalizeErr != nil {
 			return nil, normalizeErr
@@ -469,10 +483,26 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 	if req.Enabled != nil {
 		item.Enabled = *req.Enabled
 	}
-	if err := validateChannelModelTierCapabilities(tiers, item.CapabilityConfigJSON, capability); err != nil {
+	if req.Draft {
+		item.Enabled = false
+	}
+	if err := validateChannelModelTierCapabilities(tiers, item.CapabilityConfigJSON, capability); err != nil && !req.Draft {
 		return nil, err
 	}
+	item.PriceTiers = tiers
+	eligibility := s.channelModelEligibility(item)
+	if item.Enabled && !eligibility.CanEnable {
+		return nil, BadAuthRequest(eligibility.Reason)
+	}
+	item.Eligibility = &eligibility
 	// 渠道模型及所有价格档必须同时落库，不能出现“能力已开放但规格价格尚未更新”的窗口。
+	for index := range tiers {
+		tierID, idErr := s.repo.NextPrefixedID("PTIER")
+		if idErr != nil {
+			return nil, idErr
+		}
+		tiers[index].ID = tierID
+	}
 	if err := s.repo.SaveChannelModelWithPriceTiers(item, tiers); err != nil {
 		return nil, err
 	}
@@ -573,13 +603,8 @@ func (s *Service) normalizeChannelModelPriceTiers(req ChannelModelRequest, capab
 		if err := validateChannelModelTierPricing(capability, protocol, billingMode, input); err != nil {
 			return nil, err
 		}
-		id, idErr := s.repo.NextPrefixedID("PTIER")
-		if idErr != nil {
-			return nil, idErr
-		}
 		enabled := input.Enabled == nil || *input.Enabled
 		result = append(result, model.ChannelModelPriceTier{
-			ID:                           id,
 			SelectorKey:                  key,
 			SelectorJSON:                 key,
 			Selector:                     selector,
@@ -742,6 +767,7 @@ func (s *Service) applyChannelModelPriceTierSummary(item *model.ChannelModel, ti
 }
 
 func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, channelID string, req ChannelModelRequest) (*AdminChannelModelTestResult, error) {
+	req.Draft = false // A non-executing draft must never weaken the paid test boundary.
 	if err := s.RequireAdmin(actor); err != nil {
 		return nil, err
 	}
@@ -754,8 +780,8 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		return nil, err
 	}
 	if existingItem, lookupErr := s.repo.ChannelModelByKeyIncludingDisabled(channelID, modelKey); lookupErr == nil {
-		if err := requireReadyChannelModel(existingItem); err != nil {
-			return nil, err
+		if existingItem.SupportStatus == model.ChannelModelSupportUnsupported || existingItem.SupportStatus == model.ChannelModelSupportDeprecated {
+			return nil, BadAuthRequest("该模型当前不可测试")
 		}
 	} else if !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
 		return nil, lookupErr
@@ -865,14 +891,12 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		_, err = runAudioTask(testCtx, input)
 	}
 	if err != nil {
-		// 对于需要参考素材的视频模型（i2v/r2v），探针未携带图片/视频会触发错误，
-		// 但只要错误明确指向「缺少参考素材」，就证明凭证、端点、模型名和协议路由均有效。
-		// 此时判为成功并附注，避免管理员误以为配置不可用。
+		// Missing media can be rejected locally before any HTTP call; it proves no account entitlement.
 		if capability == "video" && isVideoReferenceRequiredError(err) {
 			log.Printf("[TestChannelModel] 视频模型测试触发素材缺失错误，判为成功+附注")
 			return &AdminChannelModelTestResult{
 				DurationMs: time.Since(startedAt).Milliseconds(),
-				Note:       "该模型需参考素材（图片/视频），仅验证了凭证与端点，未做完整生成测试",
+				Note:       "该模型需参考素材（图片/视频），未完成生成测试，不能据此确认凭证或端点可用",
 			}, nil
 		}
 		log.Printf("[TestChannelModel] 测试失败: capability=%s is_video_ref_required=%v error_type=%T", capability, capability == "video" && isVideoReferenceRequiredError(err), err)
@@ -963,6 +987,12 @@ func normalizeChannelModelContractWithRegistry(registry *protocol.Registry, chan
 	if providerModelKey == "" {
 		providerModelKey = modelKey
 	}
+	if req.Draft {
+		if req.Capability != "" && normalizeCapability(req.Capability) == "" {
+			return "", "", "", "", BadAuthRequest("模型能力无效")
+		}
+		return modelKey, providerModelKey, normalizeCapability(req.Capability), model.ChannelInterfaceType(strings.TrimSpace(req.Protocol)), nil
+	}
 	capability := normalizeCapability(req.Capability)
 	if capability == "" {
 		return "", "", "", "", BadAuthRequest("请选择模型能力")
@@ -977,6 +1007,12 @@ func normalizeChannelModelContractWithRegistry(registry *protocol.Registry, chan
 	}
 	if expected := protocolCapabilityFromMetadata(adapter.Metadata()); expected != "" && expected != capability {
 		return "", "", "", "", BadAuthRequest("模型能力与请求协议不匹配")
+	}
+	if !containsPluginSurface(adapter.Metadata().Scopes, "admin.system-channel") {
+		return "", "", "", "", BadAuthRequest("协议不支持系统渠道")
+	}
+	if err := adapter.Metadata().ModelContract.Check(providerModelKey); err != nil {
+		return "", "", "", "", BadAuthRequest(err.Error())
 	}
 	if (protocol == model.ChannelInterfaceVolcengineJiMengImage || protocol == model.ChannelInterfaceVolcengineJiMengVideo) && (strings.TrimSpace(channel.APIKey) == "" || strings.TrimSpace(channel.SecretKey) == "") {
 		return "", "", "", "", BadAuthRequest("即梦官方协议需要先在渠道中配置 Access Key 和 Secret Key")
@@ -1017,9 +1053,6 @@ func (s *Service) DeleteAdminChannelModels(actor *model.User, channelID string, 
 	found := 0
 	for _, item := range items {
 		if selected[item.ID] {
-			if err := requireReadyChannelModel(&item); err != nil {
-				return 0, err
-			}
 			found++
 		}
 	}

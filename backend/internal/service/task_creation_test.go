@@ -49,6 +49,7 @@ func TestResolveTaskModelSelectionAllowsExplicitSystemChannelWhenFrontendModelsE
 		ID: "channel-model-1", ChannelID: channel.ID, ModelKey: "agnes-video-2.5", Capability: "video",
 		Protocol: model.ChannelInterfaceNewAPIVideo, BillingMode: "per_second", PriceConfigured: true, Enabled: true,
 	}
+	completeModelFixtureProfile(t, &channelModel)
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}

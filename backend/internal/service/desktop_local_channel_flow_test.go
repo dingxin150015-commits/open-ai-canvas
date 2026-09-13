@@ -175,6 +175,7 @@ func TestSystemWorkerRestartReevaluatesStoredLocalFlagAgainstServerCapability(t 
 		BaseURL: "http://127.0.0.1:8000", APIKey: "key", APIFormat: "openai", ModelsJSON: `["text-model"]`, AllowLocalChannel: true,
 	}
 	channelModel := model.ChannelModel{ID: "model-local", ChannelID: channel.ID, ModelKey: "text-model", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, BillingMode: "fixed_request", Enabled: true, PriceConfigured: true}
+	completeModelFixtureProfile(t, &channelModel)
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}

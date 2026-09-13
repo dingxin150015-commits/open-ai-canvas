@@ -369,7 +369,7 @@ func (s *Service) buildAdminLogicalModel(item model.LogicalModel, graph *reposit
 			return nil, specErr
 		}
 		_, channelOK = systemChannelByID[channelModel.ChannelID]
-		structurallyAvailable := route.Enabled && route.Weight > 0 && channelModel.Enabled && channelModel.SupportStatus == model.ChannelModelSupportReady && channelOK
+		structurallyAvailable := route.Enabled && route.Weight > 0 && channelModel.Enabled && s.channelModelSupported(&channelModel) && channelOK
 		billingAvailable := item.PricePolicy != "unified" || item.BillingMode != "token" || supportsTokenBilling(item.Capability, channelModel.Protocol)
 		available := structurallyAvailable && billingAvailable && (item.PricePolicy != "channel" || HasValidPrice(&channelModel))
 		admin.Routes = append(admin.Routes, AdminLogicalRoute{ID: route.ID, ChannelModelID: channelModel.ID, ChannelID: channelModel.ChannelID, ChannelModelKey: channelModel.ModelKey, ChannelModelName: channelModel.DisplayName, Enabled: route.Enabled, Priority: route.Priority, Weight: route.Weight, Available: available, structurallyAvailable: structurallyAvailable, CapabilitySpec: capabilitySpec})
@@ -667,7 +667,7 @@ func (s *Service) logicalModelBundle(actor *model.User, id string, req LogicalMo
 			return nil, nil, nil, false, BadAuthRequest("供应线路能力类型与前台模型不一致")
 		}
 		if input.Enabled {
-			if channelModel.SupportStatus != model.ChannelModelSupportReady {
+			if !s.channelModelSupported(channelModel) {
 				return nil, nil, nil, false, BadAuthRequest("计划支持、不支持或已废弃的渠道模型不能加入启用线路")
 			}
 			enabledRouteProtocols = append(enabledRouteProtocols, channelModel.Protocol)

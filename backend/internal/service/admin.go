@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"infinite-canvas/backend/internal/model"
+	"infinite-canvas/backend/internal/protocol"
 	"infinite-canvas/backend/internal/repository"
 
 	"gorm.io/gorm"
@@ -449,7 +450,7 @@ func (s *Service) PublicSystemChannels() ([]PublicModelChannel, error) {
 		if itemErr != nil {
 			return nil, itemErr
 		}
-		result = append(result, publicChannel(channel, false, items))
+		result = append(result, publicChannel(channel, false, items, s.protocolRegistry()))
 	}
 	return result, nil
 }
@@ -836,7 +837,11 @@ func mergeChannelRequest(req ChannelRequest, channel model.ModelChannel) Channel
 	return req
 }
 
-func publicChannel(channel model.ModelChannel, admin bool, channelModels []model.ChannelModel) PublicModelChannel {
+func publicChannel(channel model.ModelChannel, admin bool, channelModels []model.ChannelModel, registries ...*protocol.Registry) PublicModelChannel {
+	registry := loadOfficialFallbackRegistry()
+	if len(registries) > 0 {
+		registry = registries[0]
+	}
 	models := make([]string, 0, len(channelModels))
 	modelCosts := make([]PublicChannelModelPrice, 0, len(channelModels))
 	for _, item := range channelModels {
@@ -844,7 +849,7 @@ func publicChannel(channel model.ModelChannel, admin bool, channelModels []model
 			continue
 		}
 		if !admin {
-			if item.SupportStatus != model.ChannelModelSupportReady || !HasValidPrice(&item) {
+			if !evaluateChannelModel(registry, &item).CanExecute {
 				continue
 			}
 			if _, err := effectiveChannelModelCapability(&item); err != nil {
@@ -862,7 +867,7 @@ func publicChannel(channel model.ModelChannel, admin bool, channelModels []model
 			modelCosts = append(modelCosts, PublicChannelModelPrice{Model: item.ModelKey, DisplayName: item.DisplayName, Icon: item.Icon, Capability: item.Capability, Protocol: item.Protocol, BillingMode: item.BillingMode, UnitPriceMicrocredits: item.UnitPriceMicrocredits, InputTokenPriceMicrocredits: item.InputTokenPriceMicrocredits, OutputTokenPriceMicrocredits: item.OutputTokenPriceMicrocredits, CachedTokenPriceMicrocredits: item.CachedTokenPriceMicrocredits, CapabilityConfig: capabilityConfig})
 		}
 	}
-	if len(models) == 0 {
+	if len(models) == 0 && (admin || channel.Scope != model.ChannelScopeSystem) {
 		_ = json.Unmarshal([]byte(channel.ModelsJSON), &models)
 	}
 	apiKey := ""

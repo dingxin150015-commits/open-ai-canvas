@@ -318,7 +318,7 @@ func (s *Service) validateSystemChannelModelSelection(input map[string]any) erro
 	if !channelModel.Enabled {
 		return InvalidModelSelection("指定的模型已停用")
 	}
-	if !s.bailianModelProtocolAvailable(*channelModel) {
+	if !s.channelModelSupported(channelModel) {
 		return InvalidModelSelection("模型协议未启用或选择不匹配")
 	}
 

@@ -48,6 +48,7 @@ export type CreditPolicy = {
 };
 
 export type ChannelModel = {
+    eligibility?: { canEditConfiguration: boolean; configurationValid: boolean; executionSupported: boolean; canEnable: boolean; canExecute: boolean; reasonCode?: string; reason?: string; protocolVersion?: string };
     id: string;
     channelId: string;
     modelKey: string;
@@ -77,7 +78,7 @@ export type ChannelModel = {
     updatedAt: string;
 };
 
-export type ChannelModelSupportStatus = "ready" | "planned" | "unsupported" | "deprecated";
+export type ChannelModelSupportStatus = "ready" | "planned" | "unsupported" | "deprecated" | "unknown";
 
 export type ChannelModelFetchResult = {
     models: string[];
@@ -116,6 +117,7 @@ export type ChannelModelPriceTier = {
 
 // 系统渠道模型的写入合同。标量价格只用于兼容旧管理请求；新的后台界面只提交 priceTiers。
 export type ChannelModelMutation = {
+    draft?: boolean;
     modelKey: string;
     providerModelKey?: string;
     displayName?: string;
@@ -309,6 +311,10 @@ export function testAdminChannelModel(channelId: string, input: Pick<ChannelMode
 
 export function createAdminChannelModel(channelId: string, input: ChannelModelMutation) {
     return request<{ model: ChannelModel }>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models`, input));
+}
+
+export function inspectAdminChannelModel(channelId: string, input: ChannelModelMutation) {
+    return request<NonNullable<ChannelModel["eligibility"]>>(api.post(`/admin/channels/${encodeURIComponent(channelId)}/models/validate`, input));
 }
 
 export function updateAdminChannelModel(channelId: string, id: string, input: ChannelModelMutation) {

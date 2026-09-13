@@ -1,13 +1,14 @@
 [CmdletBinding()]
-param()
+param([string[]]$PackageIDs = @('dashscope-image','dashscope-video'))
 $ErrorActionPreference='Stop'
 $repositoryRoot=Split-Path -Parent $PSScriptRoot
 Push-Location $repositoryRoot
 try {
-    & node 'plugin-packages/generate-catalog.mjs' 'dashscope-image' 'dashscope-video'
+    foreach ($id in $PackageIDs) { if ($id -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') { throw 'Invalid package ID' } }
+    & node 'plugin-packages/generate-catalog.mjs' @PackageIDs
     if ($LASTEXITCODE -ne 0) { throw 'Plugin generation failed' }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    foreach ($id in @('dashscope-image','dashscope-video')) {
+    foreach ($id in $PackageIDs) {
         $source=Join-Path $repositoryRoot "plugin-packages/$id"
         $temporary=Join-Path $repositoryRoot "plugin-packages/$id-$([Guid]::NewGuid().ToString('N')).zip"
         $archive=[System.IO.Compression.ZipFile]::Open($temporary,[System.IO.Compression.ZipArchiveMode]::Create)

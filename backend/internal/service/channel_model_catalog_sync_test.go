@@ -75,13 +75,10 @@ func TestUpstreamCatalogEnrichmentIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestPlannedChannelModelIsReadOnly(t *testing.T) {
-	err := requireReadyChannelModel(&model.ChannelModel{SupportStatus: model.ChannelModelSupportPlanned})
-	if err == nil {
-		t.Fatal("planned model should be rejected")
-	}
-	if err := requireReadyChannelModel(&model.ChannelModel{SupportStatus: model.ChannelModelSupportReady}); err != nil {
-		t.Fatalf("ready model rejected: %v", err)
+func TestDiscoveredModelCanBeConfiguredButNotExecuted(t *testing.T) {
+	result := evaluateChannelModel(loadOfficialFallbackRegistry(), &model.ChannelModel{SupportStatus: model.ChannelModelSupportPlanned})
+	if !result.CanEditConfiguration || result.CanEnable || result.CanExecute {
+		t.Fatalf("invalid candidate eligibility: %#v", result)
 	}
 }
 

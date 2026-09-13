@@ -112,7 +112,7 @@ func (s *Service) publicSystemChannelCatalog(intent *ModelRequestIntent) ([]Publ
 
 		publicModels := make([]PublicChannelModel, 0, len(channelModels))
 		for _, cm := range channelModels {
-			if !cm.Enabled || cm.SupportStatus != model.ChannelModelSupportReady {
+			if !cm.Enabled || !s.channelModelSupported(&cm) {
 				continue
 			}
 
@@ -165,8 +165,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) PublicChannelMode
 	// 计算价格展示
 	pricingMode, displayPrice, priceLabel := computeChannelModelPriceDisplay(cm, publicTiers)
 
-	available := cm.SupportStatus == model.ChannelModelSupportReady && (len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm)))
-	available = available && s.bailianModelProtocolAvailable(*cm)
+	available := s.channelModelSupported(cm) && (len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm)))
 
 	// Catalog and task admission consume the same durable capability profile.
 	var capabilityConfig map[string]any

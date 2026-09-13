@@ -37,6 +37,7 @@ func TestSystemChannelTaskBillingUsesExactRequestedPriceTier(t *testing.T) {
 		Capability: "video", Protocol: model.ChannelInterfaceDashScopeVideo, SupportStatus: model.ChannelModelSupportReady,
 		Enabled: true, PriceConfigured: true,
 	}
+	completeModelFixtureProfile(t, &channelModel)
 	if err := database.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}

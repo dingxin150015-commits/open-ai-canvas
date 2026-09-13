@@ -7,7 +7,7 @@ import { ModelProtocolBrowser } from "@/components/model-protocol-browser";
 import { ModelCapabilityEditor } from "@/components/model-capability-editor";
 import { defaultModelCapabilityConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import type { ModelProtocolDefinition } from "@/lib/model-protocols";
-import { createAdminChannelModel, testAdminChannelModel, updateAdminChannelModel, type ChannelModel } from "@/services/api/wallet";
+import { createAdminChannelModel, inspectAdminChannelModel, testAdminChannelModel, updateAdminChannelModel, type ChannelModel } from "@/services/api/wallet";
 import type { ModelChannel } from "@/stores/use-config-store";
 import { defaultPriceTier, priceTierResolutionFromForm, priceTierVideoSecondsFromForm, skuSelectorFromForm } from "./channel-model-price-tier-form";
 import { PriceTierFields } from "./channel-model-price-tier-fields";
@@ -91,9 +91,9 @@ export function ChannelModelEditor({
         }
     };
 
-    const save = async () => {
+    const submitConfiguration = async (draft = false, inspect = false) => {
         if (busyRef.current || readOnly) return;
-        const values = await validateEditor();
+        const values = await validateEditor(draft ? ["modelKey", "providerModelKey"] : undefined);
         if (!values) return;
         const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
         const capabilityConfig =
@@ -102,6 +102,7 @@ export function ChannelModelEditor({
         setSaving(true);
         try {
             const payload = {
+                draft,
                 modelKey: values.modelKey.trim(),
                 providerModelKey: upstreamModel,
                 displayName: values.displayName?.trim() || values.modelKey.trim(),
@@ -121,9 +122,14 @@ export function ChannelModelEditor({
                     priceConfigured: tier.priceConfigured !== false,
                     enabled: tier.enabled !== false,
                 })),
-                enabled: values.enabled !== false,
+                enabled: !draft && values.enabled !== false,
                 capabilityConfig,
             };
+            if (inspect) {
+                const result = await inspectAdminChannelModel(channel.id, payload);
+                message.info(result.canEnable ? "配置校验通过，可以启用；未调用上游，不代表账号和生成效果已验证。" : result.reason || "请完善配置");
+                return;
+            }
             if (editing) await updateAdminChannelModel(channel.id, editing.id, payload);
             else await createAdminChannelModel(channel.id, payload);
             try {
@@ -132,7 +138,7 @@ export function ChannelModelEditor({
                 message.warning("模型已保存，但列表刷新失败，请手动刷新");
             }
             onClose();
-            message.success(editing ? "模型配置已更新" : "模型已添加");
+            message.success(draft ? "已保存停用草稿，尚未开放调用" : editing ? "模型配置已更新" : "模型已添加");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "保存模型失败");
         } finally {
@@ -158,7 +164,8 @@ export function ChannelModelEditor({
                 protocol: values.protocol,
                 capabilityConfig,
             });
-            message.success(`模型测试通过，耗时 ${(result.durationMs / 1000).toFixed(2)} 秒`);
+            if (result.note) message.info(result.note);
+            else message.success(`模型测试通过，耗时 ${(result.durationMs / 1000).toFixed(2)} 秒`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "模型测试失败");
         } finally {
@@ -215,13 +222,16 @@ export function ChannelModelEditor({
                         <Button disabled={busy} onClick={requestClose}>
                             取消
                         </Button>
-                        <Button type="primary" loading={saving} disabled={readOnly || testing || protocolLoading || Boolean(protocolError)} onClick={() => void save()}>
+                        <Button disabled={busy || readOnly} onClick={() => void submitConfiguration(false, true)}>检查配置（不调用上游）</Button>
+                        <Button disabled={busy || readOnly} onClick={() => void submitConfiguration(true)}>保存停用草稿</Button>
+                        <Button type="primary" loading={saving} disabled={readOnly || testing || protocolLoading || Boolean(protocolError)} onClick={() => void submitConfiguration()}>
                             {editing ? "保存修改" : "添加模型"}
                         </Button>
                     </div>
                 </div>
             }
         >
+            {editing?.eligibility?.reason && !configurationChanged ? <p role="status" className="mb-3 text-sm">当前配置：{editing.eligibility.reason}。可以修改配置，保存或启用时由后端重新校验；配置通过不代表真实调用已验证。</p> : null}
             <Form className="admin-model-editor-form" form={form} initialValues={initialValues} layout="vertical" disabled={busy || readOnly} inert={busy || readOnly} onValuesChange={handleFormValuesChange}>
                 <Form.Item name="capabilityConfig" noStyle>
                     <CapabilityConfigField />

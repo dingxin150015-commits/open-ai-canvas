@@ -5,9 +5,15 @@ description: 影策统一插件系统的扩展边界、Manifest 合同与 Eagle 
 
 # 插件系统设计
 
+## 模型合同与目录贡献 v4
+
+统一目录修复在既有 `contributes.providers` 中增加可选 `modelContract` 和 `modelCatalog`，不引入第二套插件运行时。前者声明精确模型集合或兼容协议，配置检查和实际序列化共用；后者提供受控主机的补充目录信息。声明新字段须使用 `yingce.plugin/v4`；本轮两个百炼、三个 Gemini、OpenAI Chat Completions/Responses 包升级到 4.0.0，其他包不改。
+
+模型目录事实、管理员配置、当前执行能力和账号实测分开。插件停用/卸载使执行资格和路由缓存失效，但保留已有模型配置；重新启用不会自动改价或启用模型。详见 [系统模型目录与配置资格](/docs/backend/model-catalog)。
+
 ## 百炼声明式协议与通用引擎扩展
 
-这些扩展使用包合同 `yingce.plugin/v3`，本轮两个百炼候选包版本为 `3.1.0`，旧引擎会在加载时明确拒绝，避免忽略新变量后发送残缺请求。已有 v1/v2 包继续使用原合同。后台插件中心的展示对象仍使用既有归一化视图，包内 Manifest 才是执行合同真相。
+这些变量和媒体扩展始于包合同 `yingce.plugin/v3`，百炼 3.1.0 是历史检查点；当前包的模型合同/目录贡献使用上述 v4 / 4.0.0。旧引擎在加载时明确拒绝，避免忽略新约束后发送残缺请求。既有不使用新字段的 v1/v2/v3 包继续使用原合同。后台展示实际包 API 版本，包内 Manifest 是执行合同真相。
 
 图片插件通过 `request_mode` 选择 `sync`（默认）、`async`、`openai`，共用模型/参数校验。异步走 `/api/v1/services/aigc/image-generation/generation` 与 10 秒任务轮询；OpenAI 兼容走 `/compatible-mode/v1/images/generations`，尺寸改用 `x`，自动尺寸为 `auto`，参考图片使用 `image` 数组。响应解包与匿名结果下载仍由统一引擎完成，不引入并行宿主 Provider。同步多图建议预留至少 10 分钟任务时间，实际超时以管理员策略为准。
 

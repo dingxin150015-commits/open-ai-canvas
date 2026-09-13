@@ -27,6 +27,7 @@ type ModelChannel struct {
 }
 
 type ChannelModel struct {
+	Eligibility                  *ChannelModelEligibility  `json:"eligibility,omitempty" gorm:"-"`
 	ID                           string                    `json:"id" gorm:"primaryKey;size:36"`
 	ChannelID                    string                    `json:"channelId" gorm:"size:36;index;uniqueIndex:idx_channel_model_key_active,priority:1,where:deleted_at IS NULL"`
 	ModelKey                     string                    `json:"modelKey" gorm:"size:120;uniqueIndex:idx_channel_model_key_active,priority:2,where:deleted_at IS NULL"`
@@ -60,6 +61,18 @@ type ChannelModel struct {
 	CreatedAt  time.Time               `json:"createdAt"`
 	UpdatedAt  time.Time               `json:"updatedAt"`
 	DeletedAt  gorm.DeletedAt          `json:"-" gorm:"index"`
+}
+
+// ChannelModelEligibility is a runtime projection, not a persisted entitlement.
+type ChannelModelEligibility struct {
+	CanEditConfiguration bool   `json:"canEditConfiguration"`
+	ConfigurationValid   bool   `json:"configurationValid"`
+	ExecutionSupported   bool   `json:"executionSupported"`
+	CanEnable            bool   `json:"canEnable"`
+	CanExecute           bool   `json:"canExecute"`
+	ReasonCode           string `json:"reasonCode,omitempty"`
+	Reason               string `json:"reason,omitempty"`
+	ProtocolVersion      string `json:"protocolVersion,omitempty"`
 }
 
 // ChannelModelPriceTier 表示渠道模型在一个规格组合下的可执行上游 SKU 和用户价格。

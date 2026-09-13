@@ -6,6 +6,7 @@
     "local-development",
     "code-map",
     "backend-database",
+    "model-catalog",
     "task-runtime-stability",
     "newapi-channel-2",
     "system-update",

@@ -4,37 +4,41 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"sync"
 
 	"infinite-canvas/backend/internal/model"
+	"infinite-canvas/backend/internal/protocol"
 	"infinite-canvas/backend/internal/provider"
-	"infinite-canvas/backend/internal/provider/bailian"
 )
-
-var pluginsInitOnce sync.Once
-
-func initModelCatalogPlugins() {
-	pluginsInitOnce.Do(func() {
-		provider.Register(bailian.New())
-	})
-}
 
 // extendChannelModelCatalog 在已通过统一安全出站链路获取的标准目录上补充厂商条目。
 // 插件不持有密钥也不自行发 HTTP，避免绕过 SSRF、请求头和响应大小边界。
 func extendChannelModelCatalog(baseURL string, apiFormat string, headers []OutboundHeader, catalog []ChannelModelCatalogItem) []ChannelModelCatalogItem {
-	initModelCatalogPlugins()
-	discovery := provider.MatchProvider(baseURL, outboundHeadersMap(headers))
-	if discovery == nil {
+	return extendChannelModelCatalogWithRegistry(loadOfficialFallbackRegistry(), baseURL, catalog)
+}
+
+func extendChannelModelCatalogWithRegistry(registry *protocol.Registry, baseURL string, catalog []ChannelModelCatalogItem) []ChannelModelCatalogItem {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
 		return catalog
 	}
-	extra := discovery.AdditionalModels(provider.DiscoveryConfig{
-		BaseURL:   baseURL,
-		APIFormat: apiFormat,
-		Headers:   outboundHeadersMap(headers),
-		Region:    modelCatalogRegion(baseURL),
-	})
-	if len(extra) == 0 {
-		return catalog
+	host := strings.ToLower(parsed.Hostname())
+	extra := []provider.Model{}
+	for _, metadata := range registry.List(protocol.SurfaceAdminSystemChannel, "", false) {
+		if metadata.ModelCatalog == nil || len(metadata.Categories) != 1 {
+			continue
+		}
+		matched := false
+		for _, allowed := range metadata.ModelCatalog.Hosts {
+			if host == allowed || strings.HasSuffix(host, "."+allowed) {
+				matched = true
+			}
+		}
+		if !matched {
+			continue
+		}
+		for _, entry := range metadata.ModelCatalog.Entries {
+			extra = append(extra, provider.Model{ID: entry.ID, ProviderModelKey: entry.ID, DisplayName: entry.DisplayName, Capability: []string{string(metadata.Categories[0])}, Protocol: metadata.ID, SupportStatus: provider.ModelSupportStatus(entry.SupportStatus), SupportReason: entry.SupportReason, SupportedOperations: entry.SupportedOperations, DocumentationPaths: entry.DocumentationPaths, CatalogSource: entry.CatalogSource, CatalogVersion: entry.CatalogVersion, APIPath: entry.APIPath})
+		}
 	}
 
 	indexByID := make(map[string]int, len(catalog)+len(extra))
@@ -132,8 +136,10 @@ func normalizeCatalogSupportStatus(value string) model.ChannelModelSupportStatus
 		return model.ChannelModelSupportUnsupported
 	case model.ChannelModelSupportDeprecated:
 		return model.ChannelModelSupportDeprecated
-	default:
+	case model.ChannelModelSupportPlanned:
 		return model.ChannelModelSupportPlanned
+	default:
+		return model.ChannelModelSupportUnknown
 	}
 }
 

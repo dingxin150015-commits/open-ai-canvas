@@ -403,9 +403,10 @@ func (s *Service) processCanvasGenerationTask(ctx context.Context, userID string
 		}
 	}
 	if input.Config.APIFormat == "gemini" && input.Config.InterfaceType != string(model.ChannelInterfaceGeminiVeo) && input.Config.InterfaceType != string(model.ChannelInterfaceGeminiImage) {
-		_, hasDeclarativeAgent := agentProtocolAdapterForContext(ctx, input.Config.InterfaceType)
-		if input.AgentRequests == nil || !hasDeclarativeAgent {
-			return nil, errors.New("后端任务队列暂不支持该 Gemini 调用格式，请选择已安装的 Gemini 协议插件")
+		_, hasCreate := declarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType)
+		_, hasAgent := agentProtocolAdapterForContext(ctx, input.Config.InterfaceType)
+		if !hasCreate || (input.AgentRequests != nil && !hasAgent) {
+			return nil, errors.New("当前 Gemini 请求路径缺少有效协议插件")
 		}
 	}
 	if strings.TrimSpace(input.Config.BaseURL) == "" || strings.TrimSpace(input.Config.APIKey) == "" || strings.TrimSpace(input.Config.Model) == "" {
@@ -1326,7 +1327,7 @@ func (s *Service) validateResolvedVideoCapability(input *canvasGenerationInput) 
 		applyFixedVideoResolution(input, normalized.Video)
 		return validateVideoTask(normalized.Video, *input)
 	}
-	item, err := s.repo.ChannelModelByKey(channelID, providerChannelModelKey(input.Config))
+	item, err := s.SystemChannelModel(channelID, providerChannelModelKey(input.Config))
 	if err != nil {
 		return errors.New("当前系统渠道模型未配置或已停用")
 	}
@@ -1354,7 +1355,7 @@ func (s *Service) validateResolvedImageCapability(input *canvasGenerationInput) 
 		}
 		return validateImageTask(input.ImageCapability, *input)
 	}
-	item, err := s.repo.ChannelModelByKey(channelID, providerChannelModelKey(input.Config))
+	item, err := s.SystemChannelModel(channelID, providerChannelModelKey(input.Config))
 	if err != nil {
 		return errors.New("当前系统渠道模型未配置或已停用")
 	}
@@ -1528,7 +1529,7 @@ func (s *Service) resolveProviderConfig(config providerConfig) (providerConfig, 
 	}
 	config.ChannelID = channel.ID
 	config.APIFormat = channel.APIFormat
-	channelModel, modelErr := s.repo.ChannelModelByKey(channel.ID, modelKey)
+	channelModel, modelErr := s.SystemChannelModel(channel.ID, modelKey)
 	if modelErr != nil {
 		// ModelsJSON 只是旧渠道表上的目录缓存。SKU 合并后它不能代表可执行模型，
 		// 唯一授权来源必须是已启用的 channel_models 记录。

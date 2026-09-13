@@ -12,7 +12,7 @@ import type { ModelChannel } from "@/stores/use-config-store";
 import { ChannelModelEditor } from "./channel-model-editor";
 import { AdminPageFrame } from "./admin-shell";
 import { AdminBatchBar, AdminDataTable, AdminFilterChip, AdminStatusBadge } from "./admin-ui";
-import { channelModelFetchSummary, channelModelSupportMeta, isChannelModelReadOnly } from "./channel-model-support";
+import { channelModelFetchSummary, channelModelSupportMeta, channelModelExecutionMeta, channelModelExecutionStatus, isChannelModelReadOnly } from "./channel-model-support";
 
 export function ChannelModelManager({ channel, onClose, onChanged }: { channel: ModelChannel; onClose: () => void; onChanged: () => void | Promise<void> }) {
     const { message, modal } = App.useApp();
@@ -187,12 +187,12 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
         },
         { title: "能力", dataIndex: "capability", width: 90, render: capabilityLabel },
         {
-            title: "支持状态",
+            title: "执行支持",
             dataIndex: "supportStatus",
             width: 110,
             render: (value: ChannelModelSupportStatus, item) => {
-                const meta = channelModelSupportMeta(value);
-                return <AdminStatusBadge label={meta.label} tone={meta.tone} title={item.supportReason} />;
+                const meta = channelModelExecutionMeta(item);
+                return <AdminStatusBadge label={meta.label} tone={meta.tone} title={item.eligibility?.executionSupported ? "协议与本地配置已校验；账号和真实调用仍需单独验证" : item.eligibility?.reason || item.supportReason} />;
             },
         },
         {
@@ -236,7 +236,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
         if (capability !== "all" && item.capability !== capability) return false;
         if (status === "enabled" && !item.enabled) return false;
         if (status === "disabled" && item.enabled) return false;
-        if (supportStatus !== "all" && item.supportStatus !== supportStatus) return false;
+        if (supportStatus !== "all" && channelModelExecutionStatus(item) !== supportStatus) return false;
         return true;
     });
     const pagedItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
@@ -369,7 +369,8 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                             options={[
                                 { label: "全部支持状态", value: "all" },
                                 { label: "可用", value: "ready" },
-                                { label: "计划支持", value: "planned" },
+                                { label: "待配置", value: "unknown" },
+                                { label: "执行受限", value: "planned" },
                                 { label: "暂不支持", value: "unsupported" },
                                 { label: "已废弃", value: "deprecated" },
                             ]}

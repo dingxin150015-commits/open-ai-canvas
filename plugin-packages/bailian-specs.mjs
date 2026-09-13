@@ -93,6 +93,7 @@ const referenceIntegrity = rule(
   ),
   "参考素材缺少有效地址，不能静默忽略",
 );
+const qwenImageModels = ["qwen-image-3.0-pro"];
 export const qwenPixelPolicy = {
   presets: {
     "1:1": "1024x1024",
@@ -145,7 +146,7 @@ const imageSpec = {
   validations: [
     referenceIntegrity,
     rule(
-      inside(v("model"), ["qwen-image-3.0-pro"]),
+      inside(v("model"), qwenImageModels),
       "该图片插件仅支持已验证的 Qwen Image 3.0 Pro",
     ),
     rule(gt(len(v("prompt")), 0), "必须提供提示词"),
@@ -761,4 +762,6 @@ imageSpec.response.images = cat(imageSpec.response.images, map(ref("response.out
 imageSpec.response.errorPaths.push("error.code", "error.type");
 imageSpec.response.messagePaths.push("error.message");
 imageSpec.notes += " 支持 request_mode=sync/async/openai，默认 sync。异步使用专属 image-generation 端点与 10 秒轮询；兼容接口使用字母 x 和 image 数组。";
+imageSpec.modelContract = { mode: "exact", models: qwenImageModels };
+videoSpec.modelContract = { mode: "exact", models: [...t2v, ...i2v, ...r2v, ...horse, "wan3.0-video"] };
 export default [imageSpec, videoSpec];

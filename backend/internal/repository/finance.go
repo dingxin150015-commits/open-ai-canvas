@@ -72,7 +72,7 @@ func (r *Repository) ChannelModels(channelID string, includeDisabled bool) ([]mo
 	var items []model.ChannelModel
 	query := r.db.Where("channel_id = ?", channelID).Order("created_at asc")
 	if !includeDisabled {
-		query = query.Where("enabled = ? AND support_status = ?", true, model.ChannelModelSupportReady)
+		query = query.Where("enabled = ?", true)
 	}
 	if err := query.Find(&items).Error; err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (r *Repository) ChannelModelByID(channelID string, id string) (*model.Chann
 
 func (r *Repository) ChannelModelByKey(channelID string, modelKey string) (*model.ChannelModel, error) {
 	var item model.ChannelModel
-	if err := r.db.First(&item, "channel_id = ? AND model_key = ? AND enabled = ? AND support_status = ?", channelID, modelKey, true, model.ChannelModelSupportReady).Error; err != nil {
+	if err := r.db.First(&item, "channel_id = ? AND model_key = ? AND enabled = ?", channelID, modelKey, true).Error; err != nil {
 		return nil, err
 	}
 	if err := r.attachChannelModelPriceTiers([]*model.ChannelModel{&item}); err != nil {

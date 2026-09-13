@@ -244,7 +244,7 @@ func loadDeclarativeManifestProvider(manifest Manifest, index int) (Adapter, err
 var manifestVariableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,95}$`)
 
 func ValidateManifest(manifest Manifest) error {
-	if version := strings.TrimSpace(manifest.APIVersion); version != "yingce.plugin/v1" && version != "yingce.plugin/v2" && version != "yingce.plugin/v3" {
+	if version := strings.TrimSpace(manifest.APIVersion); version != "yingce.plugin/v1" && version != "yingce.plugin/v2" && version != "yingce.plugin/v3" && version != "yingce.plugin/v4" {
 		return fmt.Errorf("unsupported protocol manifest apiVersion %q", manifest.APIVersion)
 	}
 	if strings.TrimSpace(manifest.Metadata.ID) == "" || strings.TrimSpace(manifest.Metadata.Version) == "" {
@@ -270,6 +270,9 @@ func ValidateManifest(manifest Manifest) error {
 	}
 	providerIDs := make(map[string]struct{}, len(manifest.Contributes.Providers))
 	for index, provider := range manifest.Contributes.Providers {
+		if err := validateProviderModelMetadata(provider, manifest.APIVersion); err != nil {
+			return err
+		}
 		if provider.PollIntervalMS < 0 || provider.PollIntervalMS > 60000 {
 			return fmt.Errorf("invalid provider poll interval")
 		}
@@ -411,6 +414,8 @@ func normalizeManifestForProvider(manifest *Manifest, index int) error {
 	manifest.Validations = provider.Validations
 	manifest.Variables = provider.Variables
 	manifest.Metadata.PollIntervalMS = provider.PollIntervalMS
+	manifest.Metadata.ModelContract = provider.ModelContract
+	manifest.Metadata.ModelCatalog = provider.ModelCatalog
 	return nil
 }
 
@@ -472,6 +477,9 @@ func (a manifestAdapter) AgentAvailable() bool {
 }
 func (a manifestAdapter) ResultAvailable() bool { return a.manifest.ResultOperation != nil }
 func (a manifestAdapter) BuildCreate(_ context.Context, c RequestContext) (RequestSpec, error) {
+	if err := a.Metadata().ModelContract.Check(c.Request.Model); err != nil {
+		return RequestSpec{}, err
+	}
 	if len(a.manifest.Contributes.Providers) == 0 {
 		return RequestSpec{}, fmt.Errorf("plugin %s does not provide a provider", a.manifest.Metadata.ID)
 	}
@@ -481,6 +489,9 @@ func (a manifestAdapter) BuildCreate(_ context.Context, c RequestContext) (Reque
 	return buildManifestOperation(a.manifest.Create, a.manifest.Auth, c.Request, "", a.manifest.Variables)
 }
 func (a manifestAdapter) BuildAgent(_ context.Context, c AgentRequestContext) (RequestSpec, error) {
+	if err := a.Metadata().ModelContract.Check(c.Model); err != nil {
+		return RequestSpec{}, err
+	}
 	if a.manifest.Agent == nil {
 		return RequestSpec{}, fmt.Errorf("protocol %s has no agent operation", a.manifest.Metadata.ID)
 	}

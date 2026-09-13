@@ -124,13 +124,6 @@ func populateChannelModelCatalogMetadata(item *model.ChannelModel) {
 	item.DocumentationPaths = unmarshalCatalogStrings(item.DocumentationPathsJSON)
 }
 
-func requireReadyChannelModel(item *model.ChannelModel) error {
-	if item == nil || item.SupportStatus == model.ChannelModelSupportReady {
-		return nil
-	}
-	return BadAuthRequest("该模型当前为" + channelModelSupportStatusLabel(item.SupportStatus) + "状态，仅可查看；完成执行器适配和测试后才能定价、启用或测试")
-}
-
 func channelModelSupportStatusLabel(status model.ChannelModelSupportStatus) string {
 	switch status {
 	case model.ChannelModelSupportUnsupported:

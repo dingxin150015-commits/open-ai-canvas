@@ -456,7 +456,7 @@ func (s *Service) taskBillingOrder(userID string, task *model.Task, input map[st
 		capability = capabilityFromTaskType(task.Type)
 	}
 	scene := firstNonEmpty(strings.TrimSpace(task.Operation), task.Type)
-	channelModel, err := s.repo.ChannelModelByKey(channelID, modelKey)
+	channelModel, err := s.SystemChannelModel(channelID, modelKey)
 	if err != nil {
 		return nil, BadAuthRequest("当前模型暂时不可用，请重新选择")
 	}
@@ -579,7 +579,7 @@ func (s *Service) newBillingOrder(userID string, taskID string, idempotencyKey s
 }
 
 func (s *Service) newBillingOrderWithPriceTier(userID string, taskID string, idempotencyKey string, channelID string, modelKey string, capability string, scene string, requestedQuantity int64, tokenEstimate tokenBillingEstimate, priceTierID string, intents ...ModelRequestIntent) (*model.BillingOrder, error) {
-	item, err := s.repo.ChannelModelByKey(channelID, modelKey)
+	item, err := s.SystemChannelModel(channelID, modelKey)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, BadAuthRequest("当前模型暂时不可用，请重新选择")
 	}

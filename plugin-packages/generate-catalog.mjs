@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import bailianSpecs from "./bailian-specs.mjs";
@@ -2602,6 +2602,22 @@ for (const [id, name, capability, createPath, pollPath, resultPath] of [
 
 for (const spec of bailianSpecs) add(spec);
 
+const bailianCatalog = JSON.parse(await readFile(join(root, "../backend/internal/provider/bailian/catalog.generated.json"), "utf8"));
+for (const spec of bailianSpecs) {
+  spec.modelCatalog = {
+    hosts: ["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com", "dashscope-us.aliyuncs.com", "maas.aliyuncs.com"],
+    entries: bailianCatalog.models.filter((entry) => entry.protocol === spec.providerId).map(({ id, displayName, supportReason, supportedOperations, documentationPaths, catalogSource, catalogVersion, apiPath }) => ({
+      id, displayName, supportStatus: spec.modelContract.models.includes(id) ? "ready" : "planned", supportReason, supportedOperations, documentationPaths, catalogSource, catalogVersion, apiPath,
+    })),
+  };
+}
+for (const spec of specs) {
+  if (["gemini-generate-content", "gemini-image", "gemini-veo", "chat-completion", "openai-response", "openai-image"].includes(spec.providerId)) {
+    spec.modelContract = { mode: "compatible" };
+  }
+  if (spec.modelContract) { spec.apiVersion = "yingce.plugin/v4"; spec.version = "4.0.0"; }
+}
+
 function manifestFor(spec) {
   return {
     apiVersion: spec.apiVersion || "yingce.plugin/v2",
@@ -2624,6 +2640,8 @@ function manifestFor(spec) {
           requiresPublicMediaUrls: spec.requiresPublicMediaUrls === true,
           auth: spec.auth,
           parameters: parameters(spec.params),
+          ...(spec.modelContract ? { modelContract: spec.modelContract } : {}),
+          ...(spec.modelCatalog ? { modelCatalog: spec.modelCatalog } : {}),
           ...(spec.variables ? { variables: spec.variables } : {}),
           ...(spec.pollIntervalMs
             ? { pollIntervalMs: spec.pollIntervalMs }

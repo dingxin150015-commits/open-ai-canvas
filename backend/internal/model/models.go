@@ -65,6 +65,7 @@ const (
 	ChannelScopeUser   ChannelScope = "user"
 
 	ChannelModelSupportReady       ChannelModelSupportStatus = "ready"
+	ChannelModelSupportUnknown     ChannelModelSupportStatus = "unknown"
 	ChannelModelSupportPlanned     ChannelModelSupportStatus = "planned"
 	ChannelModelSupportUnsupported ChannelModelSupportStatus = "unsupported"
 	ChannelModelSupportDeprecated  ChannelModelSupportStatus = "deprecated"
