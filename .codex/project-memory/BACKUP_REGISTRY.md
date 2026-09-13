@@ -1,5 +1,13 @@
 # 影策备份登记簿
 
+## 2026-09-13 统一模型目录与Gemini文本插件收尾
+
+- 恢复点catalog-predeploy-20260913-143843 / catalog-postdeploy-20260913-144131，以及catalog-predeploy-20260913-145155 / catalog-postdeploy-20260913-145410，文件比对、私有ACL、DB完整性/外键/解密检查均通过；旧恢复点保留。
+- Schema9/9不变，80表；模型、价格、逻辑模型/线路、任务、订单、账户、流水和资源身份摘要一致。密钥与存储标记哈希相同。
+- 私有位置与镜像身份见有效修复树`.local/catalog-repair-deployment.json`及`.local/catalog-guard-deployment.json`；最终Backend镜像d67ee794、Web9bfc9c67。旧镜像有pre-catalog-repair/pre-catalog-guard标签保留。
+- 两个新专用克隆均停止、network=none，测试卷及私有克隆快照保留。未删除生产卷，未做生产回退演练。
+- 回退须配套主程序、协议包、plugin_registry及安装状态；v3宿主不可直接沿用v4包。交付后新增业务数据须先评估，不盲目恢复整个旧快照。
+
 ## 2026-09-12 画布单请求多图：仅前端恢复点
 
 - 原 Web 镜像 sha256:f53d523c579c6d9831262a5808375e3e65b2bfe53db68ab916c0306b5c9a19b2 已保留标签 `open-ai-canvas-web:pre-canvas-native-batch-20260912`，可仅替换 Web 回退。

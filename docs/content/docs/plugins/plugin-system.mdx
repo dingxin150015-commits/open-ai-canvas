@@ -9,6 +9,8 @@ description: 影策统一插件系统的扩展边界、Manifest 合同与 Eagle 
 
 统一目录修复在既有 `contributes.providers` 中增加可选 `modelContract` 和 `modelCatalog`，不引入第二套插件运行时。前者声明精确模型集合或兼容协议，配置检查和实际序列化共用；后者提供受控主机的补充目录信息。声明新字段须使用 `yingce.plugin/v4`；本轮两个百炼、三个 Gemini、OpenAI Chat Completions/Responses 包升级到 4.0.0，其他包不改。
 
+收尾将Gemini文本包独立升级为4.0.1：普通非Agent文本请求带媒体时在序列化前拒绝，避免模板静默丢失附件；多模态Agent使用独立请求合同。该插件升级不改变主程序二进制和前端。
+
 模型目录事实、管理员配置、当前执行能力和账号实测分开。插件停用/卸载使执行资格和路由缓存失效，但保留已有模型配置；重新启用不会自动改价或启用模型。详见 [系统模型目录与配置资格](/docs/backend/model-catalog)。
 
 ## 百炼声明式协议与通用引擎扩展

@@ -1,5 +1,9 @@
 # 影策项目级记忆入口
 
+最新交付：`MODEL_CATALOG_UNIFIED_REPAIR_20260913.md`。统一模型配置资格与Gemini分页已实现、全量验证并部署；主程序catalog1/ad3efa10，Gemini文本插件4.0.1（cc7d0b63），本轮其余六包4.0.0，Schema9/9。业务数据和Qwen既有配置保持，停在用户Edge人工门禁，未真实生成。此前Gemini未修复及旧运行版本描述均为历史检查点。
+
+最新人工反馈（2026-09-13）：用户确认画布 Qwen 单请求多图清单中的 Edge 配置检查暂无问题，并自行配置启用 qwen-image-3.0-pro。状态 `edge_config_user_confirmed_generation_pending`；真实生成、扣费及其他六模型验收没有放行。详见 CANVAS_NATIVE_BATCH_20260912.md 最新反馈。以下 Edge 待确认描述为历史检查点。
+
 最新增量：`CANVAS_NATIVE_BATCH_20260912.md`。画布原生单请求多图已补齐并部署；Web bailian3 / cd0b4340，Backend 仍为 bailian2 / 5889345a。84 专项、1645 全量、类型/构建和源码哈希检查通过。前端单独更新，不修改后端/数据库，继续停在用户 Edge 门禁前。
 
 当前最新迭代：`BAILIAN_FULL_CAPABILITIES_20260912.md`。七模型能力补齐已部署为 5889345a / v1.2.7+dingxin.1.bailian2，Schema 9/9，插件 3.1.0；完整非浏览器预验证通过，等待用户 Edge 人工确认。保留既有零售价、启用状态和订单，新增可选实际时长策略。

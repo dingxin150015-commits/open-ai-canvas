@@ -17,6 +17,8 @@ description: 模型发现、管理员配置、协议支持和实际调用的独�
 
 Gemini 原生文本、图片和 Veo 是不同协议；不能把 TTS、Embedding 等目录项一律当文本。缺少相应执行插件的模型保留草稿，不能强制启用。自定义代理应选择代理实际支持的协议，不按渠道显示名称或模型名称猜测厂商。
 
+Gemini普通非Agent文本路径只接受纯文本；带媒体附件时明确拒绝，不静默丢弃。多模态请求使用已有Agent合同，配置通过不等于该账号的多模态调用已验收。
+
 ## 后端资格投影
 
 管理员模型 API 返回只读 `eligibility`，包含 `canEditConfiguration`、`configurationValid`、`executionSupported`、`canEnable`、`canExecute`、原因码、可读原因及协议版本。该对象不进入数据库，是根据现有配置和当前插件注册表派生的模型级结果；实际调用还检查渠道、用户权限、配额和请求参数。
