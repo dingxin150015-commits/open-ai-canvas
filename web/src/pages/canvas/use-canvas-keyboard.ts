@@ -3,6 +3,7 @@ import { useEffect, type Dispatch, type SetStateAction } from "react";
 import type { CanvasNodeData, ContextMenuState } from "@/types/canvas";
 
 type UseCanvasKeyboardOptions = {
+    enabled?: boolean;
     nodesRef: { current: CanvasNodeData[] };
     selectedNodeIdsRef: { current: Set<string> };
     selectedConnectionId: string | null;
@@ -49,6 +50,7 @@ export function hasCanvasTextSelection(selection: TextSelectionLike | null | und
 }
 
 export function useCanvasKeyboard({
+    enabled = true,
     nodesRef,
     selectedNodeIdsRef,
     selectedConnectionId,
@@ -84,6 +86,7 @@ export function useCanvasKeyboard({
     beginBatchConnection,
 }: UseCanvasKeyboardOptions) {
     useEffect(() => {
+        if (!enabled) return;
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target instanceof Element ? event.target : null;
             if (target?.closest(".canvas-node-toolbar, .canvas-node-toolbar-menu")) return;
@@ -223,6 +226,7 @@ export function useCanvasKeyboard({
             window.removeEventListener("paste", handlePaste, true);
         };
     }, [
+        enabled,
         beginBatchConnection,
         cancelSelectionBox,
         copySelectedNodes,

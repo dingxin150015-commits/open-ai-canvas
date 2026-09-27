@@ -27,79 +27,79 @@
 
 每个条目区分四层：
 
-| 层         | 含义                   | 示例                                                           |
-| ---------- | ---------------------- | -------------------------------------------------------------- |
-| 模型族     | 生成能力和模型约束     | GPT、Claude、Gemini、Seedance、Wan、Hailuo H3                  |
+| 层 | 含义 | 示例 |
+| --- | --- | --- |
+| 模型族 | 生成能力和模型约束 | GPT、Claude、Gemini、Seedance、Wan、Hailuo H3 |
 | 原生线协议 | 厂商官方 HTTP/事件协议 | Anthropic Messages、Gemini generateContent、Ark contents tasks |
-| 网关协议   | 聚合平台暴露的兼容入口 | NewAPI、OpenRouter、LiteLLM、SiliconFlow                       |
-| 工作流协议 | 提交图或工作流并轮询   | ComfyUI prompt/history/view、RunningHub workflow               |
+| 网关协议 | 聚合平台暴露的兼容入口 | NewAPI、OpenRouter、LiteLLM、SiliconFlow |
+| 工作流协议 | 提交图或工作流并轮询 | ComfyUI prompt/history/view、RunningHub workflow |
 
 ## 3. 所有协议都要调查的共同维度
 
 后续统一底座至少要保存以下事实，不能只保存 `model + prompt + images`：
 
-| 维度       | 必须表达的内容                                                                             |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| endpoint   | Base URL、版本前缀、模型是否在 path、创建/查询/取消/下载路径                               |
-| 鉴权       | Bearer、`x-api-key`、`anthropic-version`、`x-goog-api-key`、AK/SK 签名、云 IAM             |
-| 编码       | JSON、multipart/form-data、二进制上传、文件 ID、URL、data URL、base64                      |
-| 操作       | text/chat/response、image generation/edit、text/image/reference/frame/video/audio-to-video |
-| 内容结构   | messages、input items、contents/parts、content blocks、instances、workflow graph           |
-| 素材语义   | first frame、last frame、subject/style/reference、mask、control、motion、audio、voice      |
-| 输出控制   | 尺寸、比例、分辨率档、时长、帧率、数量、质量、seed、水印、音频                             |
-| 生命周期   | 同步、SSE、异步任务、长操作、回调、轮询间隔、超时、取消                                    |
-| 状态       | queued/running/succeeded/failed/cancelled/expired 及厂商别名                               |
-| 结果       | 文本块、工具调用、URL、base64、file ID、临时签名 URL、二进制下载                           |
-| 错误       | HTTP 状态、业务 code、error object、风控、内容审核、配额、可重试性                         |
-| 计费       | token、图片张数、视频秒数、分辨率、是否带音频、工作流机器时长                              |
-| 幂等与追踪 | idempotency key、request ID、task ID、operation name、trace ID                             |
-| 能力约束   | 模型级输入组合、数量、格式、大小、时长、地域和版本限制                                     |
+| 维度 | 必须表达的内容 |
+| --- | --- |
+| endpoint | Base URL、版本前缀、模型是否在 path、创建/查询/取消/下载路径 |
+| 鉴权 | Bearer、`x-api-key`、`anthropic-version`、`x-goog-api-key`、AK/SK 签名、云 IAM |
+| 编码 | JSON、multipart/form-data、二进制上传、文件 ID、URL、data URL、base64 |
+| 操作 | text/chat/response、image generation/edit、text/image/reference/frame/video/audio-to-video |
+| 内容结构 | messages、input items、contents/parts、content blocks、instances、workflow graph |
+| 素材语义 | first frame、last frame、subject/style/reference、mask、control、motion、audio、voice |
+| 输出控制 | 尺寸、比例、分辨率档、时长、帧率、数量、质量、seed、水印、音频 |
+| 生命周期 | 同步、SSE、异步任务、长操作、回调、轮询间隔、超时、取消 |
+| 状态 | queued/running/succeeded/failed/cancelled/expired 及厂商别名 |
+| 结果 | 文本块、工具调用、URL、base64、file ID、临时签名 URL、二进制下载 |
+| 错误 | HTTP 状态、业务 code、error object、风控、内容审核、配额、可重试性 |
+| 计费 | token、图片张数、视频秒数、分辨率、是否带音频、工作流机器时长 |
+| 幂等与追踪 | idempotency key、request ID、task ID、operation name、trace ID |
+| 能力约束 | 模型级输入组合、数量、格式、大小、时长、地域和版本限制 |
 
 ## 4. LLM 主流协议
 
 ### 4.1 原生协议族
 
-| 协议族                        | 典型入口                                                            | 核心请求结构                                                                | 流式/工具                                              | 关键差异与插件注意事项                                                                                   |
-| ----------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| OpenAI Chat Completions       | `POST /v1/chat/completions`                                         | `model`, `messages[]`, `tools`, `tool_choice`, `response_format`            | SSE，`choices[].delta`；工具参数按增量拼接             | 多模态位于 message content parts；旧 `max_tokens` 与新字段并存；兼容网关经常只实现子集                   |
-| OpenAI Responses              | `POST /v1/responses`                                                | `input` 字符串或 items、`instructions`、`tools`、`text`                     | 事件类型化 SSE；输出为 `output[]` items                | 与 Chat Completions 不是字段替换关系；包含 reasoning、computer/tool、file、previous response 等状态语义  |
-| Anthropic Messages            | `POST /v1/messages`                                                 | `system` 独立、`messages[]`、content blocks、`max_tokens`                   | SSE 事件；`tool_use` / `tool_result` block             | `anthropic-version` 必需；assistant/user 角色与工具回填方式不同；图片常用 base64/url source              |
-| Google Gemini generateContent | `.../models/{model}:generateContent`                                | `contents[].parts[]`, `systemInstruction`, `generationConfig`, `tools`      | `streamGenerateContent`；functionCall/functionResponse | role 使用 `user/model`；文件用 `inlineData/fileData`；思考签名和函数回填不能按 OpenAI tool call 直接搬运 |
-| Cohere Chat v2                | `POST /v2/chat`                                                     | `messages`, `tools`, `response_format`, documents                           | SSE 事件                                               | citation/documents、tool plan 和 OpenAI 结构不同；v1/v2 不能混用                                         |
-| AWS Bedrock Converse          | `Converse` / `ConverseStream`                                       | `modelId` 在请求目标，`messages`, `system`, `inferenceConfig`, `toolConfig` | AWS event stream                                       | IAM/SigV4；统一包裹多个模型，但 provider-specific 字段进入 `additionalModelRequestFields`                |
-| AWS Bedrock InvokeModel       | `InvokeModel` / `InvokeModelWithResponseStream`                     | body 完全由目标模型决定                                                     | 可流式                                                 | 只是传输容器，不是统一内容协议；Anthropic、Titan、Llama 等 payload 各异                                  |
-| Vertex AI Gemini              | publisher model generateContent                                     | 与 Gemini 接近，资源名和鉴权是 GCP 风格                                     | 流式、长操作视能力                                     | OAuth/IAM、project/location、文件 URI 与 AI Studio 不同                                                  |
-| Azure OpenAI                  | `/openai/deployments/{deployment}/...?...api-version=` 或新统一入口 | 大体遵循 OpenAI，但 model/deployment 和 api-version 规则不同                | SSE                                                    | endpoint、deployment、API version、Entra ID；不能假设 OpenAI Base URL 拼接规则                           |
-| 阿里云 DashScope/Qwen 原生    | `/api/v1/services/aigc/...`、Generation/MultimodalConversation      | `input` + `parameters`                                                      | SSE/异步视 API                                         | 同一平台同时提供原生协议和 OpenAI-compatible；图片/视频任务使用 `X-DashScope-Async`、task-id             |
-| 火山方舟 Ark 原生             | `/api/v3/...`                                                       | Chat/Responses/图片/contents task 分属不同结构                              | SSE、异步任务                                          | endpoint/model ID、region、签名/Token；Seedance 全模态 content 有 role 语义                              |
-| 百度智能云千帆                | model/endpoint 路径或兼容入口                                       | messages 或模型专用 input                                                   | SSE                                                    | access token/IAM、服务实例 endpoint；不同代际接口并存                                                    |
-| 腾讯混元                      | 腾讯云 API action/version 或兼容入口                                | 云 API 公共参数 + messages/input                                            | 流式/异步                                              | TC3-HMAC-SHA256 签名；Action/Version/Region 不是普通 REST Base URL                                       |
-| MiniMax 文本原生              | `/v1/text/chatcompletion_v2` 等版本化接口                           | messages、tokens_to_generate、工具/函数字段随代际变化                       | SSE                                                    | 海内外域名、旧 GroupId 参数与新版 Bearer 方式并存；另有 Anthropic/OpenAI 兼容入口时不能混认              |
-| Ollama                        | `POST /api/chat`, `/api/generate`                                   | `messages` 或 `prompt`, `options`, `format`, `keep_alive`                   | 默认 NDJSON                                            | 不是 SSE；本机模型、图片字段、结构化输出和工具支持依版本变化                                             |
+| 协议族 | 典型入口 | 核心请求结构 | 流式/工具 | 关键差异与插件注意事项 |
+| --- | --- | --- | --- | --- |
+| OpenAI Chat Completions | `POST /v1/chat/completions` | `model`, `messages[]`, `tools`, `tool_choice`, `response_format` | SSE，`choices[].delta`；工具参数按增量拼接 | 多模态位于 message content parts；旧 `max_tokens` 与新字段并存；兼容网关经常只实现子集 |
+| OpenAI Responses | `POST /v1/responses` | `input` 字符串或 items、`instructions`、`tools`、`text` | 事件类型化 SSE；输出为 `output[]` items | 与 Chat Completions 不是字段替换关系；包含 reasoning、computer/tool、file、previous response 等状态语义 |
+| Anthropic Messages | `POST /v1/messages` | `system` 独立、`messages[]`、content blocks、`max_tokens` | SSE 事件；`tool_use` / `tool_result` block | `anthropic-version` 必需；assistant/user 角色与工具回填方式不同；图片常用 base64/url source |
+| Google Gemini generateContent | `.../models/{model}:generateContent` | `contents[].parts[]`, `systemInstruction`, `generationConfig`, `tools` | `streamGenerateContent`；functionCall/functionResponse | role 使用 `user/model`；文件用 `inlineData/fileData`；思考签名和函数回填不能按 OpenAI tool call 直接搬运 |
+| Cohere Chat v2 | `POST /v2/chat` | `messages`, `tools`, `response_format`, documents | SSE 事件 | citation/documents、tool plan 和 OpenAI 结构不同；v1/v2 不能混用 |
+| AWS Bedrock Converse | `Converse` / `ConverseStream` | `modelId` 在请求目标，`messages`, `system`, `inferenceConfig`, `toolConfig` | AWS event stream | IAM/SigV4；统一包裹多个模型，但 provider-specific 字段进入 `additionalModelRequestFields` |
+| AWS Bedrock InvokeModel | `InvokeModel` / `InvokeModelWithResponseStream` | body 完全由目标模型决定 | 可流式 | 只是传输容器，不是统一内容协议；Anthropic、Titan、Llama 等 payload 各异 |
+| Vertex AI Gemini | publisher model generateContent | 与 Gemini 接近，资源名和鉴权是 GCP 风格 | 流式、长操作视能力 | OAuth/IAM、project/location、文件 URI 与 AI Studio 不同 |
+| Azure OpenAI | `/openai/deployments/{deployment}/...?...api-version=` 或新统一入口 | 大体遵循 OpenAI，但 model/deployment 和 api-version 规则不同 | SSE | endpoint、deployment、API version、Entra ID；不能假设 OpenAI Base URL 拼接规则 |
+| 阿里云 DashScope/Qwen 原生 | `/api/v1/services/aigc/...`、Generation/MultimodalConversation | `input` + `parameters` | SSE/异步视 API | 同一平台同时提供原生协议和 OpenAI-compatible；图片/视频任务使用 `X-DashScope-Async`、task-id |
+| 火山方舟 Ark 原生 | `/api/v3/...` | Chat/Responses/图片/contents task 分属不同结构 | SSE、异步任务 | endpoint/model ID、region、签名/Token；Seedance 全模态 content 有 role 语义 |
+| 百度智能云千帆 | model/endpoint 路径或兼容入口 | messages 或模型专用 input | SSE | access token/IAM、服务实例 endpoint；不同代际接口并存 |
+| 腾讯混元 | 腾讯云 API action/version 或兼容入口 | 云 API 公共参数 + messages/input | 流式/异步 | TC3-HMAC-SHA256 签名；Action/Version/Region 不是普通 REST Base URL |
+| MiniMax 文本原生 | `/v1/text/chatcompletion_v2` 等版本化接口 | messages、tokens_to_generate、工具/函数字段随代际变化 | SSE | 海内外域名、旧 GroupId 参数与新版 Bearer 方式并存；另有 Anthropic/OpenAI 兼容入口时不能混认 |
+| Ollama | `POST /api/chat`, `/api/generate` | `messages` 或 `prompt`, `options`, `format`, `keep_alive` | 默认 NDJSON | 不是 SSE；本机模型、图片字段、结构化输出和工具支持依版本变化 |
 
 ### 4.2 OpenAI-compatible 厂商与网关
 
 以下产品通常暴露 `/v1/chat/completions`，但兼容度需要按能力矩阵验证：
 
-| 厂商/网关     | 主要定位             | 常见扩展或差异                                                                              |
-| ------------- | -------------------- | ------------------------------------------------------------------------------------------- |
-| xAI Grok      | 原生模型 API         | 文本高度接近 OpenAI；实时搜索、图片/视频是独立能力和独立参数                                |
-| DeepSeek      | 模型 API             | Chat Completions 风格；reasoner 可能返回 `reasoning_content`，上下文续写规则需保留          |
-| Mistral       | 模型 API             | OpenAI 风格但工具、JSON、Fim、OCR/Agents 有独立入口                                         |
-| 月之暗面 Kimi | 模型 API             | OpenAI-compatible；长上下文、联网/文件能力随产品入口不同                                    |
-| 智谱 GLM      | 模型 API             | Chat Completions 风格；`web_search`、thinking、视频/图片有独立异步协议                      |
-| 百川          | 模型 API             | OpenAI 风格子集，模型参数和工具能力需逐模型验证                                             |
-| 零一万物 Yi   | 模型 API             | OpenAI 风格子集；以实际开放平台版本为准                                                     |
-| SiliconFlow   | 聚合/推理平台        | Chat、Images、Audio、Rerank 并列；模型来自多个厂商，非文本协议不等于 OpenAI 官方            |
-| Together AI   | 聚合/推理平台        | Chat/Completions/Images/Embeddings；响应和模型扩展字段不同                                  |
-| Groq          | 高速推理平台         | Chat Completions 为主；部分 OpenAI 参数不支持或受模型限制                                   |
-| Fireworks AI  | 推理平台             | Chat/Completions/OpenAI-compatible；支持 provider 扩展和部署名                              |
-| NVIDIA NIM    | 模型微服务           | 多数文本 NIM 暴露 OpenAI 风格；视觉、检索、生成模型可能是专用 API                           |
-| OpenRouter    | 多厂商路由网关       | `provider`, `transforms`, route、fallback；响应会带 provider/usage 扩展，模型 ID 含厂商前缀 |
-| LiteLLM Proxy | 协议翻译网关         | OpenAI 入口转多厂商；支持预算、路由、fallback，但不保证目标厂商全部原生特性可透传           |
-| NewAPI/OneAPI | 聚合、计费和协议转换 | 同时可能提供 OpenAI、Claude、Gemini、图片和多种视频入口；版本/渠道配置会改变最终 payload    |
-| vLLM          | 自托管推理服务       | OpenAI-compatible server；支持参数取决于模型模板和启动参数                                  |
-| LocalAI       | 自托管兼容服务       | 文本、图片、音频等多能力共域名，但后端实现和字段支持由模型配置决定                          |
+| 厂商/网关 | 主要定位 | 常见扩展或差异 |
+| --- | --- | --- |
+| xAI Grok | 原生模型 API | 文本高度接近 OpenAI；实时搜索、图片/视频是独立能力和独立参数 |
+| DeepSeek | 模型 API | Chat Completions 风格；reasoner 可能返回 `reasoning_content`，上下文续写规则需保留 |
+| Mistral | 模型 API | OpenAI 风格但工具、JSON、Fim、OCR/Agents 有独立入口 |
+| 月之暗面 Kimi | 模型 API | OpenAI-compatible；长上下文、联网/文件能力随产品入口不同 |
+| 智谱 GLM | 模型 API | Chat Completions 风格；`web_search`、thinking、视频/图片有独立异步协议 |
+| 百川 | 模型 API | OpenAI 风格子集，模型参数和工具能力需逐模型验证 |
+| 零一万物 Yi | 模型 API | OpenAI 风格子集；以实际开放平台版本为准 |
+| SiliconFlow | 聚合/推理平台 | Chat、Images、Audio、Rerank 并列；模型来自多个厂商，非文本协议不等于 OpenAI 官方 |
+| Together AI | 聚合/推理平台 | Chat/Completions/Images/Embeddings；响应和模型扩展字段不同 |
+| Groq | 高速推理平台 | Chat Completions 为主；部分 OpenAI 参数不支持或受模型限制 |
+| Fireworks AI | 推理平台 | Chat/Completions/OpenAI-compatible；支持 provider 扩展和部署名 |
+| NVIDIA NIM | 模型微服务 | 多数文本 NIM 暴露 OpenAI 风格；视觉、检索、生成模型可能是专用 API |
+| OpenRouter | 多厂商路由网关 | `provider`, `transforms`, route、fallback；响应会带 provider/usage 扩展，模型 ID 含厂商前缀 |
+| LiteLLM Proxy | 协议翻译网关 | OpenAI 入口转多厂商；支持预算、路由、fallback，但不保证目标厂商全部原生特性可透传 |
+| NewAPI/OneAPI | 聚合、计费和协议转换 | 同时可能提供 OpenAI、Claude、Gemini、图片和多种视频入口；版本/渠道配置会改变最终 payload |
+| vLLM | 自托管推理服务 | OpenAI-compatible server；支持参数取决于模型模板和启动参数 |
+| LocalAI | 自托管兼容服务 | 文本、图片、音频等多能力共域名，但后端实现和字段支持由模型配置决定 |
 
 ### 4.3 LLM 不能被抹平的差异
 
@@ -112,29 +112,29 @@
 
 ## 5. Image 主流协议
 
-| 厂商/协议                  | 创建入口与编码                                              | 参考图/编辑表达                                       | 返回与生命周期                   | 关键差异                                                                                  |
-| -------------------------- | ----------------------------------------------------------- | ----------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------- |
-| OpenAI Images              | `/v1/images/generations` JSON；`/v1/images/edits` multipart | edit 使用一个或多个 image 文件，可有 mask             | 通常同步，URL 或 `b64_json`      | generation 与 edit 是两个 transport；尺寸、quality、background、output format 随模型变化  |
-| xAI Grok Images            | `/v1/images/generations` JSON                               | 常见 `image` 作为编辑/参考输入                        | 同步 URL/base64 风格             | `aspect_ratio`、`resolution` 与 OpenAI `size/quality` 不同；不能只复用 OpenAI Images 字段 |
-| Gemini 原生图片生成        | `generateContent` JSON                                      | 图片作为 `inlineData/fileData` part，与 prompt 混排   | candidates.parts 内 inline image | 图片是多模态内容结果，不是 `data[]`；可能同时返回文本与图片                               |
-| Vertex Imagen              | `:predict` / 专用生成接口                                   | `instances` + `parameters`；编辑/扩图有专用字段       | 同步或长操作视能力               | GCP 资源路径、GCS URI、safety/person generation 配置                                      |
-| 火山方舟 Seedream/图片     | `/api/v3/images/generations` JSON                           | `image` 可为字符串或数组；连续图有专用配置            | 同步 URL/base64                  | `size` 可能接受比例、像素或档位；watermark 和 sequential generation 是扩展字段            |
-| 即梦官方图片               | `CVSync2AsyncSubmitTask` + `CVSync2AsyncGetResult`          | `image_urls`, `req_key`                               | 异步 task                        | AK/SK 签名、提交和查询均 POST；不能套普通 Bearer + GET poll                               |
-| 阿里云通义万相/Wanx        | DashScope 图像生成 task                                     | `input.prompt`、参考图 URL、`parameters`              | 常见异步 task-id                 | 需 `X-DashScope-Async: enable`；结果 URL 有有效期                                         |
-| MiniMax Image              | MiniMax 图片生成入口                                        | prompt、reference/image、subject reference 随模型版本 | 同步或异步视接口                 | 模型版本字段和参考图能力变化快，应按模型 profile 管理                                     |
-| Kling Image                | Kling 开放平台图片任务                                      | image/reference、strength、negative prompt 等         | 异步 task                        | access key 签名/JWT、task status、结果数组                                                |
-| 智谱 CogView               | `/images/generations` 风格入口                              | 部分版本支持 image input/quality/size                 | 同步或任务式视版本               | OpenAI-like 但模型字段和返回 URL 生命周期不同                                             |
-| 腾讯混元图片               | 腾讯云 Action API                                           | prompt、resolution、style、reference                  | 异步 task                        | 云签名、Action/Version；错误码和 task 查询是腾讯云格式                                    |
-| 百度千帆图片               | 千帆图片生成 API                                            | prompt、参考图/控制参数因模型而异                     | 同步或异步                       | access token/IAM，模型服务路径和审核错误需单独解析                                        |
-| Stability AI               | `/v2beta/stable-image/...` 多为 multipart                   | image、mask、control image、strength                  | 常见同步二进制或 JSON            | endpoint 按 generate/edit/control/upscale 划分；`Accept` 决定输出编码                     |
-| Black Forest Labs FLUX API | 创建 task JSON                                              | prompt、image、mask、width/height 或比例              | 异步 polling URL                 | create 返回 task/polling 信息；输出 URL 临时；模型参数差异大                              |
-| Ideogram                   | `/v1/ideogram-v3/generate` multipart 等                     | image、mask、style/reference                          | 同步/任务视版本                  | magic prompt、rendering speed、style type、color palette 是专用参数                       |
-| Recraft                    | `/v1/images/generations`、编辑/矢量专用入口                 | image、mask、style id、controls                       | 同步 URL                         | 支持 raster/vector；style/substyle 和尺寸枚举不可丢失                                     |
-| Adobe Firefly              | Firefly Services 版本化接口                                 | reference image、mask、structure/style reference      | 任务/同步视版本                  | Adobe IMS 鉴权、Content Credentials、存储/结果策略                                        |
-| Runway Image               | Runway API image endpoint                                   | reference images 常带 tag/URI                         | 异步 task                        | 与 Runway video 共用 task lifecycle，但请求 schema 按模型区分                             |
-| fal.ai Queue               | `queue.fal.run/{model}`                                     | schema 由模型定义，URL/base64/file upload             | queue submit/status/result       | fal 是运行时协议，不是模型协议；每个 endpoint 的 input schema 必须保留                    |
-| Replicate Predictions      | `/v1/predictions`                                           | `version/model` + 任意 `input`                        | 异步 prediction/webhook          | input/output 完全由模型 schema 定义；支持 cancel/webhook，不能硬编码图片字段              |
-| ComfyUI                    | `/prompt` 提交 workflow JSON                                | 图片先上传，再把文件名映射到节点 input                | `/history/{prompt_id}` + `/view` | 请求是节点图，不是固定模型字段；映射目标是 node id + input name                           |
+| 厂商/协议 | 创建入口与编码 | 参考图/编辑表达 | 返回与生命周期 | 关键差异 |
+| --- | --- | --- | --- | --- |
+| OpenAI Images | `/v1/images/generations` JSON；`/v1/images/edits` multipart | edit 使用一个或多个 image 文件，可有 mask | 通常同步，URL 或 `b64_json` | generation 与 edit 是两个 transport；尺寸、quality、background、output format 随模型变化 |
+| xAI Grok Images | `/v1/images/generations` JSON | 常见 `image` 作为编辑/参考输入 | 同步 URL/base64 风格 | `aspect_ratio`、`resolution` 与 OpenAI `size/quality` 不同；不能只复用 OpenAI Images 字段 |
+| Gemini 原生图片生成 | `generateContent` JSON | 图片作为 `inlineData/fileData` part，与 prompt 混排 | candidates.parts 内 inline image | 图片是多模态内容结果，不是 `data[]`；可能同时返回文本与图片 |
+| Vertex Imagen | `:predict` / 专用生成接口 | `instances` + `parameters`；编辑/扩图有专用字段 | 同步或长操作视能力 | GCP 资源路径、GCS URI、safety/person generation 配置 |
+| 火山方舟 Seedream/图片 | `/api/v3/images/generations` JSON | `image` 可为字符串或数组；连续图有专用配置 | 同步 URL/base64 | `size` 可能接受比例、像素或档位；watermark 和 sequential generation 是扩展字段 |
+| 即梦官方图片 | `CVSync2AsyncSubmitTask` + `CVSync2AsyncGetResult` | `image_urls`, `req_key` | 异步 task | AK/SK 签名、提交和查询均 POST；不能套普通 Bearer + GET poll |
+| 阿里云通义万相/Wanx | DashScope 图像生成 task | `input.prompt`、参考图 URL、`parameters` | 常见异步 task-id | 需 `X-DashScope-Async: enable`；结果 URL 有有效期 |
+| MiniMax Image | MiniMax 图片生成入口 | prompt、reference/image、subject reference 随模型版本 | 同步或异步视接口 | 模型版本字段和参考图能力变化快，应按模型 profile 管理 |
+| Kling Image | Kling 开放平台图片任务 | image/reference、strength、negative prompt 等 | 异步 task | access key 签名/JWT、task status、结果数组 |
+| 智谱 CogView | `/images/generations` 风格入口 | 部分版本支持 image input/quality/size | 同步或任务式视版本 | OpenAI-like 但模型字段和返回 URL 生命周期不同 |
+| 腾讯混元图片 | 腾讯云 Action API | prompt、resolution、style、reference | 异步 task | 云签名、Action/Version；错误码和 task 查询是腾讯云格式 |
+| 百度千帆图片 | 千帆图片生成 API | prompt、参考图/控制参数因模型而异 | 同步或异步 | access token/IAM，模型服务路径和审核错误需单独解析 |
+| Stability AI | `/v2beta/stable-image/...` 多为 multipart | image、mask、control image、strength | 常见同步二进制或 JSON | endpoint 按 generate/edit/control/upscale 划分；`Accept` 决定输出编码 |
+| Black Forest Labs FLUX API | 创建 task JSON | prompt、image、mask、width/height 或比例 | 异步 polling URL | create 返回 task/polling 信息；输出 URL 临时；模型参数差异大 |
+| Ideogram | `/v1/ideogram-v3/generate` multipart 等 | image、mask、style/reference | 同步/任务视版本 | magic prompt、rendering speed、style type、color palette 是专用参数 |
+| Recraft | `/v1/images/generations`、编辑/矢量专用入口 | image、mask、style id、controls | 同步 URL | 支持 raster/vector；style/substyle 和尺寸枚举不可丢失 |
+| Adobe Firefly | Firefly Services 版本化接口 | reference image、mask、structure/style reference | 任务/同步视版本 | Adobe IMS 鉴权、Content Credentials、存储/结果策略 |
+| Runway Image | Runway API image endpoint | reference images 常带 tag/URI | 异步 task | 与 Runway video 共用 task lifecycle，但请求 schema 按模型区分 |
+| fal.ai Queue | `queue.fal.run/{model}` | schema 由模型定义，URL/base64/file upload | queue submit/status/result | fal 是运行时协议，不是模型协议；每个 endpoint 的 input schema 必须保留 |
+| Replicate Predictions | `/v1/predictions` | `version/model` + 任意 `input` | 异步 prediction/webhook | input/output 完全由模型 schema 定义；支持 cancel/webhook，不能硬编码图片字段 |
+| ComfyUI | `/prompt` 提交 workflow JSON | 图片先上传，再把文件名映射到节点 input | `/history/{prompt_id}` + `/view` | 请求是节点图，不是固定模型字段；映射目标是 node id + input name |
 
 ### 5.1 无稳定公开通用 API 的重要产品
 
@@ -145,54 +145,54 @@
 
 视频协议的核心不是“POST 一个 prompt”，而是**操作语义 + 参考媒体角色 + 异步生命周期**。
 
-| 厂商/协议                          | 创建/查询                                                          | 典型请求形态                                                                           | 参考素材语义                                                                               | 结果与注意事项                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| OpenAI Videos/Sora                 | `POST /v1/videos`，`GET /v1/videos/{id}`，另有 content/cancel      | multipart：model、prompt、seconds、size、`input_reference`                             | 参考图通常是上传文件；不是 JSON `image_url`                                                | 异步 task；完成后可能需单独下载 content；OpenAI-compatible 网关未必支持 multipart               |
-| xAI Video                          | `POST /v1/videos/generations`，`GET /v1/videos/{request_id}`       | JSON：model、prompt、duration、aspect_ratio、resolution                                | 单起始图常用 `image:{url}`；角色参考用 `reference_images:[{url}]`                          | 首帧与角色参考不能混为一个数组；尾帧支持需按当前官方能力确认                                    |
-| Gemini Veo                         | `models/{model}:predictLongRunning`，查询 `operations/{name}`      | `instances[]` + `parameters`                                                           | 常见单图作为 instance.image；不同版本可能有 reference images/last frame 扩展               | Google long-running operation；结果位于嵌套 response，文件需下载/复制                           |
-| Vertex AI Veo                      | Vertex publisher model 长操作                                      | instances/parameters + GCS URI                                                         | 首帧、尾帧、参考资产能力按 Veo 版本                                                        | project/location/IAM；与 Gemini Developer API 路径不同                                          |
-| 火山方舟 Seedance                  | `POST /api/v3/contents/generations/tasks`，GET task                | `content[]` 混合 text/image_url/video_url/audio_url，媒体 block 带 `role`              | `first_frame`、`last_frame`、`reference_image`、`reference_video`、`reference_audio`       | 全模态组合、数量和时长有限制；纯音频组合可能非法；支持 generate_audio/watermark                 |
-| Seedance 兼容 `/videos`            | `POST /v1/videos` 或供应商自定义 `/videos`                         | prompt + `image_url` / `image_urls` / `reference_image_urls` + media arrays            | 单主图、首尾帧数组、角色参考数组是不同字段                                                 | 这是网关约定，不等于方舟原生 content 协议；同名 Seedance 模型需选正确 profile                   |
-| 即梦官方视频                       | SubmitTask + GetResult，均为签名 JSON                              | `req_key`, prompt, image_urls, duration/ratio/resolution                               | 常按图片顺序表达关键帧                                                                     | 异步、AK/SK；模型 req_key 决定字段能力                                                          |
-| MiniMax/Hailuo H3                  | `POST /v2/video_generation`，`GET /v2/query/video_generation/{id}` | `content[]` text/image/video/audio blocks；另有 duration/resolution/ratio/watermark 等 | 图片 block 需 role；首尾帧模式不能与普通 reference_image 混用                              | H3 是全模态视频协议，不应退化为 `image_urls[0/1]`；中转可能改字段名或再包一层                   |
-| 阿里 Wan/通义万相视频              | DashScope video synthesis task                                     | `model`, `input`, `parameters`；image_url/first_frame/last_frame 随模型                | 文生、图生、首尾帧、参考视频需按 Wan 版本区分                                              | 常用异步 header、task-id 查询；Wan 3.x 仍应按官方当前模型 schema 建 profile，不以“Wan3”推断协议 |
-| Kling Video                        | 创建 video task + 查询 task                                        | text2video/image2video/multi-image 等独立 endpoint/schema                              | image、tail image、elements/subject、motion brush 等                                       | 模型版本和模式决定字段；JWT/签名；结果 URL 和 task status                                       |
-| Agnes Video 2.5                    | `POST /v1/videos`，`GET /agnesapi?video_id=...&model_name=...`     | JSON，`mode=text                                                                       | keyframe                                                                                   | reference`；seconds 是字符串；size 是档位                                                       | keyframe 使用 first_frame/last_frame；reference 使用 images/videos/audios | 2.5、2.5 Flash、V2.0 是同厂商不同协议 profile；Flash 限制更严格 |
-| Agnes Video V2.0                   | `POST /v1/videos` + Agnes 查询                                     | image 或 `extra_body.image`、mode/num_frames/frame_rate                                | 关键帧数组，无角色/风格参考模式                                                            | duration 需换算帧数；不能照搬 2.5 的 seconds/size/aspect_ratio                                  |
-| Runway                             | `/v1/...` 创建，task 查询/取消                                     | 模型专用 JSON，promptImage/promptText、ratio/duration                                  | 首帧、尾帧、references 按 generation 类型                                                  | 标准异步 task；状态、失败原因和 output URL 统一程度较高                                         |
-| Luma Dream Machine                 | `/dream-machine/v1/generations` 等                                 | prompt、model、keyframes 对象                                                          | `frame0/frame1` 等 keyframes，可扩展图像/视频                                              | 异步 generation；状态和 assets 嵌套                                                             |
-| Vidu                               | Vidu 开放平台 task API                                             | text2video/image2video/reference2video                                                 | reference images、first frame、subject consistency                                         | 异步；不同模型/模板参数独立                                                                     |
-| PixVerse                           | 平台 video generation task                                         | prompt、model、duration/quality、image                                                 | image-to-video、transition/effects 等                                                      | 异步；模板/effect 字段不能塞入全局标准字段                                                      |
-| Pika                               | 官方/合作 API 或聚合平台 endpoint                                  | 依接入渠道而异                                                                         | image/video/reference/effect                                                               | 市面常见的是 fal/Replicate/第三方协议；必须记录实际 provider，不应假称统一 Pika 原生协议        |
-| 智谱 CogVideoX                     | 视频生成 task API                                                  | model、prompt、image_url、quality/with_audio 等                                        | 常见单图图生视频                                                                           | 异步 task；字段以开放平台当前版本为准                                                           |
-| 腾讯混元视频                       | 腾讯云 Action task                                                 | 云 API 参数 + prompt/image                                                             | 图生/首帧等按 Action                                                                       | TC3 签名，创建和查询 Action 分离                                                                |
-| 百度视频生成                       | 千帆/智能云对应模型 task                                           | 模型专用 input                                                                         | 参考图/视频按模型                                                                          | 异步、审核和错误码需单独适配                                                                    |
-| Novita Video                       | `/v3/video/create`，`/v3/async/task-result`                        | `model_name`, prompt, duration, aspect_ratio, image_url                                | 常见单起始图                                                                               | 适合作为简单异步协议，不等于支持角色参考                                                        |
-| NewAPI Channel 1 媒体任务          | `POST /v1/videos`，GET `/v1/videos/{id}`                           | `{model,input:{prompt,media[]},parameters:{...}}`                                      | `media[].type` 表达 first_frame/last_frame/reference_image/reference_video/reference_voice | 是 NewAPI 的统一媒体包装之一，不是 OpenAI Videos                                                |
-| NewAPI Channel 2 Video Generations | `POST /v1/video/generations`，GET 同路径 task                      | 扁平 JSON：seconds、aspect_ratio、resolution、image_urls/video_urls/audio_urls         | 常以数组和顺序表达，role 能力取决于具体版本                                                | 与 Channel 1 不兼容；同一 NewAPI 部署可能因版本或渠道插件行为不同                               |
-| fal.ai Queue                       | submit/status/result                                               | 每个模型自定义 schema                                                                  | 由模型 endpoint schema 决定                                                                | queue runtime 统一，模型请求不统一                                                              |
-| Replicate Predictions              | predictions + webhook/cancel                                       | 任意 model input                                                                       | 由模型版本 schema 决定                                                                     | 可统一生命周期，不能统一字段名                                                                  |
-| ComfyUI                            | `/prompt`, `/history`, `/view`                                     | 完整 workflow graph                                                                    | 素材上传后映射节点 input；首尾帧取决于 workflow                                            | 插件应映射工作流 schema，不应伪装成固定视频 provider                                            |
-| RunningHub/AutoDL 工作流           | workflow/app task create + query                                   | workflow ID + node/input override                                                      | 由工作流字段发现结果决定                                                                   | 需要字段发现、可覆盖性、安全上传、工作流版本，不是普通 REST 字段映射                            |
+| 厂商/协议 | 创建/查询 | 典型请求形态 | 参考素材语义 | 结果与注意事项 |
+| --- | --- | --- | --- | --- |
+| OpenAI Videos/Sora | `POST /v1/videos`，`GET /v1/videos/{id}`，另有 content/cancel | multipart：model、prompt、seconds、size、`input_reference` | 参考图通常是上传文件；不是 JSON `image_url` | 异步 task；完成后可能需单独下载 content；OpenAI-compatible 网关未必支持 multipart |
+| xAI Video | `POST /v1/videos/generations`，`GET /v1/videos/{request_id}` | JSON：model、prompt、duration、aspect_ratio、resolution | 单起始图常用 `image:{url}`；角色参考用 `reference_images:[{url}]` | 首帧与角色参考不能混为一个数组；尾帧支持需按当前官方能力确认 |
+| Gemini Veo | `models/{model}:predictLongRunning`，查询 `operations/{name}` | `instances[]` + `parameters` | 常见单图作为 instance.image；不同版本可能有 reference images/last frame 扩展 | Google long-running operation；结果位于嵌套 response，文件需下载/复制 |
+| Vertex AI Veo | Vertex publisher model 长操作 | instances/parameters + GCS URI | 首帧、尾帧、参考资产能力按 Veo 版本 | project/location/IAM；与 Gemini Developer API 路径不同 |
+| 火山方舟 Seedance | `POST /api/v3/contents/generations/tasks`，GET task | `content[]` 混合 text/image_url/video_url/audio_url，媒体 block 带 `role` | `first_frame`、`last_frame`、`reference_image`、`reference_video`、`reference_audio` | 全模态组合、数量和时长有限制；纯音频组合可能非法；支持 generate_audio/watermark |
+| Seedance 兼容 `/videos` | `POST /v1/videos` 或供应商自定义 `/videos` | prompt + `image_url` / `image_urls` / `reference_image_urls` + media arrays | 单主图、首尾帧数组、角色参考数组是不同字段 | 这是网关约定，不等于方舟原生 content 协议；同名 Seedance 模型需选正确 profile |
+| 即梦官方视频 | SubmitTask + GetResult，均为签名 JSON | `req_key`, prompt, image_urls, duration/ratio/resolution | 常按图片顺序表达关键帧 | 异步、AK/SK；模型 req_key 决定字段能力 |
+| MiniMax/Hailuo H3 | `POST /v2/video_generation`，`GET /v2/query/video_generation/{id}` | `content[]` text/image/video/audio blocks；另有 duration/resolution/ratio/watermark 等 | 图片 block 需 role；首尾帧模式不能与普通 reference_image 混用 | H3 是全模态视频协议，不应退化为 `image_urls[0/1]`；中转可能改字段名或再包一层 |
+| 阿里 Wan/通义万相视频 | DashScope video synthesis task | `model`, `input`, `parameters`；image_url/first_frame/last_frame 随模型 | 文生、图生、首尾帧、参考视频需按 Wan 版本区分 | 常用异步 header、task-id 查询；Wan 3.x 仍应按官方当前模型 schema 建 profile，不以“Wan3”推断协议 |
+| Kling Video | 创建 video task + 查询 task | text2video/image2video/multi-image 等独立 endpoint/schema | image、tail image、elements/subject、motion brush 等 | 模型版本和模式决定字段；JWT/签名；结果 URL 和 task status |
+| Agnes Video 2.5 | `POST /v1/videos`，`GET /agnesapi?video_id=...&model_name=...` | JSON，`mode=text|keyframe|reference`；seconds 是字符串；size 是档位 | keyframe 使用 first_frame/last_frame；reference 使用 images/videos/audios | 2.5、2.5 Flash、V2.0 是同厂商不同协议 profile；Flash 限制更严格 |
+| Agnes Video V2.0 | `POST /v1/videos` + Agnes 查询 | image 或 `extra_body.image`、mode/num_frames/frame_rate | 关键帧数组，无角色/风格参考模式 | duration 需换算帧数；不能照搬 2.5 的 seconds/size/aspect_ratio |
+| Runway | `/v1/...` 创建，task 查询/取消 | 模型专用 JSON，promptImage/promptText、ratio/duration | 首帧、尾帧、references 按 generation 类型 | 标准异步 task；状态、失败原因和 output URL 统一程度较高 |
+| Luma Dream Machine | `/dream-machine/v1/generations` 等 | prompt、model、keyframes 对象 | `frame0/frame1` 等 keyframes，可扩展图像/视频 | 异步 generation；状态和 assets 嵌套 |
+| Vidu | Vidu 开放平台 task API | text2video/image2video/reference2video | reference images、first frame、subject consistency | 异步；不同模型/模板参数独立 |
+| PixVerse | 平台 video generation task | prompt、model、duration/quality、image | image-to-video、transition/effects 等 | 异步；模板/effect 字段不能塞入全局标准字段 |
+| Pika | 官方/合作 API 或聚合平台 endpoint | 依接入渠道而异 | image/video/reference/effect | 市面常见的是 fal/Replicate/第三方协议；必须记录实际 provider，不应假称统一 Pika 原生协议 |
+| 智谱 CogVideoX | 视频生成 task API | model、prompt、image_url、quality/with_audio 等 | 常见单图图生视频 | 异步 task；字段以开放平台当前版本为准 |
+| 腾讯混元视频 | 腾讯云 Action task | 云 API 参数 + prompt/image | 图生/首帧等按 Action | TC3 签名，创建和查询 Action 分离 |
+| 百度视频生成 | 千帆/智能云对应模型 task | 模型专用 input | 参考图/视频按模型 | 异步、审核和错误码需单独适配 |
+| Novita Video | `/v3/video/create`，`/v3/async/task-result` | `model_name`, prompt, duration, aspect_ratio, image_url | 常见单起始图 | 适合作为简单异步协议，不等于支持角色参考 |
+| NewAPI Channel 1 媒体任务 | `POST /v1/videos`，GET `/v1/videos/{id}` | `{model,input:{prompt,media[]},parameters:{...}}` | `media[].type` 表达 first_frame/last_frame/reference_image/reference_video/reference_voice | 是 NewAPI 的统一媒体包装之一，不是 OpenAI Videos |
+| NewAPI Channel 2 Video Generations | `POST /v1/video/generations`，GET 同路径 task | 扁平 JSON：seconds、aspect_ratio、resolution、image_urls/video_urls/audio_urls | 常以数组和顺序表达，role 能力取决于具体版本 | 与 Channel 1 不兼容；同一 NewAPI 部署可能因版本或渠道插件行为不同 |
+| fal.ai Queue | submit/status/result | 每个模型自定义 schema | 由模型 endpoint schema 决定 | queue runtime 统一，模型请求不统一 |
+| Replicate Predictions | predictions + webhook/cancel | 任意 model input | 由模型版本 schema 决定 | 可统一生命周期，不能统一字段名 |
+| ComfyUI | `/prompt`, `/history`, `/view` | 完整 workflow graph | 素材上传后映射节点 input；首尾帧取决于 workflow | 插件应映射工作流 schema，不应伪装成固定视频 provider |
+| RunningHub/AutoDL 工作流 | workflow/app task create + query | workflow ID + node/input override | 由工作流字段发现结果决定 | 需要字段发现、可覆盖性、安全上传、工作流版本，不是普通 REST 字段映射 |
 
 ## 7. 参考素材语义：必须成为通用底座的一等公民
 
 ### 7.1 建议保留的角色词汇
 
-| kind  | role 示例           | 说明                                           |
-| ----- | ------------------- | ---------------------------------------------- |
-| image | `first_frame`       | 视频起始关键帧                                 |
-| image | `last_frame`        | 视频结束关键帧                                 |
-| image | `reference_image`   | 泛化角色/主体/风格参考，不能自动当首帧         |
+| kind | role 示例 | 说明 |
+| --- | --- | --- |
+| image | `first_frame` | 视频起始关键帧 |
+| image | `last_frame` | 视频结束关键帧 |
+| image | `reference_image` | 泛化角色/主体/风格参考，不能自动当首帧 |
 | image | `subject_reference` | 主体一致性参考；有些协议还需要 subject id/type |
-| image | `style_reference`   | 风格参考，可能带 weight                        |
-| image | `edit_source`       | 图片编辑原图                                   |
-| image | `mask`              | 编辑蒙版，与普通 reference 不同                |
-| image | `control`           | pose/depth/canny/layout 等控制图               |
-| video | `reference_video`   | 动作、镜头、风格或重绘参考                     |
-| video | `motion_reference`  | 明确的运动参考                                 |
-| audio | `reference_audio`   | 音乐/环境/节奏参考                             |
-| audio | `reference_voice`   | 音色/说话人参考                                |
+| image | `style_reference` | 风格参考，可能带 weight |
+| image | `edit_source` | 图片编辑原图 |
+| image | `mask` | 编辑蒙版，与普通 reference 不同 |
+| image | `control` | pose/depth/canny/layout 等控制图 |
+| video | `reference_video` | 动作、镜头、风格或重绘参考 |
+| video | `motion_reference` | 明确的运动参考 |
+| audio | `reference_audio` | 音乐/环境/节奏参考 |
+| audio | `reference_voice` | 音色/说话人参考 |
 
 建议媒体项至少具备：
 
@@ -316,11 +316,7 @@ request.images.1.url
   "model": "...",
   "content": [
     { "type": "text", "text": "..." },
-    {
-      "type": "image_url",
-      "image_url": { "url": "..." },
-      "role": "first_frame|last_frame|reference_image"
-    }
+    { "type": "image_url", "image_url": { "url": "..." }, "role": "first_frame|last_frame|reference_image" }
   ],
   "resolution": "768P|2K",
   "duration": 4,
@@ -428,26 +424,28 @@ if model name contains minimax/h3
 
 插件应按“线协议 profile”拆分，而不是按营销品牌笼统拆分：
 
-| 推荐插件 ID 示例                 | 覆盖范围                             |
-| -------------------------------- | ------------------------------------ |
-| `openai-chat-completions`        | OpenAI Chat 线协议及严格兼容网关     |
-| `openai-responses`               | Responses 事件和 item 协议           |
-| `anthropic-messages`             | Claude Messages/tool/SSE             |
-| `google-gemini-generate-content` | Gemini contents/parts/functions      |
-| `openai-images`                  | generations + multipart edits        |
-| `google-gemini-image`            | generateContent 图片输入输出         |
-| `openai-videos`                  | multipart create/task/content/cancel |
-| `xai-video`                      | xAI JSON video + reference_images    |
-| `volcengine-ark-seedance`        | Ark contents task + multimodal roles |
-| `minimax-hailuo-video-v2`        | MiniMax `/v2/video_generation`       |
-| `dashscope-wan-video`            | DashScope async Wan task             |
-| `newapi-media-task-v1`           | NewAPI Channel 1 包装                |
-| `newapi-video-generations-v1`    | NewAPI Channel 2 包装                |
-| `agnes-video-25`                 | 2.5/Flash profile                    |
-| `agnes-video-v20`                | frame-based V2.0 profile             |
-| `replicate-prediction`           | prediction lifecycle + model schema  |
-| `fal-queue`                      | queue lifecycle + endpoint schema    |
-| `comfyui-workflow`               | workflow graph/upload/history/view   |
+| 推荐插件 ID 示例 | 覆盖范围 |
+| --- | --- |
+| `openai-chat-completions` | OpenAI Chat 线协议及严格兼容网关 |
+| `openai-responses` | Responses 事件和 item 协议 |
+| `anthropic-messages` | Claude Messages/tool/SSE |
+| `google-gemini-generate-content` | Gemini contents/parts/functions |
+| `openai-images` | generations + multipart edits |
+| `google-gemini-image` | generateContent 图片输入输出 |
+| `openai-videos` | multipart create/task/content/cancel |
+| `xai-video` | xAI JSON video + reference_images |
+| `volcengine-ark-seedance` | Ark contents task + multimodal roles |
+| `volcengine-ark-agent-plan-seedream` | Agent Plan `/api/plan/v3/images/generations` |
+| `volcengine-ark-agent-plan-seedance` | Agent Plan `/api/plan/v3/contents/generations/tasks` |
+| `minimax-hailuo-video-v2` | MiniMax `/v2/video_generation` |
+| `dashscope-wan-video` | DashScope async Wan task |
+| `newapi-media-task-v1` | NewAPI Channel 1 包装 |
+| `newapi-video-generations-v1` | NewAPI Channel 2 包装 |
+| `agnes-video-25` | 2.5/Flash profile |
+| `agnes-video-v20` | frame-based V2.0 profile |
+| `replicate-prediction` | prediction lifecycle + model schema |
+| `fal-queue` | queue lifecycle + endpoint schema |
+| `comfyui-workflow` | workflow graph/upload/history/view |
 
 一个安装包可以贡献多个 provider profile，但运行时必须能区分每个 profile 的 endpoint、transport、能力和模型约束。
 

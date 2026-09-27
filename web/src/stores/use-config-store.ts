@@ -3,13 +3,12 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
-import { projectDesktopLocalChannelRuntime } from "@/lib/desktop-local-channel";
 import { scopedLocalStorage } from "@/lib/user-scope";
 import { modelProtocolCapability, normalizeModelProtocol, type ModelProtocol } from "@/lib/model-protocols";
 import { normalizeVideoDuration, normalizeVideoResolution } from "@/lib/video-generation-options";
 import { workflowFieldRole, workflowFieldSafeToOverride, workflowVideoFieldsFromJson, type ModelCapabilityConfig } from "@/lib/model-capabilities";
-import { useLocalDreaminaModelStore } from "@/stores/use-local-dreamina-model-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { useLocalDreaminaModelStore } from "@/stores/use-local-dreamina-model-store";
 import type { DreaminaLocalModel } from "@/services/local-dreamina-model-catalog";
 import type { CapabilitySpec, PublicLogicalModelPriceTier } from "@/services/api/logical-models";
 
@@ -336,6 +335,11 @@ export type RunningHubConfig = {
     workflows: RunningHubWorkflow[];
 };
 
+export type WorkflowGraphPreview = {
+    nodes: Array<{ id: string; title?: string; classType?: string }>;
+    edges: Array<{ from: string; to: string }>;
+};
+
 export type ComfyBridgeWorkflow = {
     workflowId: string;
     title?: string;
@@ -343,11 +347,6 @@ export type ComfyBridgeWorkflow = {
     fields?: WorkflowFieldMapping[];
     workflowJson?: Record<string, unknown>;
     workflowGraph?: WorkflowGraphPreview;
-};
-
-export type WorkflowGraphPreview = {
-    nodes: Array<{ id: string; title?: string; classType?: string }>;
-    edges: Array<{ from: string; to: string }>;
 };
 
 export type ComfyBridgeConfig = {
@@ -366,6 +365,7 @@ export const PUBLIC_MODEL_CATALOG_ID = "managed";
 export type ModelChannel = {
     id: string;
     name: string;
+    sortOrder?: number;
     baseUrl: string;
     allowLocalChannel?: boolean;
     apiKey: string;
@@ -384,6 +384,7 @@ export type ModelChannel = {
     modelCosts?: Array<{
         model: string;
         displayName?: string;
+        channelLabel?: string;
         description?: string;
         icon?: string;
         capability: ModelCapability;
@@ -454,7 +455,7 @@ const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 const LEGACY_DEFAULT_MODEL_NAMES = new Set(["gpt-image-2", "grok-imagine-video", "gpt-5.5", "gpt-4o-mini-tts"]);
 
 export const defaultConfig: AiConfig = {
-    channelMode: "local",
+    channelMode: "remote",
     baseUrl: OPENAI_BASE_URL,
     apiKey: "",
     apiFormat: "openai",
@@ -615,11 +616,7 @@ function isAiConfigReady(config: AiConfig, model: string) {
         const key = config.runningHub.apiKey;
         return Boolean(config.runningHub.enabled && config.runningHub.baseUrl.trim() && key.trim() && config.runningHub.workflowId.trim());
     }
-    if (config.taskWorkflowProvider === "comfyui") {
-        return Boolean(config.comfyBridge.enabled && config.comfyBridge.bridgeId.trim() && config.comfyBridge.workflowId.trim());
-    }
     const channel = resolveModelChannel(config, model);
-    if (channel.transport === "local-runtime") return channel.enabled !== false && Boolean(channel.localModels?.some((item) => item.id === modelOptionName(model)));
     return Boolean(model.trim() && channel.baseUrl.trim() && channel.apiKey.trim());
 }
 
@@ -734,7 +731,7 @@ export function normalizeConfigSnapshot(snapshot: ConfigStoreSnapshot | undefine
     return {
         config: {
             ...config,
-            channelMode: "local" as const,
+            channelMode: "remote" as const,
             apiFormat: normalizeApiFormat(config.apiFormat),
             channels,
             models,
@@ -818,6 +815,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
     return {
         id: channel?.id?.trim() || nanoid(),
         name: channel?.name?.trim() || "新渠道",
+        sortOrder: channel?.sortOrder ?? 0,
         baseUrl: providedBaseUrl || (interfaceType ? defaultBaseUrlForChannelInterface(interfaceType) : defaultBaseUrlForApiFormat(apiFormat)),
         allowLocalChannel: channel?.allowLocalChannel === true,
         apiKey: channel?.apiKey || "",
@@ -835,6 +833,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
 }
 
 export function encodeChannelModel(channelId: string, model: string) {
+    if (channelId === "local:dreamina-cli") return `local:dreamina-cli:${model.trim()}`;
     return `${channelId}${CHANNEL_MODEL_SEPARATOR}${model.trim()}`;
 }
 
@@ -884,7 +883,7 @@ export function modelOptionsFromChannels(channels: ModelChannel[]) {
                 .map(normalizeRawModelName)
                 .filter(Boolean)
                 .filter((model) => channel.scope !== "system" || hasSystemModelPrice(channel, model))
-                .map((model) => (channel.transport === "local-runtime" ? `local:dreamina-cli:${model}` : encodeChannelModel(channel.id, model))),
+                .map((model) => encodeChannelModel(channel.id, model)),
         ),
     );
 }
@@ -943,7 +942,7 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
     const model = modelOptionName(value || config.model);
     const modelProtocol = channel.modelCosts?.find((item) => item.model === model)?.protocol;
     const interfaceType = modelProtocol || channel.interfaceType;
-    return projectDesktopLocalChannelRuntime({
+    return {
         ...config,
         model,
         baseUrl: channel.baseUrl,
@@ -954,7 +953,7 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
         apiFormat: interfaceType ? (interfaceType === "gemini-veo" || interfaceType === "gemini-image" ? ("gemini" as const) : interfaceType === "claude-api" ? ("claude" as const) : ("openai" as const)) : channel.apiFormat,
         interfaceType,
         channelId: channel.scope === "system" ? channel.id : "",
-    });
+    };
 }
 
 function normalizeChannels(config: AiConfig, ensureDefault = true) {
@@ -1002,6 +1001,7 @@ export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
 export function defaultBaseUrlForChannelInterface(interfaceType?: ChannelInterfaceType) {
     if (interfaceType === "gemini-veo" || interfaceType === "gemini-image") return GEMINI_BASE_URL;
     if (interfaceType === "novita-video") return "https://api.novita.ai/v3";
+    if (interfaceType === "volcengine-ark-agent-plan-image" || interfaceType === "volcengine-ark-agent-plan-video") return "https://ark.cn-beijing.volces.com/api/plan/v3";
     if (interfaceType === "volcengine-ark-image" || interfaceType === "volcengine-ark-video") return "https://ark.cn-beijing.volces.com/api/v3";
     if (interfaceType === "volcengine-jimeng-image" || interfaceType === "volcengine-jimeng-video") return "https://visual.volcengineapi.com";
     if (interfaceType === "minimax-video") return "https://api.minimaxi.com";

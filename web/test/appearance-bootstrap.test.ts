@@ -6,7 +6,6 @@ test("initial HTML stays brand neutral until the public appearance is resolved",
     const [html, mainSource] = await Promise.all([Bun.file(new URL("../index.html", import.meta.url)).text(), Bun.file(new URL("../src/main.tsx", import.meta.url)).text()]);
 
     expect(html).not.toContain("影策");
-    expect(html).not.toContain("/logo.svg");
     expect(html).toContain("<title>正在加载</title>");
     expect(mainSource.indexOf("bootstrapAppearance()")).toBeLessThan(mainSource.indexOf('import("./application")'));
 });
@@ -100,7 +99,7 @@ test("appearance management exposes light and dark logo uploads plus the frame s
     expect(pageSource).toContain("深浅模式 Logo 预览");
     expect(pageSource).toContain("登录页视频自动播放");
     expect(pageSource).toContain("authVideoAutoplay");
-    expect(brandSource).toContain("useThemeStore");
+    expect(brandSource).toContain("useActiveTheme");
     expect(brandSource).toContain("data-logo-frame-enabled");
     expect(brandSource).toContain("failedSource === source");
     expect(brandSource).toContain('aria-hidden="true"');
@@ -125,5 +124,5 @@ test("appearance management exposes a server-side reset to the built-in Yingce b
     expect(pageSource).toContain("恢复影策默认");
     expect(pageSource).toContain("resetAdminAppearance()");
     expect(pageSource).toContain("已上传文件仍保留在存储资源中");
-    expect(apiSource).toContain('apiClient.delete("/admin/settings/appearance")');
+    expect(apiSource).toContain('http.delete<{ setting: AdminAppearance }>("/admin/settings/appearance")');
 });

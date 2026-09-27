@@ -5,13 +5,15 @@ import { useNavigate } from "react-router";
 import { navigationTools } from "@/constant/navigation-tools";
 import { Kbd } from "@/components/ui/base/kbd";
 import { cn } from "@/lib/utils";
+import { openWorkspaceWallet } from "@/lib/workspace-wallet";
 import { useUserStore } from "@/stores/use-user-store";
 
 type PaletteEntry = {
     id: string;
     title: string;
     icon: ComponentType<{ className?: string; strokeWidth?: number }>;
-    to: string;
+    to?: string;
+    run?: () => void;
 };
 
 /** 顶栏搜索 / ⌘K 命令面板：按功能开关过滤当前可用页面入口。 */
@@ -23,7 +25,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
     const inputRef = useRef<HTMLInputElement>(null);
 
     const entries = useMemo<PaletteEntry[]>(() => {
-        const toolEntry = (slug: string, to: string): PaletteEntry => {
+        const toolEntry = (slug: string, to?: string): PaletteEntry => {
             const tool = navigationTools.find((item) => item.slug === slug);
             return { id: slug, title: tool?.label ?? slug, icon: tool?.icon ?? Home, to };
         };
@@ -35,7 +37,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),
             toolEntry("assets", "/assets"),
             toolEntry("skills", "/skills"),
-            ...(features.creditsEnabled ? [toolEntry("wallet", "/wallet")] : []),
+            ...(features.creditsEnabled ? [{ ...toolEntry("wallet"), run: () => openWorkspaceWallet() }] : []),
             toolEntry("settings", "/settings"),
         ];
     }, [features]);
@@ -45,6 +47,15 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
         if (!keyword) return entries;
         return entries.filter((entry) => entry.title.toLowerCase().includes(keyword));
     }, [entries, query]);
+
+    const activateEntry = (entry: PaletteEntry) => {
+        onClose();
+        if (entry.run) {
+            entry.run();
+            return;
+        }
+        if (entry.to) navigate(entry.to);
+    };
 
     useEffect(() => {
         if (open) {
@@ -77,14 +88,12 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
             }
             if (event.key === "Enter" && filtered[highlight]) {
                 event.preventDefault();
-                const target = filtered[highlight];
-                onClose();
-                navigate(target.to);
+                activateEntry(filtered[highlight]);
             }
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [open, filtered, highlight, navigate, onClose]);
+    }, [activateEntry, filtered, highlight, onClose, open]);
 
     if (!open) return null;
 
@@ -115,10 +124,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
                                         <button
                                             type="button"
                                             onMouseEnter={() => setHighlight(index)}
-                                            onClick={() => {
-                                                onClose();
-                                                navigate(entry.to);
-                                            }}
+                                            onClick={() => activateEntry(entry)}
                                             className={cn(
                                                 "flex w-full items-center gap-2.5 rounded-[var(--r-sm)] px-3 py-2.5 text-left text-[var(--fs-body)] transition-colors",
                                                 index === highlight ? "bg-surface-hover text-foreground" : "text-foreground/65",

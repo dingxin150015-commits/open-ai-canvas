@@ -1,10 +1,11 @@
-import { type FormEvent, useEffect, useState, type ReactNode } from "react";
+import { type FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import { App, Button, Divider, Input } from "antd";
 import { ArrowRight, Info, LockKeyhole, Mail, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { getAuthSession, getAuthSettings, linuxDOLoginURL, register, sendRegistrationEmailCode } from "@/services/api/auth";
 import { LinuxDOIcon } from "./auth-scene";
+import { ApiError } from "@/services/api/request";
 
 type AuthSettings = Awaited<ReturnType<typeof getAuthSettings>>;
 
@@ -22,6 +23,9 @@ export default function RegisterPage() {
     const [submitting, setSubmitting] = useState(false);
     const [sendingCode, setSendingCode] = useState(false);
     const [countdown, setCountdown] = useState(0);
+    const [registerCountdown, setRegisterCountdown] = useState(0);
+    const sending = useRef(false),
+        registering = useRef(false);
     const next = safeNext(params.get("next"));
 
     useEffect(() => {
@@ -41,28 +45,34 @@ export default function RegisterPage() {
     }, [countdown]);
 
     const sendCode = async () => {
+        if (sending.current || countdown > 0) return;
         if (!email.trim()) {
             message.warning("请先输入邮箱");
             return;
         }
+        sending.current = true;
         setSendingCode(true);
         try {
             await sendRegistrationEmailCode(email.trim());
             setCountdown(60);
             message.success("验证码已发送，请检查邮箱");
         } catch (error) {
+            if (error instanceof ApiError && error.status === 429) setCountdown(Math.max(1, Math.ceil((error.retryAfterMs ?? 60000) / 1000)));
             message.error(error instanceof Error ? error.message : "发送验证码失败");
         } finally {
+            sending.current = false;
             setSendingCode(false);
         }
     };
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        if (registering.current || registerCountdown > 0) return;
         if (password !== confirmPassword) {
             message.error("两次输入的密码不一致");
             return;
         }
+        registering.current = true;
         setSubmitting(true);
         try {
             await register({ username, email, emailCode, displayName, password });
@@ -72,11 +82,19 @@ export default function RegisterPage() {
             message.success(settings?.firstUser ? "管理员账号已创建" : "注册成功");
             navigate(next, { replace: true });
         } catch (error) {
+            if (error instanceof ApiError && error.status === 429) setRegisterCountdown(Math.max(1, Math.ceil((error.retryAfterMs ?? 60000) / 1000)));
             message.error(error instanceof Error ? error.message : "注册失败");
         } finally {
+            registering.current = false;
             setSubmitting(false);
         }
     };
+
+    useEffect(() => {
+        if (registerCountdown <= 0) return;
+        const timer = window.setInterval(() => setRegisterCountdown((value) => Math.max(0, value - 1)), 1000);
+        return () => window.clearInterval(timer);
+    }, [registerCountdown]);
 
     const registrationClosed = settings?.registrationEnabled === false;
     const mailUnavailable = Boolean(settings && !settings.firstUser && settings.emailCodeRequired && !settings.emailEnabled);
@@ -171,8 +189,8 @@ export default function RegisterPage() {
                 </AuthField>
             </div>
 
-            <Button type="primary" htmlType="submit" size="large" block loading={submitting} disabled={disabled} icon={<ArrowRight className="size-4" />} iconPlacement="end">
-                创建账号
+            <Button type="primary" htmlType="submit" size="large" block loading={submitting} disabled={disabled || registerCountdown > 0} icon={<ArrowRight className="size-4" />} iconPlacement="end">
+                {registerCountdown > 0 ? `${registerCountdown} 秒后可重试` : "创建账号"}
             </Button>
             {settings?.linuxdoEnabled ? (
                 <>

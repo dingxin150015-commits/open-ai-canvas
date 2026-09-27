@@ -40,8 +40,9 @@ import {
 } from "@/lib/model-capabilities";
 import { defaultImageParamsForModel, modelCompatibilityError, modelRequestOptions, resolveCompatibleModel, resolveModelGenerationDefaults, type ModelRequirements } from "@/lib/model-selection";
 import { resolveCanvasWorkflowProvider } from "@/lib/canvas/canvas-workflow";
+import { canonicalGenerationMetadata } from "@/lib/canvas/generation-contract";
 import type { CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
-import { useThemeStore } from "@/stores/use-theme-store";
+import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { workflowProviderPluginEnabled } from "@/lib/plugins/builtin/workflows";
 import { usePluginStore } from "@/stores/use-plugin-store";
 import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata, CanvasVideoEditOperation, CanvasWorkspaceMode } from "@/types/canvas";
@@ -93,8 +94,9 @@ function runningHubWorkflowEntryKey(workflow: RunningHubWorkflow): string {
 export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigChange, onGenerate, onComposerToggle, workspaceMode = "professional" }: CanvasConfigNodePanelProps) {
     const globalConfig = useEffectiveConfig();
     const runtimeStatuses = usePluginStore((state) => state.runtimeStatuses);
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = canvasThemes[useActiveTheme()];
     const mode = node.metadata?.generationMode === "video" || node.metadata?.generationMode === "audio" ? node.metadata.generationMode : "image";
+    node = { ...node, metadata: canonicalGenerationMetadata(node, mode) };
     const simpleMode = workspaceMode === "simple";
     const resolvedProvider = resolveCanvasWorkflowProvider(node.metadata);
     const workflowProvider = resolvedProvider;
@@ -103,23 +105,20 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
         capability: mode,
         input: inputSummary,
         videoOperation: node.metadata?.videoEditOperation,
-        videoSeconds: mode === "video" ? node.metadata?.seconds || globalConfig.videoSeconds : undefined,
-        options: modelRequestOptions(
-            {
-                ...globalConfig,
-                size: node.metadata?.size || globalConfig.size,
-                quality: node.metadata?.quality || globalConfig.quality,
-                count: String(node.metadata?.count || globalConfig.count),
-                videoSeconds: node.metadata?.seconds || globalConfig.videoSeconds,
-                vquality: node.metadata?.vquality || globalConfig.vquality,
-                videoGenerateAudio: node.metadata?.generateAudio || globalConfig.videoGenerateAudio,
-                videoWatermark: node.metadata?.watermark || globalConfig.videoWatermark,
-                audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice,
-                audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat,
-                audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed,
-            },
-            mode,
-        ),
+        videoSeconds: mode === "video" ? node.metadata?.seconds ?? globalConfig.videoSeconds : undefined,
+        options: modelRequestOptions({
+            ...globalConfig,
+            size: node.metadata?.size || globalConfig.size,
+            quality: node.metadata?.quality || globalConfig.quality,
+            count: String(node.metadata?.count || globalConfig.count),
+            videoSeconds: node.metadata?.seconds ?? globalConfig.videoSeconds,
+            vquality: node.metadata?.vquality || globalConfig.vquality,
+            videoGenerateAudio: node.metadata?.generateAudio ?? globalConfig.videoGenerateAudio,
+            videoWatermark: node.metadata?.watermark ?? globalConfig.videoWatermark,
+            audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice,
+            audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat,
+            audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed,
+        }, mode),
     };
     const config = buildNodeConfig(globalConfig, node, mode, requirements);
     const defaultWorkflowCapability = normalizeRunningHubCapability(globalConfig.runningHub.capability);
@@ -351,9 +350,9 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                                     return;
                                 }
                                 if (nextProvider === "runninghub") {
-                                    onConfigChange(node.id, { workflowProvider: "runninghub", workflowTitle: "RunningHub 工作流", comfyBridgeWorkflowId: undefined, workflowParameters: {} });
+                                    onConfigChange(node.id, { workflowProvider: "runninghub", workflowTitle: "RunningHub 工作流", workflowParameters: {} });
                                 } else {
-                                    onConfigChange(node.id, { workflowProvider: "comfyui", workflowTitle: "ComfyUI Bridge", runningHubWorkflowId: undefined, runningHubWorkflowKind: undefined, workflowParameters: {} });
+                                    onConfigChange(node.id, { workflowProvider: "comfyui", workflowTitle: "ComfyUI Bridge", workflowParameters: {} });
                                 }
                             }}
                         />
@@ -650,6 +649,7 @@ function WorkflowSelectedLabel({ kind, label }: { kind: "app" | "workflow"; labe
 }
 
 function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasGenerationMode, requirements: ModelRequirements): AiConfig {
+    node = { ...node, metadata: canonicalGenerationMetadata(node, mode) };
     const workflowProvider = mode === "text" ? "model" : resolveCanvasWorkflowProvider(node.metadata);
     if (workflowProvider === "model") return buildModelNodeConfig(globalConfig, node, mode, requirements);
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : mode === "audio" ? globalConfig.audioModel : globalConfig.textModel;
@@ -720,10 +720,10 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
         quality: workflowParameter("quality") || normalizedImage?.quality || node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
         size: normalizedImage?.size || normalizedVideo?.ratio || node.metadata?.size || globalConfig.size || defaultConfig.size,
         transparentBackground: normalizedImage?.transparentBackground || ((node.metadata?.transparentBackground || globalConfig.transparentBackground) === "true" ? "true" : "false"),
-        videoSeconds: normalizedVideo?.seconds || normalizeVideoDuration(node.metadata?.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds),
+        videoSeconds: normalizedVideo?.seconds ?? normalizeVideoDuration(node.metadata?.seconds ?? globalConfig.videoSeconds ?? defaultConfig.videoSeconds),
         vquality: String(node.metadata?.vquality || globalConfig.vquality || defaultConfig.vquality),
-        videoGenerateAudio: videoProfile?.generateAudio.supported ? node.metadata?.generateAudio || globalConfig.videoGenerateAudio || String(videoProfile.generateAudio.default) : "false",
-        videoWatermark: videoProfile?.watermark.supported ? node.metadata?.watermark || globalConfig.videoWatermark || String(videoProfile.watermark.default) : "false",
+        videoGenerateAudio: videoProfile?.generateAudio.supported ? node.metadata?.generateAudio ?? globalConfig.videoGenerateAudio ?? String(videoProfile.generateAudio.default) : "false",
+        videoWatermark: videoProfile?.watermark.supported ? node.metadata?.watermark ?? globalConfig.videoWatermark ?? String(videoProfile.watermark.default) : "false",
         audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice || defaultConfig.audioVoice,
         audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed || defaultConfig.audioSpeed,
@@ -733,6 +733,7 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
 }
 
 function buildModelNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasGenerationMode, requirements: ModelRequirements): AiConfig {
+    node = { ...node, metadata: canonicalGenerationMetadata(node, mode) };
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : mode === "audio" ? globalConfig.audioModel : globalConfig.textModel;
     const fallbackModel = mode === "image" ? defaultConfig.imageModel : mode === "video" ? defaultConfig.videoModel : mode === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
     const storedModel = node.metadata?.model;
@@ -775,10 +776,10 @@ function buildModelNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode
         quality: generationDefaults.quality || globalConfig.quality || defaultConfig.quality,
         size: generationDefaults.size ?? globalConfig.size ?? defaultConfig.size,
         transparentBackground: generationDefaults.transparentBackground || "false",
-        videoSeconds: generationDefaults.videoSeconds || normalizeVideoDuration(globalConfig.videoSeconds || defaultConfig.videoSeconds),
+        videoSeconds: generationDefaults.videoSeconds ?? normalizeVideoDuration(globalConfig.videoSeconds || defaultConfig.videoSeconds),
         vquality: generationDefaults.vquality ?? normalizeVideoResolution(globalConfig.vquality || defaultConfig.vquality),
-        videoGenerateAudio: videoProfile?.generateAudio.supported ? generationDefaults.videoGenerateAudio || String(videoProfile.generateAudio.default) : "false",
-        videoWatermark: videoProfile?.watermark.supported ? generationDefaults.videoWatermark || String(videoProfile.watermark.default) : "false",
+        videoGenerateAudio: videoProfile?.generateAudio.supported ? generationDefaults.videoGenerateAudio ?? String(videoProfile.generateAudio.default) : "false",
+        videoWatermark: videoProfile?.watermark.supported ? generationDefaults.videoWatermark ?? String(videoProfile.watermark.default) : "false",
         audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice || defaultConfig.audioVoice,
         audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed || defaultConfig.audioSpeed,

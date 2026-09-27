@@ -65,7 +65,7 @@ export const DREAMINA_SUBMIT_ERROR_MESSAGES: Record<string, string> = {
 export function generationErrorCode(error: unknown) {
     if (error && typeof error === "object" && "code" in error && typeof (error as { code?: unknown }).code === "string") {
         const code = (error as { code: string }).code;
-        if (/^(?:dreamina|local_generation|origin)_[a-z0-9_]{2,80}$/.test(code)) return code;
+        if (/^(?:model|provider|origin)_[a-z0-9_]{2,80}$/.test(code)) return code;
     }
     return undefined;
 }

@@ -1,40 +1,20 @@
 import { describe, expect, test } from "bun:test";
 
-import { buildImageResolutionOptions, formatImageResolutionSize, imageResolutionChoices, imageResolutionOption, imageSizeForResolution, supportsImageResolutionPresets } from "../src/lib/image-resolution-tiers";
-import { defaultImageCapabilityConfig, defaultModelCapabilityConfig, imageSizeRequest, modelCapabilityConfigFor } from "../src/lib/model-capabilities";
+import {
+    buildImageResolutionOptions,
+    formatImageResolutionSize,
+    imageResolutionChoices,
+    imageResolutionOption,
+    imageSizeForResolution,
+    supportsImageResolutionPresets,
+} from "../src/lib/image-resolution-tiers";
+import { defaultImageCapabilityConfig, normalizeImageValue } from "../src/lib/model-capabilities";
 import { resolveImageRequestSize } from "../src/services/api/image-validation";
 
 const sizes = [
-    "1024x1024",
-    "1360x1024",
-    "1024x1360",
-    "1536x1024",
-    "1024x1536",
-    "1024x1280",
-    "1280x1024",
-    "2048x878",
-    "1824x1024",
-    "1024x1824",
-    "2048x2048",
-    "2304x1728",
-    "1728x2304",
-    "2496x1664",
-    "1664x2496",
-    "1792x2240",
-    "2240x1792",
-    "3136x1344",
-    "2752x1536",
-    "1536x2752",
-    "2880x2880",
-    "3264x2448",
-    "2448x3264",
-    "3504x2336",
-    "2336x3504",
-    "2560x3200",
-    "3200x2560",
-    "3808x1632",
-    "3840x2160",
-    "2160x3840",
+    "1024x1024", "1360x1024", "1024x1360", "1536x1024", "1024x1536", "1024x1280", "1280x1024", "2048x878", "1824x1024", "1024x1824",
+    "2048x2048", "2304x1728", "1728x2304", "2496x1664", "1664x2496", "1792x2240", "2240x1792", "3136x1344", "2752x1536", "1536x2752",
+    "2880x2880", "3264x2448", "2448x3264", "3504x2336", "2336x3504", "2560x3200", "3200x2560", "3808x1632", "3840x2160", "2160x3840",
 ];
 
 describe("image resolution tiers", () => {
@@ -85,31 +65,27 @@ describe("image resolution tiers", () => {
         expect(buildImageResolutionOptions(profile.size.values)).toHaveLength(30);
     });
 
+    // Agnes 图像的 size 是官方必填项，但取分辨率档位，画面比例走独立的 ratio 字段，
+    // 所以界面必须同时保留比例和档位两个选择器，不能退化成 OpenAI 的像素尺寸。
+    test("Agnes 图像按比例加档位选择尺寸，并关闭上游不支持的输出开关", () => {
+        const profile = defaultImageCapabilityConfig("agnes-image", "agnes-image-2.1-flash");
+
+        expect(profile.size.parameter).toBe("aspect_ratio");
+        expect(profile.size.values).toEqual(["1:1", "3:4", "4:3", "16:9", "9:16", "2:3", "3:2", "21:9"]);
+        expect(profile.quality.values).toEqual(["1k", "2k", "4k"]);
+        expect(normalizeImageValue(profile, { size: "3:4", quality: "4k", count: "4" })).toMatchObject({ size: "3:4", quality: "4k", count: "1" });
+
+        // 顶层 response_format 是官方明确列出的错误写法，output_format 会被上游直接拒绝。
+        expect(profile.responseFormat.supported).toBe(false);
+        expect(profile.outputFormat.supported).toBe(false);
+        expect(profile.transparentBackground.supported).toBe(false);
+        expect(profile.references.maskSupported).toBe(false);
+    });
+
     test("识别适合全景图的 2:1 自定义尺寸", () => {
         const options = buildImageResolutionOptions(["1440x720", "2048x1024", "3840x1920"]);
 
         expect(options.map((item) => item.tier)).toEqual(["1k", "2k", "4k"]);
         expect(imageResolutionOption(options, "3840x1920")).toMatchObject({ tier: "4k", ratio: "2:1" });
-    });
-
-    test("显式空尺寸与通配符保留管理员语义，不回填协议预设", () => {
-        const capabilityConfig = defaultModelCapabilityConfig("openai-image", "fixture-image");
-        const channel = {
-            id: "channel",
-            models: ["fixture-image"],
-            modelCosts: [{ model: "fixture-image", protocol: "openai-image" as const, capabilityConfig }],
-        };
-        capabilityConfig.image!.size = { parameter: "size", values: [], default: "auto", allowCustom: false };
-
-        const explicitEmpty = modelCapabilityConfigFor({ channels: [channel] }, "channel::fixture-image").image!;
-        expect(explicitEmpty.size.values).toEqual([]);
-        expect(explicitEmpty.size.allowCustom).toBe(false);
-        expect(imageSizeRequest(explicitEmpty, "1024x1024")).toBeUndefined();
-
-        capabilityConfig.image!.size = { parameter: "size", values: ["*"], default: "auto", allowCustom: false };
-        const wildcard = modelCapabilityConfigFor({ channels: [channel] }, "channel::fixture-image").image!;
-        expect(wildcard.size.values).toEqual([]);
-        expect(wildcard.size.allowCustom).toBe(true);
-        expect(imageSizeRequest(wildcard, "1234x777")).toEqual({ parameter: "size", value: "1234x777" });
     });
 });

@@ -11,11 +11,13 @@ import { modelCapabilityConfigFor, workflowFieldCurrentValue, workflowFieldHasSt
 import { modelRequestOptions, resolveCompatibleModel, resolveModelGenerationDefaults, resolveVideoOperation, type ModelGenerationDefaults, type ModelRequirements } from "@/lib/model-selection";
 import { imageMetadata } from "@/lib/canvas/canvas-generation-task-sync";
 import { ensureMediaNodeMinimumSize } from "@/lib/canvas/canvas-node-size";
+import { interruptFileUpload } from "@/lib/canvas/canvas-file-upload";
 import { isCanvasWorkflowProvider, resolveCanvasWorkflowProvider } from "@/lib/canvas/canvas-workflow";
 import type { CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import { CanvasNodeType, type CanvasAssistantSession, type CanvasConnection, type CanvasImageGenerationType, type CanvasNodeData, type CanvasNodeMetadata, type CanvasVideoEditOperation } from "@/types/canvas";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+import { generationSpecMetadata, readNodeGenerationSpec, resolveGenerationSelection } from "@/lib/canvas/generation-contract";
 
 export async function runBackendCanvasGenerationTask(
     {
@@ -232,6 +234,19 @@ export function buildImageGenerationMetadata(type: CanvasImageGenerationType, co
 }
 
 export function nodeReferenceImage(node: CanvasNodeData): ReferenceImage | null {
+    if (node.type === CanvasNodeType.MediaConversion) {
+        // 转换结果只在成功物化后作为生成参考；运行中、跳过和失败状态都不能透传旧结果。
+        const conversion = node.metadata?.mediaConversion;
+        const storageKey = conversion?.resultStorageKey || node.metadata?.storageKey;
+        if (conversion?.status !== "completed" || !storageKey) return null;
+        return {
+            id: node.id,
+            name: node.title || `conversion-${node.id}.png`,
+            type: node.metadata?.mimeType || "image/png",
+            dataUrl: node.metadata?.content || "",
+            storageKey,
+        };
+    }
     if (node.type !== CanvasNodeType.Image || (!node.metadata?.content && !node.metadata?.storageKey)) return null;
     return {
         id: node.id,
@@ -395,22 +410,27 @@ export function getGenerationCount(count: string) {
     return Math.max(1, Math.min(15, Math.floor(Math.abs(Number(count)) || 1)));
 }
 
-export function generationWorkflowMetadata(config: AiConfig): Pick<CanvasNodeMetadata, "workflowProvider" | "runningHubWorkflowId" | "runningHubWorkflowKind" | "comfyBridgeWorkflowId"> {
+export function generationWorkflowMetadata(config: AiConfig): Pick<CanvasNodeMetadata, "workflowProvider" | "runningHubWorkflowId" | "runningHubWorkflowKind"> {
     const provider = config.taskWorkflowProvider || "model";
     return {
         workflowProvider: provider,
         runningHubWorkflowId: provider === "runninghub" ? config.runningHub.workflowId : undefined,
         runningHubWorkflowKind: provider === "runninghub" ? config.runningHub.selectedKind : undefined,
-        comfyBridgeWorkflowId: provider === "comfyui" ? config.comfyBridge.workflowId : undefined,
     };
 }
 
-export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode, requirements?: ModelRequirements): AiConfig {
+export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode, requirements?: ModelRequirements, displayOnly = false): AiConfig {
+    const generationSpec = node ? readNodeGenerationSpec(node) : undefined;
+    const selection = generationSpec?.mode === mode ? generationSpec.modelSelection : undefined;
+    const selectedModel = resolveGenerationSelection(config, selection);
+    if (selection && !selectedModel && !displayOnly) throw new Error("节点选择的模型或渠道已不可用，请重新选择模型后生成");
+    if (node && generationSpec?.mode === mode) node = { ...node, metadata: { ...node.metadata, ...generationSpecMetadata(generationSpec) } };
     // 只有独立 Config 节点读取工作流元数据；普通图片/视频/音频节点始终按基础模型生成。
     const workflowProvider = mode !== "text" && node?.type === CanvasNodeType.Config ? (resolveCanvasWorkflowProvider(node.metadata) === "comfyui" ? "comfyui" : "runninghub") : "model";
     const defaultModel = mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : mode === "audio" ? config.audioModel : config.textModel;
     const fallbackModel = mode === "image" ? defaultConfig.imageModel : mode === "video" ? defaultConfig.videoModel : mode === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
-    const storedModel = resolveCanvasGenerationModel(config, node?.metadata?.model, mode);
+    const storedModel = resolveCanvasGenerationModel(config, selectedModel || node?.metadata?.model, mode);
+    if (selection && selectedModel && !storedModel && !displayOnly) throw new Error("节点选择的模型不支持当前生成模式，请重新选择");
     const preferredModel = storedModel || resolveCanvasGenerationModel(config, defaultModel, mode) || fallbackModel;
     // 先合并节点上的实时选择，再做兼容性匹配。否则路由只看到全局默认值，节点改过的时长、分辨率或布尔能力无法参与分流。
     const workflowParameters = node?.metadata?.workflowParameters || {};
@@ -537,10 +557,10 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         quality: generationDefaults.quality || requestedConfig.quality,
         size: generationDefaults.size ?? requestedConfig.size,
         transparentBackground: generationDefaults.transparentBackground || (requestedConfig.transparentBackground === "true" ? "true" : "false"),
-        videoSeconds: generationDefaults.videoSeconds || requestedConfig.videoSeconds,
+        videoSeconds: generationDefaults.videoSeconds ?? requestedConfig.videoSeconds,
         vquality: generationDefaults.vquality ?? requestedConfig.vquality,
-        videoGenerateAudio: generationDefaults.videoGenerateAudio || requestedConfig.videoGenerateAudio,
-        videoWatermark: generationDefaults.videoWatermark || requestedConfig.videoWatermark,
+        videoGenerateAudio: generationDefaults.videoGenerateAudio ?? requestedConfig.videoGenerateAudio,
+        videoWatermark: generationDefaults.videoWatermark ?? requestedConfig.videoWatermark,
         videoArkPrivateAssetUpload: requestedConfig.videoArkPrivateAssetUpload,
         count: generationDefaults.count || requestedConfig.count,
     };
@@ -585,7 +605,7 @@ export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
     const configHeight = NODE_DEFAULT_SIZE[CanvasNodeType.Config].height;
     let changed = false;
     const reset = nodes.map((node) => {
-        const mediaNode = ensureMediaNodeMinimumSize(node);
+        const mediaNode = ensureMediaNodeMinimumSize(interruptFileUpload(node));
         const resizedNode =
             mediaNode.type === CanvasNodeType.Config && (mediaNode.width < configWidth || mediaNode.height < configHeight)
                 ? { ...mediaNode, width: Math.max(mediaNode.width, configWidth), height: Math.max(mediaNode.height, configHeight) }

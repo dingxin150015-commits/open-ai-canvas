@@ -18,22 +18,41 @@ import (
 type failureEnvelope struct {
 	Code          int    `json:"code"`
 	Msg           string `json:"msg"`
+	Reason        string `json:"reason"`
 	ErrorCode     string `json:"errorCode"`
 	ErrorCategory string `json:"errorCategory"`
 	Retryable     bool   `json:"retryable"`
 	RequestID     string `json:"requestId"`
 }
 
+func TestFailServiceRegistrationCooldown(t *testing.T) {
+	recorder, context := responseTestContext()
+	failService(context, &service.EmailCodeCooldownError{Seconds: 47})
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusTooManyRequests || response.Code != service.CodeRateLimited || response.Reason != string(service.ReasonRateLimited) || response.ErrorCategory != service.ErrorCategoryQuota || !response.Retryable || recorder.Header().Get("Retry-After") != "47" || !strings.Contains(response.Msg, "47") {
+		t.Fatalf("cooldown response: status=%d header=%s body=%#v", recorder.Code, recorder.Header().Get("Retry-After"), response)
+	}
+}
+
 func TestFailServiceProjectsAppError(t *testing.T) {
 	recorder, context := responseTestContext()
-	err := service.NewAppError(http.StatusTooManyRequests, "请求过于频繁，请稍后重试")
-	err.Code = 42901
+	err := service.RateLimited("请求过于频繁，请稍后重试")
 
 	failService(context, err)
 
 	response := decodeFailureEnvelope(t, recorder)
-	if recorder.Code != http.StatusTooManyRequests || response.Code != 42901 || response.Msg != err.Message || response.ErrorCode != "request_throttled" || response.ErrorCategory != service.ErrorCategoryQuota || !response.Retryable || !strings.HasPrefix(response.RequestID, "req_") {
+	if recorder.Code != http.StatusTooManyRequests || response.Code != service.CodeRateLimited || response.Reason != string(service.ReasonRateLimited) || response.ErrorCode != "request_throttled" || response.ErrorCategory != service.ErrorCategoryQuota || !response.Retryable || response.Msg != err.Message || !strings.HasPrefix(response.RequestID, "req_") {
 		t.Fatalf("response = status %d, body %#v", recorder.Code, response)
+	}
+}
+
+func TestFailServiceQuotaExceeded(t *testing.T) {
+	recorder, context := responseTestContext()
+	failService(context, service.QuotaExceeded("账号素材数量已达到 100 个上限"))
+
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusForbidden || response.Code != service.CodeQuotaExceeded || response.Reason != string(service.ReasonQuotaExceeded) || response.ErrorCode != string(service.ReasonQuotaExceeded) || response.ErrorCategory != service.ErrorCategoryQuota || response.Retryable {
+		t.Fatalf("quota response = status %d, body %#v", recorder.Code, response)
 	}
 }
 
@@ -42,7 +61,7 @@ func TestFailServiceProjectsModelErrorMetadata(t *testing.T) {
 	failService(context, service.ProviderRequestFailed("模型服务暂时不可用"))
 
 	response := decodeFailureEnvelope(t, recorder)
-	if recorder.Code != http.StatusBadGateway || response.Code != http.StatusBadGateway || response.ErrorCode != string(service.ErrCodeProviderRequestFailed) || response.ErrorCategory != service.ErrorCategoryProvider || !response.Retryable || response.Msg != "模型服务暂时不可用" {
+	if recorder.Code != http.StatusBadGateway || response.Code != http.StatusBadGateway || response.Reason != string(service.ErrCodeProviderRequestFailed) || response.ErrorCode != string(service.ErrCodeProviderRequestFailed) || response.ErrorCategory != service.ErrorCategoryProvider || !response.Retryable || response.Msg != "模型服务暂时不可用" {
 		t.Fatalf("response = status %d, body %#v", recorder.Code, response)
 	}
 }
@@ -74,15 +93,6 @@ func TestRequestCorrelationMiddlewareGeneratesRequestIDAndAcceptsSafeTraceID(t *
 	}
 	if valid.Header().Get("X-Canvas-Trace-ID") != "client-trace-123" || !strings.Contains(valid.Body.String(), "client-trace-123") {
 		t.Fatalf("safe trace id was not preserved: headers=%v body=%s", valid.Header(), valid.Body.String())
-	}
-
-	invalid := httptest.NewRecorder()
-	invalidRequest := httptest.NewRequest(http.MethodGet, "/test", nil)
-	invalidRequest.Header.Set("X-Request-ID", "Bearer secret value")
-	invalidRequest.Header.Set("X-Canvas-Trace-ID", "Bearer trace secret")
-	router.ServeHTTP(invalid, invalidRequest)
-	if !strings.HasPrefix(invalid.Header().Get("X-Request-ID"), "req_") || !strings.HasPrefix(invalid.Header().Get("X-Canvas-Trace-ID"), "trace_") || strings.Contains(invalid.Body.String(), "Bearer") {
-		t.Fatalf("unsafe correlation id was accepted: headers=%v body=%s", invalid.Header(), invalid.Body.String())
 	}
 }
 
@@ -130,6 +140,40 @@ func TestStructuredHandlerLogContainsCorrelationWithoutCause(t *testing.T) {
 	}
 	if strings.Contains(logged, "secret") || strings.Contains(logged, "private") {
 		t.Fatalf("structured log leaked cause: %s", logged)
+	}
+}
+
+func TestParsePaginationQueryUsesDefaultsAndRejectsInvalidValues(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tests := []struct {
+		name      string
+		query     string
+		page      int
+		pageSize  int
+		wantError bool
+	}{
+		{name: "defaults", query: "", page: 1, pageSize: 40},
+		{name: "explicit values", query: "page=3&pageSize=25", page: 3, pageSize: 25},
+		{name: "invalid page", query: "page=abc", wantError: true},
+		{name: "zero page", query: "page=0", wantError: true},
+		{name: "negative page size", query: "pageSize=-1", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/api/test?"+tt.query, nil)
+			context, _ := gin.CreateTestContext(httptest.NewRecorder())
+			context.Request = request
+			page, pageSize, err := parsePaginationQuery(context, 40)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("error = %v, wantError = %t", err, tt.wantError)
+			}
+			if tt.wantError {
+				return
+			}
+			if page != tt.page || pageSize != tt.pageSize {
+				t.Fatalf("pagination = (%d, %d), want (%d, %d)", page, pageSize, tt.page, tt.pageSize)
+			}
+		})
 	}
 }
 

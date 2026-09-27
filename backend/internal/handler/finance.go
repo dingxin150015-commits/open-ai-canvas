@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"infinite-canvas/backend/internal/service"
@@ -17,8 +16,11 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "30"))
+		page, limit, err := parsePaginationQuery(c, 30)
+		if err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
 		wallet, err := svc.Wallet(user, c.Query("type"), page, limit)
 		if err != nil {
 			failService(c, err)
@@ -203,7 +205,11 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		ok(c, gin.H{"models": items})
+		models := make([]adminChannelModelResponse, 0, len(items))
+		for _, item := range items {
+			models = append(models, adminChannelModel(item))
+		}
+		ok(c, gin.H{"models": models})
 	})
 	r.POST("/admin/channels/:id/models/fetch", func(c *gin.Context) {
 		user, err := currentUser(c, svc)
@@ -315,6 +321,23 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 	r.PATCH("/admin/channels/:id/models/:modelId", func(c *gin.Context) {
 		saveChannelModel(c, svc, c.Param("modelId"))
 	})
+	r.PATCH("/admin/channels/:id/models/:modelId/sort", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		var req service.ChannelModelSortRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		if err := svc.UpdateAdminChannelModelSort(user, c.Param("id"), c.Param("modelId"), req); err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, gin.H{"updated": true})
+	})
 	r.DELETE("/admin/channels/:id/models/:modelId", func(c *gin.Context) {
 		user, err := currentUser(c, svc)
 		if err != nil {
@@ -334,8 +357,11 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+		page, limit, err := parsePaginationQuery(c, 20)
+		if err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
 		items, err := svc.AdminRedeemBatchPage(user, service.AdminListQuery{Keyword: c.Query("keyword"), Status: c.Query("validity"), Page: page, Limit: limit})
 		if err != nil {
 			failService(c, err)
@@ -372,8 +398,11 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+		page, limit, err := parsePaginationQuery(c, 50)
+		if err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
 		result, err := svc.AdminRedeemCodePage(user, c.Param("id"), c.Query("status"), page, limit)
 		if err != nil {
 			failService(c, err)
@@ -431,8 +460,11 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+		page, limit, err := parsePaginationQuery(c, 20)
+		if err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
 		items, err := svc.AdminBillingOrderPage(user, service.AdminListQuery{Keyword: c.Query("keyword"), Status: c.DefaultQuery("status", "review"), Page: page, Limit: limit})
 		if err != nil {
 			failService(c, err)
@@ -495,5 +527,5 @@ func saveChannelModel(c *gin.Context, svc *service.Service, id string) {
 		failService(c, err)
 		return
 	}
-	ok(c, gin.H{"model": item})
+	ok(c, gin.H{"model": adminChannelModel(*item)})
 }

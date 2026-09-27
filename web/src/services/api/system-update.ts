@@ -1,4 +1,4 @@
-import { apiClient, request } from "./request";
+import { http } from "./request";
 
 export type UpdatePhase = "idle" | "checking" | "ready" | "no_update" | "preflight" | "backing_up" | "pulling" | "draining" | "migrating" | "switching" | "verifying" | "succeeded" | "rolling_back" | "rolled_back" | "failed" | "manual_intervention";
 
@@ -62,17 +62,17 @@ export type SystemUpdateStatus = {
 };
 
 export function getSystemUpdateStatus(signal?: AbortSignal) {
-    return request<SystemUpdateStatus>(apiClient.get("/admin/system-update", { signal }));
+    return http.get<SystemUpdateStatus>("/admin/system-update", { signal });
 }
 
 export function checkSystemUpdate() {
-    return request<SystemUpdateStatus>(apiClient.post("/admin/system-update/check"));
+    return http.post<SystemUpdateStatus>("/admin/system-update/check");
 }
 
 export function startSystemUpdate(targetVersion: string) {
-    return request<SystemUpdateStatus>(apiClient.post("/admin/system-update/start", { targetVersion }));
+    return http.post<SystemUpdateStatus>("/admin/system-update/start", { targetVersion });
 }
 
 export function rollbackSystemUpdate(reason: string) {
-    return request<SystemUpdateStatus>(apiClient.post("/admin/system-update/rollback", { reason }));
+    return http.post<SystemUpdateStatus>("/admin/system-update/rollback", { reason });
 }

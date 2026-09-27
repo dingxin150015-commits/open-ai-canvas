@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"infinite-canvas/backend/internal/service"
@@ -20,7 +21,7 @@ func HandleRecovery(c *gin.Context, recovered any) {
 
 func ok(c *gin.Context, data any) {
 	_ = RequestID(c)
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": data, "msg": "ok"})
+	c.JSON(http.StatusOK, gin.H{"code": service.CodeOK, "data": data, "msg": "ok"})
 }
 
 // fail 只接受调用方已经确认可公开的错误；service 返回值统一交给 failService 投影。
@@ -33,52 +34,52 @@ func fail(c *gin.Context, status int, err error) {
 		failInternal(c, status, err)
 		return
 	}
-	publicCode, category, retryable := handlerErrorMetadata(status)
-	logHandlerFailure(c, status, category, publicCode, retryable, err)
-	writeFailure(c, status, status, safeClientErrorMessage(status), publicCode, category, retryable)
+	reason := service.ReasonForStatus(status)
+	logHandlerFailure(c, status, reason, false, err)
+	writeFailure(c, status, status, reason, safeClientErrorMessage(status), false)
 }
 
 func failService(c *gin.Context, err error) {
+	var cooldown *service.EmailCodeCooldownError
+	if errors.As(err, &cooldown) {
+		c.Header("Retry-After", strconv.Itoa(cooldown.Seconds))
+		writeFailure(c, http.StatusTooManyRequests, service.CodeRateLimited, service.ReasonRateLimited, cooldown.Error(), true)
+		return
+	}
 	var modelErr *service.ModelError
-	if errors.As(err, &modelErr) && modelErr.AppError != nil {
-		writeAppFailure(c, modelErr.AppError, string(modelErr.ErrorCode), err)
+	if errors.As(err, &modelErr) && modelErr.AppError != nil && validErrorStatus(modelErr.Status) {
+		writeAppError(c, modelErr.AppError)
 		return
 	}
 	var appErr *service.AppError
 	if errors.As(err, &appErr) && validErrorStatus(appErr.Status) {
-		writeAppFailure(c, appErr, appErr.PublicCode, err)
+		writeAppError(c, appErr)
 		return
 	}
 	failInternal(c, http.StatusInternalServerError, err)
 }
 
-func writeAppFailure(c *gin.Context, appErr *service.AppError, publicCode string, diagnostic error) {
-	status := appErr.Status
-	if !validErrorStatus(status) {
-		status = http.StatusInternalServerError
-	}
+func writeAppError(c *gin.Context, appErr *service.AppError) {
 	code := appErr.Code
 	if code == 0 {
-		code = status
+		code = appErr.Status
 	}
-	if strings.TrimSpace(publicCode) == "" {
-		publicCode = appErr.PublicCode
+	reason := appErr.Reason
+	if reason == "" {
+		reason = service.ReasonForStatus(appErr.Status)
 	}
-	category := strings.TrimSpace(appErr.Category)
-	defaultCode, defaultCategory, defaultRetryable := handlerErrorMetadata(status)
-	if strings.TrimSpace(publicCode) == "" {
-		publicCode = defaultCode
-	}
-	if category == "" {
-		category = defaultCategory
-	}
-	retryable := appErr.Retryable || defaultRetryable
 	message := strings.TrimSpace(appErr.Message)
 	if message == "" {
-		message = safeInternalErrorMessage(status)
+		message = safeInternalErrorMessage(appErr.Status)
 	}
-	logHandlerFailure(c, status, category, publicCode, retryable, diagnostic)
-	writeFailure(c, status, code, message, publicCode, category, retryable)
+	if appErr.Status >= http.StatusInternalServerError {
+		diagnosticErr := appErr.Cause
+		if diagnosticErr == nil {
+			diagnosticErr = appErr
+		}
+		logHandlerFailure(c, appErr.Status, reason, appErr.Retryable, diagnosticErr)
+	}
+	writeFailure(c, appErr.Status, code, reason, message, appErr.Retryable)
 }
 
 // failInternal 保留真实 HTTP 状态，但绝不把未分类错误原文写入响应。
@@ -86,16 +87,25 @@ func failInternal(c *gin.Context, status int, err error) {
 	if !validErrorStatus(status) {
 		status = http.StatusInternalServerError
 	}
-	publicCode, category, retryable := handlerErrorMetadata(status)
-	logHandlerFailure(c, status, category, publicCode, retryable, err)
-	writeFailure(c, status, status, safeInternalErrorMessage(status), publicCode, category, retryable)
+	reason := service.ReasonForStatus(status)
+	logHandlerFailure(c, status, reason, true, err)
+	writeFailure(c, status, status, reason, safeInternalErrorMessage(status), true)
 }
 
-func writeFailure(c *gin.Context, status int, code int, message string, publicCode string, category string, retryable bool) {
-	c.JSON(status, gin.H{
-		"code": code, "data": nil, "msg": message,
-		"errorCode": publicCode, "errorCategory": category, "retryable": retryable, "requestId": RequestID(c),
-	})
+func writeFailure(c *gin.Context, status int, code int, reason service.ErrorReason, message string, retryable bool) {
+	body := gin.H{"code": code, "data": nil, "msg": message}
+	if reason != "" {
+		body["reason"] = reason
+	}
+	publicCode, category, defaultRetryable := handlerErrorMetadata(status)
+	if reason != "" {
+		publicCode, category, defaultRetryable = handlerMetadataForReason(reason, status)
+	}
+	body["errorCode"] = publicCode
+	body["errorCategory"] = category
+	body["retryable"] = retryable || defaultRetryable
+	body["requestId"] = RequestID(c)
+	c.JSON(status, body)
 }
 
 func validErrorStatus(status int) bool {
@@ -115,7 +125,10 @@ func safeInternalErrorMessage(status int) string {
 	}
 }
 
-func logHandlerFailure(c *gin.Context, status int, category string, publicCode string, retryable bool, err error) {
+func logHandlerFailure(c *gin.Context, status int, reason service.ErrorReason, retryable bool, err error) {
+	if err == nil {
+		return
+	}
 	method := ""
 	route := ""
 	if c != nil && c.Request != nil {
@@ -125,8 +138,9 @@ func logHandlerFailure(c *gin.Context, status int, category string, publicCode s
 			route = "<unmatched>"
 		}
 	}
-	// 只记录关联键、分类和 Go 类型；错误原文、URL、请求体和凭据均不得进入进程日志。
-	log.Printf("handler request failed: request_id=%s method=%s route=%s status=%d category=%s error_code=%s retryable=%t error_type=%T", RequestID(c), method, route, status, category, publicCode, retryable, err)
+	publicCode, category, defaultRetryable := handlerMetadataForReason(reason, status)
+	// 只记录关联键、分类和 Go 类型；错误原文、URL、请求体和凭据不得进入进程日志。
+	log.Printf("handler request failed: request_id=%s method=%s route=%s status=%d category=%s error_code=%s retryable=%t error_type=%T", RequestID(c), method, route, status, category, publicCode, retryable || defaultRetryable, err)
 }
 
 func isStructuredServiceError(err error) bool {
@@ -139,6 +153,29 @@ func isStructuredServiceError(err error) bool {
 	}
 	var appErr *service.AppError
 	return errors.As(err, &appErr)
+}
+
+func handlerMetadataForReason(reason service.ErrorReason, status int) (string, string, bool) {
+	switch string(reason) {
+	case string(service.ErrCodeModelCapabilityNotSupported):
+		return string(reason), service.ErrorCategoryCapability, false
+	case string(service.ErrCodeModelPriceNotConfigured):
+		return string(reason), service.ErrorCategoryPricing, false
+	case string(service.ErrCodeModelRouteUnavailable):
+		return string(reason), service.ErrorCategoryRouting, true
+	case string(service.ErrCodeProviderRequestFailed):
+		return string(reason), service.ErrorCategoryProvider, true
+	case string(service.ErrCodeModelCatalogMismatch):
+		return string(reason), service.ErrorCategoryConflict, false
+	case string(service.ErrCodeInvalidModelSelection):
+		return string(reason), service.ErrorCategoryValidation, false
+	case string(service.ReasonQuotaExceeded):
+		return string(reason), service.ErrorCategoryQuota, false
+	case string(service.ReasonRateLimited):
+		return "request_throttled", service.ErrorCategoryQuota, true
+	default:
+		return handlerErrorMetadata(status)
+	}
 }
 
 func handlerErrorMetadata(status int) (string, string, bool) {

@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { Archive, FlaskConical, GitBranch, Layers3, Pencil, Plus, Search } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { PaginationBar } from "@/components/layout/workspace-page";
+import { PaginationBar } from "@/pages/admin/components/admin-ui";
 import { ModelIconPicker, ModelLogo } from "@/components/model-logo";
 import { ChoiceBrowser } from "@/components/choice-browser";
 import { ModelEditorModal } from "@/components/model-editor-modal";
@@ -93,8 +93,8 @@ export default function LogicalModelsPage() {
     const reload = async () => {
         setLoading(true);
         try {
-            const [modelResult, firstChannelPage] = await Promise.all([listAdminLogicalModels(), listAdminChannels({ page: 1, limit: 100 })]);
-            const remainingChannelPages = await Promise.all(Array.from({ length: Math.max(0, Math.ceil(firstChannelPage.total / firstChannelPage.limit) - 1) }, (_, index) => listAdminChannels({ page: index + 2, limit: firstChannelPage.limit })));
+            const [modelResult, firstChannelPage] = await Promise.all([listAdminLogicalModels(), listAdminChannels({ page: 1, pageSize: 100 })]);
+            const remainingChannelPages = await Promise.all(Array.from({ length: Math.max(0, Math.ceil(firstChannelPage.total / firstChannelPage.pageSize) - 1) }, (_, index) => listAdminChannels({ page: index + 2, pageSize: firstChannelPage.pageSize })));
             const channels = [firstChannelPage, ...remainingChannelPages].flatMap((result) => result.channels);
             const channelModelResults = await Promise.all(channels.map((channel) => listAdminChannelModels(channel.id)));
             setModels(modelResult.models);

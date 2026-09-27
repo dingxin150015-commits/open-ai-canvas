@@ -42,8 +42,7 @@
 | `create.body.contents[0].parts` | `{"$concatArrays":[[{"text":{"$ref":"request.prompt"}}],{"$map":{"from":{"$ref":"request.images"},"as":"media","in":{"$if":{"condition":{"$ref":"media.dataUrl"},"then":{"inlineData":{"mimeType":{"$dataMime":{"$ref":"media.dataUrl"}},"data":{"$dataPayload":{"$ref":"media.dataUrl"}}}},"else":{"fileData":{"mimeType":{"$omitEmpty":{"$ref":"media.mimeType"}},"fileUri":{"$ref":"media.url"}}}}}}}]}` |
 | `create.body.generationConfig.responseModalities` | `{"$coalesce":[{"$ref":"request.providerOptions.gemini-image.responseModalities"},["TEXT","IMAGE"]]}` |
 | `create.body.generationConfig.imageConfig.aspectRatio` | `{"$omitEmpty":{"$ref":"request.aspectRatio"}}` |
-| `create.body.generationConfig.imageConfig.imageSize` | `{"$omitEmpty":{"$coalesce":[{"$ref":"request.resolution"},{"$ref":"request.quality"}]}}` |
-| `create.body.generationConfig.candidateCount` | `{"$omitEmpty":{"$ref":"request.imageCount"}}` |
+| `create.body.generationConfig.imageConfig.imageSize` | `{"$omitEmpty":{"$coalesce":[{"$switch":{"cases":[{"when":{"$in":[{"$lower":{"$ref":"request.quality"}},["1k","low"]]},"then":"1K"},{"when":{"$in":[{"$lower":{"$ref":"request.quality"}},["2k","medium"]]},"then":"2K"},{"when":{"$in":[{"$lower":{"$ref":"request.quality"}},["4k","high"]]},"then":"4K"}],"default":null}},{"$switch":{"cases":[{"when":{"$in":[{"$lower":{"$ref":"request.resolution"}},["1k","low"]]},"then":"1K"},{"when":{"$in":[{"$lower":{"$ref":"request.resolution"}},["2k","medium"]]},"then":"2K"},{"when":{"$in":[{"$lower":{"$ref":"request.resolution"}},["4k","high"]]},"then":"4K"}],"default":null}}]}}` |
 | `create.body.generationConfig.temperature` | `{"$omitEmpty":{"$ref":"request.providerOptions.gemini-image.temperature"}}` |
 | `create.body.generationConfig.topP` | `{"$omitEmpty":{"$ref":"request.providerOptions.gemini-image.topP"}}` |
 | `create.body.generationConfig.topK` | `{"$omitEmpty":{"$ref":"request.providerOptions.gemini-image.topK"}}` |
@@ -276,18 +275,117 @@
                   "$omitEmpty": {
                     "$coalesce": [
                       {
-                        "$ref": "request.resolution"
+                        "$switch": {
+                          "cases": [
+                            {
+                              "when": {
+                                "$in": [
+                                  {
+                                    "$lower": {
+                                      "$ref": "request.quality"
+                                    }
+                                  },
+                                  [
+                                    "1k",
+                                    "low"
+                                  ]
+                                ]
+                              },
+                              "then": "1K"
+                            },
+                            {
+                              "when": {
+                                "$in": [
+                                  {
+                                    "$lower": {
+                                      "$ref": "request.quality"
+                                    }
+                                  },
+                                  [
+                                    "2k",
+                                    "medium"
+                                  ]
+                                ]
+                              },
+                              "then": "2K"
+                            },
+                            {
+                              "when": {
+                                "$in": [
+                                  {
+                                    "$lower": {
+                                      "$ref": "request.quality"
+                                    }
+                                  },
+                                  [
+                                    "4k",
+                                    "high"
+                                  ]
+                                ]
+                              },
+                              "then": "4K"
+                            }
+                          ],
+                          "default": null
+                        }
                       },
                       {
-                        "$ref": "request.quality"
+                        "$switch": {
+                          "cases": [
+                            {
+                              "when": {
+                                "$in": [
+                                  {
+                                    "$lower": {
+                                      "$ref": "request.resolution"
+                                    }
+                                  },
+                                  [
+                                    "1k",
+                                    "low"
+                                  ]
+                                ]
+                              },
+                              "then": "1K"
+                            },
+                            {
+                              "when": {
+                                "$in": [
+                                  {
+                                    "$lower": {
+                                      "$ref": "request.resolution"
+                                    }
+                                  },
+                                  [
+                                    "2k",
+                                    "medium"
+                                  ]
+                                ]
+                              },
+                              "then": "2K"
+                            },
+                            {
+                              "when": {
+                                "$in": [
+                                  {
+                                    "$lower": {
+                                      "$ref": "request.resolution"
+                                    }
+                                  },
+                                  [
+                                    "4k",
+                                    "high"
+                                  ]
+                                ]
+                              },
+                              "then": "4K"
+                            }
+                          ],
+                          "default": null
+                        }
                       }
                     ]
                   }
-                }
-              },
-              "candidateCount": {
-                "$omitEmpty": {
-                  "$ref": "request.imageCount"
                 }
               },
               "temperature": {

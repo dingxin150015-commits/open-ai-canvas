@@ -63,8 +63,17 @@ func TestPostgresAssetIDMigrationsCoverEveryAssetIDColumn(t *testing.T) {
 	}
 }
 
+func TestModelsIncludeCloudAgentCanvasMutation(t *testing.T) {
+	for _, item := range Models() {
+		if _, ok := item.(*model.CloudAgentCanvasMutation); ok {
+			return
+		}
+	}
+	t.Fatal("Models must include CloudAgentCanvasMutation")
+}
+
 func TestBackfillChannelModelCatalogState(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("file:catalog-backfill?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,26 +83,18 @@ func TestBackfillChannelModelCatalogState(t *testing.T) {
 	configured := model.ChannelModel{ID: "configured", ChannelID: "channel", ModelKey: "configured-model", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, CapabilityConfigJSON: `{"version":1,"text":{"references":{"promptMaxChars":32000,"maxImages":0,"maxImageBytes":0,"maxVideos":0,"maxVideoBytes":0,"maxVideoDurationSeconds":0}}}`, BillingMode: "fixed_request", PriceVersion: 1}
 	incomplete := model.ChannelModel{ID: "incomplete", ChannelID: "channel", ModelKey: "incomplete-model", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, BillingMode: "fixed_request", PriceVersion: 1}
 	legacy := model.ChannelModel{ID: "legacy", ChannelID: "channel", ModelKey: "legacy-model", BillingMode: "fixed_request", PriceVersion: 1}
-	if err := db.Create(&configured).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&incomplete).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Create(&legacy).Error; err != nil {
-		t.Fatal(err)
+	for _, item := range []*model.ChannelModel{&configured, &incomplete, &legacy} {
+		if err := db.Create(item).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := backfillChannelModelCatalogState(db); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.First(&configured, "id = ?", configured.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.First(&legacy, "id = ?", legacy.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.First(&incomplete, "id = ?", incomplete.ID).Error; err != nil {
-		t.Fatal(err)
+	for _, item := range []*model.ChannelModel{&configured, &incomplete, &legacy} {
+		if err := db.First(item, "id = ?", item.ID).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	if configured.SupportStatus != model.ChannelModelSupportReady || configured.CatalogSource != "manual" {
 		t.Fatalf("configured backfill = %#v", configured)
@@ -103,5 +104,59 @@ func TestBackfillChannelModelCatalogState(t *testing.T) {
 	}
 	if incomplete.SupportStatus != model.ChannelModelSupportPlanned || incomplete.CatalogSource != "legacy" {
 		t.Fatalf("incomplete configured backfill = %#v", incomplete)
+	}
+}
+
+func TestMigrationPlanAcceptsProviderDurationVersionNineLineage(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:duration-v9-lineage?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&schemaMigration{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&schemaMigration{Version: 9, Name: "provider_duration_metering", Checksum: providerDurationMeteringChecksum}).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan, err := migrationsForDatabase(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan) != int(CurrentSchemaVersion) {
+		t.Fatalf("plan length = %d, want %d", len(plan), CurrentSchemaVersion)
+	}
+	if plan[8].version != 9 || plan[8].name != "provider_duration_metering" {
+		t.Fatalf("migration 9 = %#v", plan[8])
+	}
+	if plan[9].version != 10 || plan[9].name != "channel_presentation" {
+		t.Fatalf("migration 10 = %#v", plan[9])
+	}
+	last := plan[len(plan)-1]
+	if last.version != CurrentSchemaVersion || last.name != "comfy_bridge_runtime" {
+		t.Fatalf("last migration = %#v", last)
+	}
+}
+
+func TestMigrationPlanKeepsOfficialVersionNineLineage(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:official-v9-lineage?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&schemaMigration{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&schemaMigration{Version: 9, Name: "channel_presentation", Checksum: "sha256:channel-presentation-v9-20260908"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan, err := migrationsForDatabase(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan[8].version != 9 || plan[8].name != "channel_presentation" {
+		t.Fatalf("migration 9 = %#v", plan[8])
+	}
+	last := plan[len(plan)-1]
+	if last.version != CurrentSchemaVersion || last.name != "comfy_bridge_runtime" {
+		t.Fatalf("last migration = %#v", last)
 	}
 }

@@ -1,19 +1,22 @@
 import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob } from "@/services/image-storage";
 import { resourceIdFromStorageKey, resourceStorageKey, uploadResourceFile } from "@/services/api/resources";
-import { createGenerationTask, waitForGenerationTask, type GenerationTask } from "@/services/api/task-center";
+import { createGenerationTask, waitForGenerationTask, type GenerationTask, type CreateTaskInput } from "@/services/api/task-center";
 import { LOCAL_DREAMINA_WAIT_STOPPED_CODE, LocalDreaminaGenerationClientError, runLocalDreaminaGenerationTask, type LocalDreaminaGenerationInput, type LocalDreaminaGenerationTask } from "@/services/local-dreamina-generation";
 import { isLocalDreaminaBackgroundTask, localDreaminaTaskId, projectLocalDreaminaTask, stripLocalDreaminaTaskPrefix } from "@/services/local-dreamina-task-projection";
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
+import { projectDesktopLocalChannelRuntime } from "@/lib/desktop-local-channel";
 import { bailianContractModel, declaredGenerationContract, bailianModelKind, bailianReferencePrompt, bailianVideoOperation, validateBailianOptions, validateBailianFrames } from "@/lib/bailian-generation";
 import { grokImagePromptLimitError } from "@/lib/grok-image-prompt-limit";
 import { resolveGenerationWorkflowExecution, type GenerationWorkflowExecution } from "@/lib/generation-workflow-execution";
+import { isArkPlanBaseUrl } from "@/lib/seedance-video";
 import { resolveVideoOperation } from "@/lib/model-selection";
 import { logicalModelIDForConfig, modelOptionName, resolveModelChannel, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { useLocalDreaminaModelStore } from "@/stores/use-local-dreamina-model-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { buildBackendToolRequests, type ResponseFunctionTool, type ResponseInputMessage, type ToolChoice, type ToolResponseResult } from "@/services/api/image";
+import { assertAgentExchangeBudget } from "@/lib/canvas/agent-context-budget";
 
 export { logicalModelIDForConfig };
 
@@ -136,9 +139,9 @@ export async function runBackendGenerationTask(
         );
     }
     assertBackendRuntimeConfigured(config, mode);
-    const prepared = await prepareGenerationReferences({ referenceImages, referenceVideos, referenceAudios, mask });
+    const prepared = await prepareGenerationReferences({ config, mode, referenceImages, referenceVideos, referenceAudios, mask });
     throwIfAborted(signal);
-    return createAndWaitGenerationTask({ projectId, mode, prompt, config, referenceImages, referenceVideos, referenceAudios, textHistory, signal, metadata, onTaskUpdate, onTextDelta, streamText, enableThinking }, prepared, dependencies);
+    return createAndWaitGenerationTask({ projectId, mode, prompt, config, referenceImages, referenceVideos, referenceAudios, textHistory, mask, signal, metadata, onTaskUpdate, onTextDelta, streamText, enableThinking, clientOperationId, retryOf, attemptGroupId }, prepared, dependencies);
 }
 
 // 分镜等后台生产流程只需要可靠提交任务；任务状态与产物由项目工作区轮询和
@@ -153,7 +156,7 @@ export async function submitBackendGenerationTask(options: BackendGenerationTask
     return createBackendGenerationTask(options, prepared, dependencies);
 }
 
-export async function runBackendToolGenerationTask(options: {
+type BackendToolGenerationOptions = {
     prompt: string;
     config: AiConfig;
     messages: ResponseInputMessage[];
@@ -161,12 +164,29 @@ export async function runBackendToolGenerationTask(options: {
     toolChoice: ToolChoice;
     signal?: AbortSignal;
     onDelta?: (text: string) => void;
-}): Promise<ToolResponseResult> {
+    onTaskCreated?: (task: GenerationTask) => void;
+    metadata?: { source: string; nodeId?: string; runId?: string; stage?: string };
+};
+
+// 报价和执行复用完全相同的任务协议，准备阶段不提交模型任务。
+export function prepareBackendToolGenerationTask(options: BackendToolGenerationOptions): CreateTaskInput {
     throwIfAborted(options.signal);
     const logicalModelId = logicalModelIDForConfig(options.config);
     const requestConfig = resolveModelRequestConfig(options.config, options.config.model);
+    const capability = modelCapabilityConfigFor(options.config, requestConfig.model).text;
+    assertAgentExchangeBudget(options.messages, options.tools, options.config.systemPrompt || "", capability);
+    const imageKeys = new Set<string>();
+    for (const message of options.messages) {
+        if ("type" in message || message.role === "tool" || !Array.isArray(message.content)) continue;
+        for (const part of message.content) {
+            if (part.type !== "image_url") continue;
+            const key = part.image_url.url;
+            if (!resourceIdFromStorageKey(key)) throw new Error("看图素材尚未保存为资源，请让助手重新读取图片后继续。");
+            imageKeys.add(key);
+        }
+    }
     if (!logicalModelId && !requestConfig.channelId && !requestConfig.interfaceType) throw new Error("当前模型未选择可用请求协议");
-    const task = await createGenerationTask({
+    const task: CreateTaskInput = {
         type: "canvas_text",
         operation: "text",
         prompt: options.prompt,
@@ -175,11 +195,22 @@ export async function runBackendToolGenerationTask(options: {
         input: {
             mode: "text",
             prompt: options.prompt,
-            config: backendProviderConfig(options.config),
+            config: backendProviderConfig(options.config, "text"),
             agentRequests: buildBackendToolRequests(options.messages, options.tools, options.toolChoice, options.config),
-            metadata: { source: "canvas-online-agent" },
+            textOptions: { stream: modelCapabilityConfigFor(options.config, requestConfig.model).text?.streaming !== false },
+            referenceImages: [...imageKeys].map((storageKey) => ({ storageKey })),
+            metadata: options.metadata || { source: "canvas-online-agent" },
         },
-    });
+    };
+    if (new Blob([JSON.stringify(task)]).size > 15 * 1024 * 1024) {
+        throw new Error("本次图片或对话内容过多，请减少参考图片，或新建会话后继续。已有作品会保留。");
+    }
+    return task;
+}
+
+export async function runBackendToolGenerationTask(options: BackendToolGenerationOptions): Promise<ToolResponseResult> {
+    const task = await createGenerationTask(prepareBackendToolGenerationTask(options));
+    options.onTaskCreated?.(task);
     const completed = await waitForGenerationTask(task.id, { signal: options.signal, initialTask: task, onTextDelta: options.onDelta });
     const result = parseBackendGenerationResult(completed);
     return {
@@ -197,23 +228,18 @@ export async function runBackendGenerationTaskBatch(options: BackendGenerationTa
     if (usesLocalDreamina(options.config)) {
         await dependencies.ensureLocalDreaminaReady?.(options.signal);
         throwIfAborted(options.signal);
-        return Promise.allSettled(
-            Array.from({ length: count }, (_, batchIndex) => {
-                const retryContext = options.retryContextsByBatchIndex?.[batchIndex];
-                return runLocalDreaminaGeneration(
-                    {
-                        ...options,
-                        config: { ...options.config, count: "1" },
-                        metadata: { ...options.metadata, batchIndex, batchCount: count },
-                        localIdempotencyKey: options.localIdempotencyKey ? `${options.localIdempotencyKey}:${batchIndex + 1}` : undefined,
-                        clientOperationId: retryContext?.clientOperationId ?? (options.clientOperationId ? `${options.clientOperationId}:${batchIndex + 1}` : undefined),
-                        retryOf: retryContext?.retryOf ?? options.retryOf,
-                        attemptGroupId: retryContext?.attemptGroupId ?? options.attemptGroupId,
-                    },
-                    dependencies,
-                );
-            }),
-        );
+        return Promise.allSettled(Array.from({ length: count }, (_, batchIndex) => {
+            const retryContext = options.retryContextsByBatchIndex?.[batchIndex];
+            return runLocalDreaminaGeneration({
+                ...options,
+                config: { ...options.config, count: "1" },
+                metadata: { ...options.metadata, batchIndex, batchCount: count },
+                localIdempotencyKey: options.localIdempotencyKey ? `${options.localIdempotencyKey}:${batchIndex + 1}` : undefined,
+                clientOperationId: retryContext?.clientOperationId ?? (options.clientOperationId ? `${options.clientOperationId}:${batchIndex + 1}` : undefined),
+                retryOf: retryContext?.retryOf ?? options.retryOf,
+                attemptGroupId: retryContext?.attemptGroupId ?? options.attemptGroupId,
+            }, dependencies);
+        }));
     }
     const prepared = await prepareGenerationReferences(options);
     throwIfAborted(options.signal);
@@ -312,7 +338,6 @@ async function runLocalDreaminaGeneration(options: BackendGenerationTaskOptions,
         throw error;
     }
 }
-
 function generationOperation(options: BackendGenerationTaskOptions, nativeModel = true) {
     if (options.mode !== "video") return options.mode;
     const nativeOperation = bailianVideoOperation(options.config.model, options.referenceVideos?.length ?? 0, options.referenceAudios?.length ?? 0);
@@ -429,16 +454,29 @@ function assertClientPromptLimit(mode: BackendGenerationMode, prompt: string, co
 }
 
 async function prepareGenerationReferences({
+    config,
+    mode,
     referenceImages = [],
     referenceVideos = [],
     referenceAudios = [],
     mask,
-}: Pick<BackendGenerationTaskOptions, "referenceImages" | "referenceVideos" | "referenceAudios" | "mask">): Promise<PreparedGenerationReferences> {
-    const preparedImages = await Promise.all(referenceImages.map(prepareBackendImageReference));
+}: Pick<BackendGenerationTaskOptions, "config" | "mode" | "referenceImages" | "referenceVideos" | "referenceAudios" | "mask">): Promise<PreparedGenerationReferences> {
+    // asset:// 仅视频生成可用；Agent Plan Seedream 与 Seedance 共用 /api/plan/v3，不能按 BaseURL 误判。
+    const preferArkAssetUrl = mode === "video" && usesArkVideoAssetReference(config);
+    const preparedImages = await Promise.all(referenceImages.map((image) => prepareBackendImageReference(image, preferArkAssetUrl)));
     const preparedVideos = await Promise.all(referenceVideos.map(prepareBackendMediaReference));
     const preparedAudios = await Promise.all(referenceAudios.map(prepareBackendMediaReference));
-    const preparedMask = mask ? await prepareBackendImageReference(mask) : undefined;
+    const preparedMask = mask ? await prepareBackendImageReference(mask, false) : undefined;
     return { referenceImages: preparedImages, referenceVideos: preparedVideos, referenceAudios: preparedAudios, mask: preparedMask };
+}
+
+// 与后端 isArkPrivateAssetVideoConfig 对齐：方舟视频渠道允许参考图直接 asset:// 引用，
+// 跳过可信素材上传同步（适合已录入方舟素材 ID 的素材，例如被授权的真人像素材）。
+function usesArkVideoAssetReference(config: AiConfig) {
+    const interfaceType = resolveModelRequestConfig(config, config.model).interfaceType;
+    if (interfaceType === "volcengine-ark-video" || interfaceType === "volcengine-ark-agent-plan-video") return true;
+    if (interfaceType === "volcengine-ark-image" || interfaceType === "volcengine-ark-agent-plan-image") return false;
+    return isArkPlanBaseUrl(config.baseUrl || "");
 }
 
 async function createAndWaitGenerationTask(options: BackendGenerationTaskOptions, prepared: PreparedGenerationReferences, dependencies: GenerationTaskDependencies) {
@@ -449,7 +487,23 @@ async function createAndWaitGenerationTask(options: BackendGenerationTaskOptions
 }
 
 async function createBackendGenerationTask(options: BackendGenerationTaskOptions, prepared: PreparedGenerationReferences, dependencies: GenerationTaskDependencies) {
-    const { projectId, mode, prompt, config, metadata, onTaskUpdate } = options;
+    const task = await dependencies.createTask(backendGenerationTaskInput(options, prepared));
+    options.onTaskUpdate?.(task);
+    return task;
+}
+
+export async function prepareBackendGenerationTask(options: BackendGenerationTaskOptions): Promise<CreateTaskInput> {
+    throwIfAborted(options.signal);
+    assertClientPromptLimit(options.mode, options.prompt, options.config, options.metadata);
+    if (usesLocalDreamina(options.config)) throw new Error("本机即梦任务暂不支持后台提交");
+    assertBackendRuntimeConfigured(options.config, options.mode);
+    const prepared = await prepareGenerationReferences(options);
+    throwIfAborted(options.signal);
+    return backendGenerationTaskInput(options, prepared);
+}
+
+function backendGenerationTaskInput(options: BackendGenerationTaskOptions, prepared: PreparedGenerationReferences): CreateTaskInput {
+    const { projectId, mode, prompt, config, metadata } = options;
     const contractModel = bailianContractModel(config);
     const workflow = resolveGenerationWorkflowExecution(config, mode);
     if (!workflow) {
@@ -461,7 +515,7 @@ async function createBackendGenerationTask(options: BackendGenerationTaskOptions
     const wirePrompt = workflow ? prompt : bailianReferencePrompt(prompt, contractModel, prepared.referenceImages, typeof metadata?.videoStartFrameNodeId === "string" ? metadata.videoStartFrameNodeId : undefined);
     const videoOperation = generationOperation(options, !workflow);
     const logicalModelId = workflow ? "" : logicalModelIDForConfig(config);
-    const task = await dependencies.createTask({
+    return {
         ...(projectId ? { projectId } : {}),
         type: `canvas_${mode}`,
         operation: mode === "video" ? videoOperation : mode,
@@ -481,11 +535,15 @@ async function createBackendGenerationTask(options: BackendGenerationTaskOptions
             referenceVideos: prepared.referenceVideos,
             referenceAudios: prepared.referenceAudios,
             mask: prepared.mask,
-            metadata: generationMetadata(workflow ? { ...config, generationOptions: undefined } : config, !workflow && mode === "video" && bailianModelKind(contractModel) ? { ...metadata, videoEditOperation: videoOperation } : metadata),
+            metadata: generationMetadata(workflow ? { ...config, generationOptions: undefined } : config, {
+                ...metadata,
+                ...(!workflow && mode === "video" && bailianModelKind(contractModel) ? { videoEditOperation: videoOperation } : {}),
+                ...(options.clientOperationId ? { clientOperationId: options.clientOperationId } : {}),
+                ...(options.retryOf ? { retryOf: options.retryOf } : {}),
+                ...(options.attemptGroupId ? { attemptGroupId: options.attemptGroupId } : {}),
+            }),
         },
-    });
-    onTaskUpdate?.(task);
-    return task;
+    };
 }
 
 function generationMetadata(config: AiConfig, metadata?: Record<string, unknown>) {
@@ -523,7 +581,8 @@ async function prepareBackendMediaReference(media: ReferenceVideo | ReferenceAud
     }
 }
 
-async function prepareBackendImageReference(image: ReferenceImage) {
+async function prepareBackendImageReference(image: ReferenceImage, preferArkAssetUrl = false) {
+    if (preferArkAssetUrl && image.arkAssetId) return backendImageReference(image, { url: `asset://${image.arkAssetId}` });
     if (resourceIdFromStorageKey(image.storageKey)) return backendImageReference(image, { storageKey: image.storageKey });
     const sourceUrl = image.url || image.dataUrl;
     if (/^https?:\/\//i.test(sourceUrl)) return backendImageReference(image, { url: sourceUrl });
@@ -567,13 +626,13 @@ function backendMediaReference<T extends ReferenceVideo | ReferenceAudio>(media:
 }
 
 export function backendProviderConfig(config: AiConfig, mode: BackendGenerationMode = "image") {
-    const requestConfig = resolveModelRequestConfig(config, config.model);
+    const requestConfig = projectDesktopLocalChannelRuntime(resolveModelRequestConfig(config, config.model));
     const workflow = resolveGenerationWorkflowExecution(config, mode);
     if (workflow) return workflowProviderConfig(config, requestConfig, workflow);
     const generationOptions = {
         generationContract: declaredGenerationContract(config),
         size: config.size,
-        quality: config.quality,
+        quality: omittedImageQuality(config.quality),
         transparentBackground: config.transparentBackground,
         count: config.count,
         videoSeconds: config.videoSeconds,
@@ -593,7 +652,7 @@ export function backendProviderConfig(config: AiConfig, mode: BackendGenerationM
         apiFormat: requestConfig.apiFormat,
         interfaceType: requestConfig.interfaceType,
         baseUrl: requestConfig.baseUrl,
-        allowLocalChannel: requestConfig.allowLocalChannel === true,
+        allowLocalChannel: requestConfig.allowLocalChannel,
         apiKey: requestConfig.apiKey,
         secretKey: requestConfig.secretKey,
         model: requestConfig.model,
@@ -657,17 +716,24 @@ function workflowPublicExecution(workflow: GenerationWorkflowExecution) {
 function logicalCapabilityOptions(config: AiConfig, mode: BackendGenerationMode) {
     const channel = resolveModelChannel(config, config.model);
     const spec = channel.modelCosts?.find((item) => item.model === modelOptionName(config.model))?.logicalCapabilitySpec;
-    const candidates: Record<string, unknown> =
-        mode === "image"
-            ? { size: config.size, quality: config.quality, transparentBackground: config.transparentBackground === "true", count: Number(config.count) }
-            : mode === "video"
-              ? { size: config.size, videoSeconds: Number(config.videoSeconds), vquality: config.vquality, videoGenerateAudio: config.videoGenerateAudio === "true", videoWatermark: config.videoWatermark === "true" }
-              : mode === "audio"
+    const candidates: Record<string, unknown> = mode === "image"
+        ? { size: config.size, quality: omittedImageQuality(config.quality), transparentBackground: config.transparentBackground === "true", count: Number(config.count) }
+        : mode === "video"
+            ? { size: config.size, videoSeconds: Number(config.videoSeconds), vquality: config.vquality, videoGenerateAudio: config.videoGenerateAudio === "true", videoWatermark: config.videoWatermark === "true" }
+            : mode === "audio"
                 ? { audioVoice: config.audioVoice, audioFormat: config.audioFormat, audioSpeed: Number(config.audioSpeed) }
                 : {};
     const contract = declaredGenerationContract(config);
     if (contract && (mode === "image" || mode === "video")) candidates.generationContract = contract;
-    return Object.fromEntries(Object.entries(candidates).filter(([key]) => Boolean(spec?.options?.[key])));
+    const filtered = Object.fromEntries(Object.entries(candidates).filter(([key]) => Boolean(spec?.options?.[key])));
+    // 只把前台模型声明过的参数送进能力匹配。未声明的 quality 不能因为画布选了 4K 档位
+    // 而被硬塞进去，否则会报“不支持参数 生成质量”；插件仍从 config.quality 读取档位。
+    return filtered;
+}
+
+function omittedImageQuality(value: string | undefined) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "auto" || normalized === "any" ? undefined : value;
 }
 
 export function parseBackendGenerationResult(task: GenerationTask): BackendGenerationResult {

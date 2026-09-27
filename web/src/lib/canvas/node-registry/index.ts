@@ -1,12 +1,14 @@
 export type { CanvasNodeDefinition, CanvasNodeInputKind } from "./node-definition";
 export {
     getNodeAcceptedInputKind,
+    getNodeAcceptedInputKinds,
     getNodeDefinition,
     getNodeGenerationMode,
     getNodeIcon,
     getNodeInputKind,
     getNodeLabel,
     getNodeListLabel,
+    getNodeMaxInputCount,
     getNodeMinSize,
     getNodeOwnerId,
     getNodeResourceKind,

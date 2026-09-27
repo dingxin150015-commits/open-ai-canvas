@@ -41,7 +41,7 @@
 | `create.method` | `"POST"` |
 | `create.path` | `"/v1beta/models/{{model}}:generateContent"` |
 | `create.contentType` | `"application/json"` |
-| `create.body.contents` | `{"$map":{"from":{"$ref":"request.messages"},"as":"message","in":{"role":{"$if":{"condition":{"$eq":[{"$ref":"message.role"},"assistant"]},"then":"model","else":"user"}},"parts":[{"text":{"$ref":"message.content"}}]}}}` |
+| `create.body.contents` | `{"$map":{"from":{"$filter":{"from":{"$ref":"request.messages"},"as":"message","where":{"$ne":[{"$ref":"message.role"},"system"]}}},"as":"message","in":{"role":{"$if":{"condition":{"$eq":[{"$ref":"message.role"},"assistant"]},"then":"model","else":"user"}},"parts":[{"text":{"$ref":"message.content"}}]}}}` |
 | `create.body.systemInstruction` | `{"$if":{"condition":{"$ref":"request.instructions"},"then":{"parts":[{"text":{"$ref":"request.instructions"}}]},"else":null}}` |
 | `create.body.generationConfig` | `{"$omitEmpty":{"$ref":"request.providerOptions.gemini-generate-content.generationConfig"}}` |
 | `create.body.safetySettings` | `{"$omitEmpty":{"$ref":"request.providerOptions.gemini-generate-content.safetySettings"}}` |
@@ -249,7 +249,20 @@
             "contents": {
               "$map": {
                 "from": {
-                  "$ref": "request.messages"
+                  "$filter": {
+                    "from": {
+                      "$ref": "request.messages"
+                    },
+                    "as": "message",
+                    "where": {
+                      "$ne": [
+                        {
+                          "$ref": "message.role"
+                        },
+                        "system"
+                      ]
+                    }
+                  }
                 },
                 "as": "message",
                 "in": {

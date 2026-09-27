@@ -42,7 +42,7 @@
 | `create.path` | `"/responses"` |
 | `create.contentType` | `"application/json"` |
 | `create.body.model` | `{"$ref":"request.model"}` |
-| `create.body.input` | `{"$ref":"request.messages"}` |
+| `create.body.input` | `{"$filter":{"from":{"$ref":"request.messages"},"as":"message","where":{"$ne":[{"$ref":"message.role"},"system"]}}}` |
 | `create.body.instructions` | `{"$omitEmpty":{"$ref":"request.instructions"}}` |
 | `create.body.temperature` | `{"$omitEmpty":{"$ref":"request.providerOptions.openai-response.temperature"}}` |
 | `create.body.top_p` | `{"$omitEmpty":{"$ref":"request.providerOptions.openai-response.top_p"}}` |
@@ -239,7 +239,20 @@
               "$ref": "request.model"
             },
             "input": {
-              "$ref": "request.messages"
+              "$filter": {
+                "from": {
+                  "$ref": "request.messages"
+                },
+                "as": "message",
+                "where": {
+                  "$ne": [
+                    {
+                      "$ref": "message.role"
+                    },
+                    "system"
+                  ]
+                }
+              }
             },
             "instructions": {
               "$omitEmpty": {

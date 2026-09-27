@@ -1,9 +1,9 @@
-import { apiClient, request } from "@/services/api/request";
+import { http } from "@/services/api/request";
 import type { GenerationTask } from "@/services/api/task-center";
 import type { TimelineProject } from "@/types/timeline";
 
-// 时间线字幕转写任务（M4.1，whisper.cpp 本地执行）。
-// 创建入参与后端 TimelineTranscriptionCreateRequest 契约一致。
+// 时间线字幕转写任务 API。
+// 创建入参与后端 TimelineTranscriptionCreateRequest 保持同名字段，结果由任务中心统一查询。
 
 export type TimelineTranscriptionCreateRequest = {
     resourceId: string;
@@ -23,14 +23,16 @@ export type TimelineTranscriptionSegment = {
     text: string;
 };
 
-export async function createTimelineTranscriptionTask(payload: TimelineTranscriptionCreateRequest, signal?: AbortSignal): Promise<GenerationTask> {
-    return request<GenerationTask>(apiClient.post("/timeline/transcriptions", payload, { signal }));
+export async function createTimelineTranscriptionTask(
+    payload: TimelineTranscriptionCreateRequest,
+    signal?: AbortSignal,
+): Promise<GenerationTask> {
+    return http.post<GenerationTask>("/timeline/transcriptions", payload, { signal });
 }
 
-// 时间线成片渲染任务（M4.2，后端 ffmpeg 合成）。
-// 创建入参与后端 TimelineRenderCreateRequest 契约一致；timeline 直接传
-// TimelineProject v2（后端 renderProject 与其字段同名同构，多余字段被忽略）。
-// 任务完成后轮询 status，ResultJSON = TimelineRenderResult。
+// 时间线成片渲染任务 API。
+// timeline 直接传 TimelineProject；后端使用同名字段构建渲染输入，未知字段由后端边界忽略。
+// 任务完成后由任务中心读取 ResultJSON，并按 TimelineRenderResult 解包。
 
 export type TimelineRenderCreateRequest = {
     projectId: string;
@@ -45,6 +47,9 @@ export type TimelineRenderResult = {
     subtitleSrt?: string;
 };
 
-export async function createTimelineRenderTask(payload: TimelineRenderCreateRequest, signal?: AbortSignal): Promise<GenerationTask> {
-    return request<GenerationTask>(apiClient.post("/timeline/renders", payload, { signal }));
+export async function createTimelineRenderTask(
+    payload: TimelineRenderCreateRequest,
+    signal?: AbortSignal,
+): Promise<GenerationTask> {
+    return http.post<GenerationTask>("/timeline/renders", payload, { signal });
 }

@@ -1,3 +1,4 @@
+import { CollectionToolbar } from "@/components/layout/collection-toolbar";
 import { App, Button, Drawer, Form, Input, Modal, Select, Typography } from "antd";
 import { Switch } from "@/components/ui/base/switch";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
@@ -6,14 +7,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { MediaPreview } from "@/components/media-preview";
-import { ListToolbar, PageHeader, PaginationBar, WorkspacePage } from "@/components/layout/workspace-page";
+import { PageHeader, PaginationBar, WorkspacePage } from "@/components/layout/workspace-page";
 import { WorkspaceState } from "@/components/layout/workspace-state";
 import { CONTENT_MODERATION_ERROR_CODE, generationErrorMessage, isContentModerationError } from "@/lib/generation-error";
-import { formatTaskKind, isGenerationTaskSubmissionUncertain, operationOptions, statusLabel } from "@/lib/generation-task-display";
+import { formatTaskKind, operationOptions, statusLabel } from "@/lib/generation-task-display";
+import { buildVideoOperationPrompt } from "@/lib/prompts";
 import { backendProviderConfig, logicalModelIDForConfig } from "@/services/api/generation-task";
 
 import {
-    createAgentSession,
     createGenerationTask,
     deleteGenerationTask,
     formatTaskLog,
@@ -68,7 +69,7 @@ function taskStatusFilter(value: string | null): TaskStatusFilter {
 }
 
 export default function TasksPage() {
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const effectiveConfig = useEffectiveConfig();
@@ -208,7 +209,12 @@ export default function TasksPage() {
             .then((result) => {
                 if (!cancelled) setDomainProjects(result.projects);
             })
-            .catch(() => undefined);
+            .catch((error) => {
+                if (cancelled) return;
+                // 领域项目只是任务页的辅助筛选数据；读取失败不能阻断任务列表，但必须清空旧快照并留下可检索的诊断。
+                setDomainProjects([]);
+                console.warn("加载任务关联项目失败，已禁用本次项目筛选", error);
+            });
         return () => {
             cancelled = true;
         };
@@ -269,7 +275,6 @@ export default function TasksPage() {
                 const [detail, logs] = await Promise.all([queryGenerationTask(task.id), listTaskLogs(task.id)]);
                 setDetailTask(detail);
                 setTaskLogs(logs);
-                if (await syncGenerationTaskToCanvasStore(detail)) message.success("已同步到画布");
             } catch (error) {
                 message.error(error instanceof Error ? error.message : "任务详情加载失败");
             } finally {
@@ -310,10 +315,6 @@ export default function TasksPage() {
 
     const runAction = async (id: string) => {
         const currentTask = tasksRef.current.find((task) => task.id === id);
-        if (currentTask && isGenerationTaskSubmissionUncertain(currentTask)) {
-            message.warning("提交结果尚未确认，不能自动重试；请先核对官方状态，避免重复生成。");
-            return;
-        }
         setActingId(id);
         try {
             const next = await retryGenerationTask(id);
@@ -369,7 +370,6 @@ export default function TasksPage() {
             setActingId("");
         }
     };
-
     const queryProviderTask = async (task: GenerationTask) => {
         setActingId(task.id);
         try {
@@ -398,21 +398,7 @@ export default function TasksPage() {
         const values = await form.validateFields();
         setCreating(true);
         try {
-            if (values.operation === "agent_session") {
-                const textModel = values.model?.trim() || effectiveConfig.textModel || effectiveConfig.model;
-                if (!isAiConfigReady(effectiveConfig, textModel)) {
-                    message.error("请先在设置里配置可用的文本模型、Base URL 和 API Key");
-                    return;
-                }
-                const requestConfig = resolveModelRequestConfig(effectiveConfig, textModel);
-                const detail = await createAgentSession({
-                    projectId: values.projectId,
-                    prompt: values.prompt,
-                    config: backendProviderConfig(requestConfig),
-                    ...(logicalModelIDForConfig(requestConfig) ? { logicalModelId: logicalModelIDForConfig(requestConfig) } : {}),
-                });
-                setTasks((items) => [...detail.tasks, ...items]);
-            } else {
+            {
                 const videoModel = values.model?.trim() || effectiveConfig.videoModel || effectiveConfig.model;
                 if (values.operation !== "compare_versions" && !isAiConfigReady(effectiveConfig, videoModel)) {
                     message.error("请先在设置里配置可用的视频模型、Base URL 和 API Key");
@@ -430,7 +416,7 @@ export default function TasksPage() {
                     input: {
                         source: "tasks-page",
                         mode: values.operation === "compare_versions" ? "workflow" : "video",
-                        prompt: buildVideoOperationPrompt(values.operation, values.prompt),
+                        prompt: buildVideoOperationPrompt(values.operation, values.prompt, operationOptions.find((item) => item.value === values.operation)?.label || "其他视频操作"),
                         config: values.operation === "compare_versions" ? undefined : backendProviderConfig(requestConfig),
                         metadata: { videoEditOperation: values.operation },
                     },
@@ -453,8 +439,20 @@ export default function TasksPage() {
         <>
             <WorkspacePage grid className="library-page task-library-page">
                 <div className="studio-band">
-                    <ListToolbar
-                        className="library-toolbar task-library-toolbar"
+                    <PageHeader
+                        title="创作历史"
+                        description="查看文本、图片和视频生成任务，跟踪进度并处理失败任务。"
+                        meta={<span className="app-projects-header-meta">{taskStats.total} 个任务</span>}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                <Button onClick={() => navigate("/canvas")}>前往画布使用 Agent</Button>
+                                <Button type="primary" icon={<Plus className="size-3.5" />} onClick={() => setCreateOpen(true)}>
+                                    新建任务
+                                </Button>
+                            </div>
+                        }
+                    />
+                    <CollectionToolbar
                         active={Boolean(keyword || projectFilter !== "all" || kindFilter !== "all" || modelFilter !== "all" || statusFilter !== "all")}
                         onReset={() => {
                             setKeyword("");
@@ -487,70 +485,16 @@ export default function TasksPage() {
                             </div>
                         }
                     >
-                        <TaskStatusFilterBar
-                            stats={taskStats}
-                            value={statusFilter}
-                            onChange={(value) => {
-                                setStatusFilter(value);
-                                setPage(1);
-                            }}
-                        />
-                        <Input
-                            id="task-search"
-                            name="taskSearch"
-                            allowClear
-                            className="app-list-search"
-                            prefix={<Search className="size-4 text-foreground/40" />}
-                            value={keyword}
-                            placeholder="搜索任务、模型或画布"
-                            onChange={(event) => {
-                                setKeyword(event.target.value);
-                                setPage(1);
-                            }}
-                        />
-                        <Select
-                            className="w-full sm:w-48"
-                            value={projectFilter}
-                            onChange={(value) => {
-                                setProjectFilter(value);
-                                setPage(1);
-                            }}
-                            options={[{ label: "全部画布", value: "all" }, ...projectOptions]}
-                        />
-                        <Select
-                            className="w-full sm:w-32"
-                            value={kindFilter}
-                            onChange={(value) => {
-                                setKindFilter(value as TaskKindFilter);
-                                setPage(1);
-                            }}
-                            options={[
-                                { label: "全部类型", value: "all" },
-                                { label: "文本", value: "text" },
-                                { label: "图片", value: "image" },
-                                { label: "视频", value: "video" },
-                            ]}
-                        />
-                        <Select
-                            className="w-full sm:w-44"
-                            value={modelFilter}
-                            onChange={(value) => {
-                                setModelFilter(value);
-                                setPage(1);
-                            }}
-                            options={[{ label: "全部模型", value: "all" }, ...modelOptions.map((model) => ({ label: model, value: model }))]}
-                        />
-                    </ListToolbar>
+                        <TaskStatusFilterBar stats={taskStats} value={statusFilter} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
+                        <Input id="task-search" name="taskSearch" allowClear className="app-list-search" prefix={<Search className="size-4 text-foreground/40" />} value={keyword} placeholder="搜索任务、模型或画布" onChange={(event) => { setKeyword(event.target.value); setPage(1); }} />
+                        <Select className="w-full sm:w-48" value={projectFilter} onChange={(value) => { setProjectFilter(value); setPage(1); }} options={[{ label: "全部画布", value: "all" }, ...projectOptions]} />
+                        <Select className="w-full sm:w-32" value={kindFilter} onChange={(value) => { setKindFilter(value as TaskKindFilter); setPage(1); }} options={[{ label: "全部类型", value: "all" }, { label: "文本", value: "text" }, { label: "图片", value: "image" }, { label: "视频", value: "video" }]} />
+                        <Select className="w-full sm:w-44" value={modelFilter} onChange={(value) => { setModelFilter(value); setPage(1); }} options={[{ label: "全部模型", value: "all" }, ...modelOptions.map((model) => ({ label: model, value: model }))]} />
+                    </CollectionToolbar>
                 </div>
 
-                <div className="canvas-library-frame task-library-frame">
-                    {loading && !tasks.length ? (
-                        <div className="library-loading-grid" aria-label="正在加载任务">
-                            {Array.from({ length: 8 }, (_, index) => (
-                                <div key={index} className="library-skeleton" />
-                            ))}
-                        </div>
-                    ) : null}
+                <div className="collection-content task-collection-content">
+                    {loading && !tasks.length ? <div className="library-loading-grid" aria-label="正在加载任务">{Array.from({ length: 8 }, (_, index) => <div key={index} className="library-skeleton" />)}</div> : null}
                     {!loading || tasks.length ? (
                         visibleTasks.length ? (
                             viewMode === "grid" ? (
@@ -595,7 +539,7 @@ export default function TasksPage() {
                 </div>
             </WorkspacePage>
             <Modal className="library-modal" title="新建异步生成任务" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={submitTask} confirmLoading={creating} okText="创建任务">
-                <Form form={form} layout="vertical" initialValues={{ operation: "agent_session" }}>
+                <Form form={form} layout="vertical" initialValues={{ operation: "text_to_video" }}>
                     <Form.Item name="operation" label="任务类型" rules={[{ required: true, message: "请选择任务类型" }]}>
                         <Select options={operationOptions} />
                     </Form.Item>
@@ -626,7 +570,6 @@ export default function TasksPage() {
                             {detailTask.providerCancelStatus ? <InfoItem label="上游取消" value={providerCancelStatusLabel(detailTask)} /> : null}
                             {detailTask.providerCancelRequestedAt ? <InfoItem label="请求取消时间" value={formatDate(detailTask.providerCancelRequestedAt)} /> : null}
                         </div>
-                        {detailTask.provider === "dreamina-cli" ? <p className="text-xs leading-5 text-foreground/60">官方状态采用最终一致轮询；转入后台后仍会继续等待并同步官方状态。官方即梦 CLI 当前不支持可靠的官方取消。</p> : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             {detailTask.provider === "dreamina-cli" && detailTask.receiptRecorded && detailTask.status === "running" ? (
                                 <Button aria-label="更新官方状态" icon={<RefreshCw className="size-4" />} loading={actingId === detailTask.id} onClick={() => void refreshLocalTaskStatus(detailTask)}>
@@ -926,10 +869,4 @@ function formatTaskJson(value?: string) {
     } catch {
         return value;
     }
-}
-
-function buildVideoOperationPrompt(operation: string, prompt: string) {
-    const operationLabel = operationOptions.find((item) => item.value === operation)?.label || "其他视频操作";
-    if (operation === "compare_versions") return `请对以下视频结果版本做对比分析，输出推荐版本、差异点和修改建议：\n${prompt}`;
-    return `视频编辑任务：${operationLabel}\n创作要求：${prompt}`;
 }

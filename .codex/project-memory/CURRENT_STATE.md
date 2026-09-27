@@ -1,5 +1,17 @@
 # 当前状态
 
+## 当前：官方 v1.5.8 增量审计，尚未实际合并
+
+2026-09-27 官方 `main` 和正式标签 `v1.5.8` 固定于 `25842275`。以当前 v1.5.6 候选完整工作内容为一侧进行 `git merge-tree` 模拟：官方增量 830 路径，双方重叠 157，显式新冲突 59，另 98 个自动合并重叠路径待语义审计。真实候选仍为 `HEAD=6b16d25e`、`MERGE_HEAD=473d535e`，本轮未叠加合并、未提交/部署。详见 `UPSTREAM_V158_INCREMENT_AUDIT_20260927.md`。
+
+## 当前：v1.5.6 无提交合并进行中
+
+用户已选择方案 A，保留本机 Agent、Runtime、Codex 插件、本机渠道及人像功能。独立工作树 `codex/upstream-v1.5.6-20260921@6b16d25e` 正在合并固定官方 `v1.5.6@473d535e`，`MERGE_HEAD` 存在，2026-09-23 接管时仍有 197 个未合并路径；尚未完成编译/迁移/浏览器门禁。见 `UPSTREAM_V156_MERGE_20260923.md`。此工作树不得构建部署到真实数据卷。
+
+2026-09-24 用户补充决定：旧 `/sessions` 影视 Agent 会话改接上游新 Agent；本机 Comfy Bridge 的设备管理、轮询及结果回传接口保留并迁移。做决定时合并树仍有 58 个显式未合并文件、28 个暂存删除文件；此状态是实施门禁而非完成声明。旧会话数据不得静默删除或伪称已被新 Agent 自动吸收，Comfy Bridge 不能只留前端和本机程序而缺后端接口。
+
+2026-09-25 增量检查点：Comfy Bridge 已迁入后端 `app` 并接入 Schema31；专项 Linux CGO 的设备鉴权/重启恢复与 `internal/database` 全包通过。网页旧 `/sessions` 调用和旧面板已移除，画布与创作入口接上游 Cloud Agent；独立 `canvas-agent/` 和 Codex 插件仍保留。所有显式 Git 冲突已清零，暂存差异无冲突标记/空白错误，但仍处于 MERGE_HEAD 打开的未提交候选。Backend Linux CGO 全量仍有真实或待分类失败并超时，Web Docker 构建与类型/测试仍在验证，双谱系真实克隆与 Edge 均未验收，禁止部署。详细失败清单与证据见 `UPSTREAM_V156_MERGE_20260923.md`。
+
 ## 当前：统一模型目录修复已部署预验证，等待 Edge
 
 详见MODEL_CATALOG_UNIFIED_REPAIR_20260913.md。主程序前后端catalog1/ad3efa10，独立Gemini文本插件4.0.1收尾cc7d0b63；Schema9/9、Backend b7497517、Web1479e358均healthy/restart0。Backend最终全量、Web1645全量/40专项/类型/构建、源码/运行包哈希、两次断网双启动及业务数据摘要保持均通过。未自动启用模型或改价，未执行Edge/真实调用/push。下方“未修复/待实施”为历史。

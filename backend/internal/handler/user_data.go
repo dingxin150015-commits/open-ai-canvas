@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -142,8 +143,12 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
-		resources, err := svc.Resources(user.ID, limit)
+		pageSize, err := parsePositiveQueryInt(c.Query("pageSize"), 200)
+		if err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		resources, err := svc.Resources(user.ID, pageSize)
 		if err != nil {
 			failService(c, err)
 			return
@@ -290,8 +295,8 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		if delivery.RedirectURL != "" {
-			// CDN 或对象存储直连地址不进入应用缓存，也不作为后续请求的 Referer 泄露。
-			c.Header("Cache-Control", "private, no-store")
+			// 签名链接仅有效 5 分钟；重定向缓存必须短于签名 TTL，避免命中过期地址。
+			c.Header("Cache-Control", "private, max-age=240")
 			c.Header("Referrer-Policy", "no-referrer")
 			c.Header("X-Content-Type-Options", "nosniff")
 			c.Redirect(http.StatusTemporaryRedirect, delivery.RedirectURL)
@@ -307,8 +312,14 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 		if usePlayback {
 			serveETag = etag + ":pb"
 		}
-		// 私有资源允许浏览器保存响应，但每次复用前必须重新鉴权；304 会在读取 OSS 前返回。
-		c.Header("Cache-Control", "private, no-cache")
+		// 资源 ID 内容不可变（上传永远生成新 ID，不会原地覆盖）：图片可以放心交给浏览器
+		// 磁盘强缓存 30 天，大画布二次打开零请求直读磁盘缓存。视频/音频涉及转码副本
+		// 就绪与 Range 语义，保持逐次条件请求（304）。
+		if strings.HasPrefix(resource.MimeType, "image/") {
+			c.Header("Cache-Control", "private, max-age=2592000, stale-while-revalidate=86400")
+		} else {
+			c.Header("Cache-Control", "private, no-cache")
+		}
 		c.Header("ETag", serveETag)
 		c.Header("Accept-Ranges", "bytes")
 		c.Header("X-Content-Type-Options", "nosniff")
@@ -406,18 +417,13 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		if _, paged := c.GetQuery("page"); paged || hasUserAssetPageFilters(c) {
-			page, pageErr := strconv.Atoi(c.DefaultQuery("page", "1"))
-			if pageErr != nil || page < 1 {
-				fail(c, http.StatusBadRequest, service.BadAuthRequest("页码必须是正整数"))
-				return
-			}
-			pageSize, pageSizeErr := strconv.Atoi(c.DefaultQuery("page_size", "40"))
-			if pageSizeErr != nil || pageSize < 1 {
-				fail(c, http.StatusBadRequest, service.BadAuthRequest("每页数量必须是正整数"))
+			page, pageSize, pageErr := parsePaginationQuery(c, 40)
+			if pageErr != nil {
+				fail(c, http.StatusBadRequest, pageErr)
 				return
 			}
 			var folderID *string
-			if value, present := c.GetQuery("folder_id"); present {
+			if value, present := c.GetQuery("folderId"); present {
 				folderID = &value
 			}
 			assets, pageErr := svc.UserAssetsPage(user.ID, page, pageSize, service.UserAssetPageFilter{
@@ -593,9 +599,12 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		if c.Query("page") != "" {
-			page, _ := strconv.Atoi(c.Query("page"))
-			pageSize, _ := strconv.Atoi(c.Query("page_size"))
-			result, pageErr := svc.UserCanvasProjectsPage(user.ID, page, pageSize, c.Query("project_id"), c.Query("q"), c.Query("sort"))
+			page, pageSize, pageErr := parsePaginationQuery(c, 40)
+			if pageErr != nil {
+				fail(c, http.StatusBadRequest, pageErr)
+				return
+			}
+			result, pageErr := svc.UserCanvasProjectsPage(user.ID, page, pageSize, c.Query("projectId"), c.Query("q"), c.Query("sort"))
 			if pageErr != nil {
 				failService(c, pageErr)
 				return
@@ -623,6 +632,58 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		ok(c, gin.H{"project": project})
 	})
+	r.GET("/canvas-projects/:id/history", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		result, err := svc.CanvasHistory(user.ID, c.Param("id"))
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, result)
+	})
+	r.GET("/canvas-projects/:id/history/:snapshotId", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		snapshot, err := svc.CanvasHistorySnapshot(user.ID, c.Param("id"), c.Param("snapshotId"))
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, gin.H{"snapshot": snapshot, "project": json.RawMessage(snapshot.PayloadJSON)})
+	})
+	r.POST("/canvas-projects/:id/history/:snapshotId/restore", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		policy, available := loadRuntimePolicy(c, svc)
+		if !available || !enforceRateLimit(c, "canvas-write:"+user.ID, policy.Request.CanvasWritePerMinute, time.Minute) {
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024)
+		var req struct {
+			Revision *int64 `json:"revision"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fail(c, http.StatusBadRequest, service.BadAuthRequest("恢复请求格式错误"))
+			return
+		}
+		project, err := svc.RestoreCanvasHistory(user.ID, c.Param("id"), c.Param("snapshotId"), req.Revision)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		log.Printf("canvas_restore request_id=%q trace_id=%q actor=%q canvas=%q snapshot=%q base_revision=%d revision=%d", RequestID(c), TraceID(c), user.ID, c.Param("id"), c.Param("snapshotId"), *req.Revision, project.Revision)
+		ok(c, gin.H{"project": project})
+	})
 	r.PUT("/canvas-projects/:id", func(c *gin.Context) {
 		user, err := currentUser(c, svc)
 		if err != nil {
@@ -648,7 +709,25 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 			fail(c, http.StatusBadRequest, service.BadAuthRequest("画布 ID 与请求路径不一致"))
 			return
 		}
+		var audit struct {
+			Revision    *int64            `json:"revision"`
+			Nodes       []json.RawMessage `json:"nodes"`
+			Connections []json.RawMessage `json:"connections"`
+		}
+		_ = json.Unmarshal(req.Project, &audit)
+		baseRevision := int64(-1)
+		if audit.Revision != nil {
+			baseRevision = *audit.Revision
+		}
 		project, err := svc.UpsertUserCanvasProject(user.ID, req.Project)
+		defer func() {
+			nodesBefore, nodesAfter := -1, len(audit.Nodes)
+			if project.SaveAudit != nil {
+				nodesBefore, nodesAfter = project.SaveAudit.NodesBefore, project.SaveAudit.NodesAfter
+			}
+			// Metadata only: never log prompts, media URLs, cookies, or the canvas payload.
+			log.Printf("canvas_save request_id=%q trace_id=%q actor=%q canvas=%q base_revision=%d revision=%d nodes_before=%d nodes_after=%d connections=%d status=%d", RequestID(c), TraceID(c), user.ID, identity.ID, baseRevision, project.Revision, nodesBefore, nodesAfter, len(audit.Connections), c.Writer.Status())
+		}()
 		if err != nil {
 			failService(c, err)
 			return
@@ -670,7 +749,7 @@ func RegisterUserDataRoutes(r *gin.RouterGroup, svc *service.Service) {
 }
 
 func hasUserAssetPageFilters(c *gin.Context) bool {
-	for _, key := range []string{"page_size", "kind", "category", "folder_id", "uncategorized", "status", "q"} {
+	for _, key := range []string{"pageSize", "kind", "category", "folderId", "uncategorized", "status", "q"} {
 		if _, present := c.GetQuery(key); present {
 			return true
 		}

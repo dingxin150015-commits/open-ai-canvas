@@ -1,5 +1,9 @@
 # 影策项目级记忆入口
 
+2026-09-27 已批准的 A/A′ 分支晋升、手工 Edge 和远端/删除批准门禁见 `BRANCH_LIFECYCLE_20260927.md`。本轮 A′ 仍为待创建/待验证，不得把 WIP 检查点当作稳定版本。
+
+当前进行中的 v1.5.6 无提交合并见 `UPSTREAM_V156_MERGE_20260923.md`；显式 Git 冲突已清零，但全量回归与数据克隆未闭合，不能部署。官方最新固定 `v1.5.8@25842275` 的增量模拟与 59 个新冲突方案见 `UPSTREAM_V158_INCREMENT_AUDIT_20260927.md`；本轮尚未实际合入该版本。
+
 最新交付：`MODEL_CATALOG_UNIFIED_REPAIR_20260913.md`。统一模型配置资格与Gemini分页已实现、全量验证并部署；主程序catalog1/ad3efa10，Gemini文本插件4.0.1（cc7d0b63），本轮其余六包4.0.0，Schema9/9。业务数据和Qwen既有配置保持，停在用户Edge人工门禁，未真实生成。此前Gemini未修复及旧运行版本描述均为历史检查点。
 
 最新人工反馈（2026-09-13）：用户确认画布 Qwen 单请求多图清单中的 Edge 配置检查暂无问题，并自行配置启用 qwen-image-3.0-pro。状态 `edge_config_user_confirmed_generation_pending`；真实生成、扣费及其他六模型验收没有放行。详见 CANVAS_NATIVE_BATCH_20260912.md 最新反馈。以下 Edge 待确认描述为历史检查点。

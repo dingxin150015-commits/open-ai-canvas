@@ -4,7 +4,7 @@ import { videoFrameRoles } from "@/lib/bailian-generation";
 import { Check, ChevronDown, Image as ImageIcon } from "lucide-react";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
-import { useThemeStore } from "@/stores/use-theme-store";
+import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import type { CanvasNodeMetadata } from "@/types/canvas";
 
 type VideoFrameOption = {
@@ -37,7 +37,7 @@ const CONTROL_TEXT_STYLE: CSSProperties = { fontFamily: "inherit", fontSize: 11,
 
 export function CanvasVideoPromptTools({ model = "", metadata, frameOptions, onMetadataChange, referenceMode = "frames", referenceSummary }: CanvasVideoPromptToolsProps) {
     const roles = videoFrameRoles(model);
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = canvasThemes[useActiveTheme()];
     const startFrame = metadata?.videoStartFrameNodeId || EMPTY_FRAME_VALUE;
     const endFrame = metadata?.videoEndFrameNodeId || EMPTY_FRAME_VALUE;
 

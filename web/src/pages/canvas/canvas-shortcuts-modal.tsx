@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AppModal } from "@/components/ui/product/app-modal";
 import { Command, Search } from "lucide-react";
 import { Kbd } from "@/components/ui/base/kbd";
-import { Modal } from "antd";
 
 import { CANVAS_SHORTCUT_CATEGORIES, CANVAS_SHORTCUTS, filterCanvasShortcuts, type CanvasShortcutCategoryId, type CanvasShortcutItem } from "@/lib/canvas/canvas-shortcuts";
 
@@ -22,7 +22,7 @@ export function CanvasShortcutsModal({ open, onClose }: { open: boolean; onClose
     const categoryCounts = useMemo(() => new Map(CANVAS_SHORTCUT_CATEGORIES.map((entry) => [entry.id, CANVAS_SHORTCUTS.filter((shortcut) => shortcut.category === entry.id).length])), []);
 
     return (
-        <Modal
+        <AppModal
             className="workspace-modal workspace-modal-wide canvas-shortcuts-modal"
             open={open}
             onCancel={onClose}
@@ -31,7 +31,7 @@ export function CanvasShortcutsModal({ open, onClose }: { open: boolean; onClose
             centered
             keyboard
             width="min(860px, calc(100vw - 24px))"
-            styles={{ container: { padding: 0 }, body: { padding: 0 } }}
+            flush
             afterOpenChange={(visible) => {
                 if (visible) window.requestAnimationFrame(() => inputRef.current?.focus());
             }}
@@ -90,7 +90,7 @@ export function CanvasShortcutsModal({ open, onClose }: { open: boolean; onClose
                     </span>
                 </footer>
             </div>
-        </Modal>
+        </AppModal>
     );
 }
 

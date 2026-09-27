@@ -2,10 +2,11 @@ import { ImageSizePicker } from "@/components/image-size-picker";
 import { imageResolutionUsesQuality } from "@/lib/image-size-presets";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { App, Button, Form, Image, Input, InputNumber, Modal, Select } from "antd";
+import { App, Button, Form, Image, Input, InputNumber, Select } from "antd";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import { EmptyState } from "@/components/ui/product/empty-state";
 import { StatusBadge } from "@/components/ui/base/badges";
+import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 import { Box, ChevronDown, ChevronLeft, ChevronRight, Download, Film, Image as ImageIcon, Layers3, List, Maximize2, Play, Plus, RefreshCcw, Save, Search, SlidersHorizontal, Trash2, UsersRound, WandSparkles, X } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
@@ -14,12 +15,12 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ModelPicker } from "@/components/model-picker";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationOptions } from "@/lib/model-capabilities";
-import { modelQuoteValidationError, modelQuoteRequest } from "@/lib/model-pricing";
+import { modelQuoteDescription, modelQuoteValidationError, modelQuoteRequest } from "@/lib/model-pricing";
 import { customShotTitle, formatShotOrdinal, normalizeDefaultShotTitle } from "@/lib/shot-label";
 import { modelCompatibilityError, resolveCompatibleModel, resolveModelVideoBooleanOptions, type ModelRequirements } from "@/lib/model-selection";
 import { formatVideoResolutionLabel } from "@/lib/video-generation-options";
 import { submitBackendGenerationTask } from "@/services/api/generation-task";
-import { quoteModelCatalog } from "@/services/api/logical-models";
+import { quoteModel, type LogicalModelQuote } from "@/services/api/logical-models";
 import { type GenerationTask } from "@/services/api/task-center";
 import {
     createUnitWorkflow,
@@ -201,8 +202,8 @@ export default function WorkflowProductionWorkbench(props: Props) {
     const quoteRequestKey = JSON.stringify(quoteRequest || null);
     const validationError = modelQuoteValidationError(generationConfig, routedModel, generationCapability, modelRequirements);
     const [quoteError, setQuoteError] = useState("");
-    const [quotedCredits, setQuotedCredits] = useState<number | null>(null);
-    const generationCredits = quoteError ? null : (quotedCredits ?? configuredCredits);
+    const [routeQuote, setRouteQuote] = useState<LogicalModelQuote | null>(null);
+    const generationCredits = quoteError ? null : routeQuote ? routeQuote.amountMicrocredits / 1_000_000 : configuredCredits;
     const formattedGenerationCredits = generationCredits?.toLocaleString("zh-CN", { maximumFractionDigits: 6 });
     const modelSummary = routedModel ? modelDisplayName(effectiveConfig, routedModel) : "未选择模型";
     const durationSummary = `${Number(watchedDuration || Math.max(0.5, (selectedShot?.durationMs || 3000) / 1000))}s`;
@@ -231,18 +232,18 @@ export default function WorkflowProductionWorkbench(props: Props) {
 
     useEffect(() => {
         if (!creditsEnabled || !quoteRequest) {
-            setQuotedCredits(null);
+            setRouteQuote(null);
             setQuoteError(validationError);
             return;
         }
         const controller = new AbortController();
-        setQuotedCredits(null);
+        setRouteQuote(null);
         setQuoteError("");
-        quoteModelCatalog(quoteRequest.modelID, quoteRequest.intent, controller.signal)
-            .then(({ quote }) => setQuotedCredits(quote.amountMicrocredits / 1_000_000))
+        quoteModel(quoteRequest, controller.signal)
+            .then(({ quote }) => setRouteQuote(quote))
             .catch((error: unknown) => {
                 if (!controller.signal.aborted) {
-                    setQuotedCredits(null);
+                    setRouteQuote(null);
                     setQuoteError(error instanceof Error ? error.message : "报价失败");
                 }
             });
@@ -358,7 +359,6 @@ export default function WorkflowProductionWorkbench(props: Props) {
             if (!productionStep) throw new Error("当前生成阶段不可用，请刷新页面后重试");
             if (productionStep.status === "failed") throw new Error("当前生成阶段失败，请刷新后重试");
             if (!routedModel) throw new Error(activeStage === "video" ? "请先配置视频模型" : "请先配置图片模型");
-            if (routedModel.startsWith("local:dreamina-cli")) throw new Error("本机即梦任务暂不能登记到分镜产物，请选择后端模型渠道");
             const compatibilityError = modelCompatibilityError(effectiveConfig, routedModel, modelRequirements);
             if (compatibilityError) throw new Error(`当前模型配置不可用：${compatibilityError}`);
             const saved = await saveProjectShot(projectId, {
@@ -657,7 +657,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                                 ) : creditsEnabled && formattedGenerationCredits ? (
                                     <>
                                         <CreditSymbol />
-                                        <span>本次预计 {formattedGenerationCredits} 积分</span>
+                                        <span title={routeQuote ? modelQuoteDescription(routeQuote) : undefined}>本次{routeQuote?.estimated ? "预估" : "费用"} {formattedGenerationCredits} 积分</span>
                                     </>
                                 ) : creditsEnabled && routedModel ? (
                                     <span>本次费用将在提交时按实际规格计算</span>
@@ -757,15 +757,14 @@ export default function WorkflowProductionWorkbench(props: Props) {
                 </aside>
             </div>
 
-            <Modal
+            <AppModal
+                flush
                 open={Boolean(imagePreviewArtifact?.resourceId)}
                 title={imagePreviewArtifact?.type === "action_board" ? "动作预演预览" : "分镜图预览"}
                 footer={null}
                 centered
-                destroyOnHidden
                 width="min(960px, calc(100vw - 32px))"
                 onCancel={() => setImagePreviewArtifact(null)}
-                styles={{ body: { padding: 0 } }}
             >
                 {imagePreviewArtifact?.resourceId ? (
                     <img
@@ -774,7 +773,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                         alt={imagePreviewArtifact.type === "action_board" ? "动作预演大图" : "分镜图大图"}
                     />
                 ) : null}
-            </Modal>
+            </AppModal>
 
             <ShotTimeline activeStage={activeStage} detail={detail} shots={shots} selectedShotId={selectedShot.id} submittingShotIds={submittingShotIds} onSelectShot={requestShotSelection} onAddShot={requestAddShot} addingShot={addingShot} />
         </div>

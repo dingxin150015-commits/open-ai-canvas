@@ -6,6 +6,7 @@ import type { CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 // 但画布节点经 CanvasProjectWorldLayers 渲染、不便逐个透传 handler，
 // 通过 Context 注入，避免改动 world-layers。无 Provider 时静默降级为 no-op。
 export type CanvasNodeActionContextValue = {
+    upload?: (node: CanvasNodeData) => void;
     download?: (node: CanvasNodeData) => void;
     duplicate?: (node: CanvasNodeData) => void;
     deleteNode?: (node: CanvasNodeData) => void;
@@ -21,6 +22,8 @@ export type CanvasNodeActionContextValue = {
     openPortraitClearance?: (node: CanvasNodeData) => void;
     /** 打开节点级 AI 审美批改报告。 */
     openArtCritique?: (node: CanvasNodeData) => void;
+    /** 全景节点导出截图：上传 dataUrl 并在源节点右侧创建派生图片节点。 */
+    addPanoramaCaptureNode?: (node: CanvasNodeData, dataUrl: string, title: string) => Promise<void> | void;
 };
 
 export const CanvasNodeActionContext = createContext<CanvasNodeActionContextValue>({});

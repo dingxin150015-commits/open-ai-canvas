@@ -6,6 +6,7 @@ import { Palette, Info } from "lucide-react";
 import { FloatingDock } from "@/components/ui/aceternity/floating-dock";
 import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
 import { CanvasAppearanceControls } from "@/components/canvas/canvas-appearance-controls";
+import { useCanvasOverlayLayer } from "@/components/canvas/canvas-overlay-layer";
 import { CanvasCreateMenu, type CanvasCreateCommand } from "@/components/canvas/canvas-create-menu";
 import { useCanvasCreateCommands } from "@/components/canvas/use-canvas-create-commands";
 import { ToolbarSettingsModal } from "@/components/canvas/toolbars/toolbar-settings-modal";
@@ -14,7 +15,7 @@ import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import type { CanvasAppearance } from "@/lib/canvas/canvas-appearance";
 import { canvasThemes, type CanvasBackgroundMode, type CanvasTheme } from "@/lib/canvas-theme";
 import { defaultToolbarPrefs, readToolbarPrefs, resolveToolbarEntries, type ToolContext, type ToolbarHandlers, type ToolbarPrefs } from "@/lib/canvas/tool-registry";
-import { useThemeStore } from "@/stores/use-theme-store";
+import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import type { CanvasNodeTypeId, CanvasToolMode, CanvasWorkspaceMode } from "@/types/canvas";
 
 export function CanvasToolbar({
@@ -93,14 +94,19 @@ export function CanvasToolbar({
     onOpenProjectCharacters: () => void;
 }) {
     const rootRef = useRef<HTMLDivElement>(null);
+    const { bringToFront, zIndex } = useCanvasOverlayLayer("main-toolbar", "var(--z-toolbar)");
     const dockRef = useRef<HTMLDivElement>(null);
-    const colorTheme = useThemeStore((state) => state.theme);
+    const colorTheme = useActiveTheme();
     const theme = canvasThemes[colorTheme];
     const [addOpen, setAddOpen] = useState(false);
     const [appearanceOpen, setAppearanceOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [panelX, setPanelX] = useState(0);
     const [prefs, setPrefs] = useState<ToolbarPrefs | null>(() => readToolbarPrefs("main"));
+
+    useEffect(() => {
+        if (addOpen || appearanceOpen) bringToFront();
+    }, [addOpen, appearanceOpen, bringToFront]);
 
     // 设置面板关闭后重新读取偏好（用户可能调整了排序/显隐）
     useEffect(() => {
@@ -171,42 +177,12 @@ export function CanvasToolbar({
         },
         onDeleteSelected: onDelete,
         // 以下为多选/节点悬停工具栏回调，主工具栏不使用，用 no-op 占位
-        onAlign: () => {},
-        onArrange: () => {},
-        onCreateStoryboard: () => {},
-        onCreateReferenceGroup: () => {},
-        onBatchConnect: () => {},
-        onMergeVideos: () => {},
-        onNodeInfo: () => {},
-        onNodeDelete: () => {},
-        onNodeRetry: () => {},
-        onNodeEditText: () => {},
-        onNodeDecreaseFont: () => {},
-        onNodeIncreaseFont: () => {},
-        onNodeToggleDialog: () => {},
-        onNodeAnnotate: () => {},
-        onNodeGenerateImage: () => {},
-        onNodeUpload: () => {},
-        onNodeDownload: () => {},
-        onNodeSaveAsset: () => {},
-        onNodeMaskEdit: () => {},
-        onNodeEmotion: () => {},
-        onNodePortraitTexture: () => {},
-        onNodeCrop: () => {},
-        onNodeSplit: () => {},
-        onNodeUpscale: () => {},
-        onNodeSuperResolve: () => {},
-        onNodeAngle: () => {},
-        onNodeViewImage: () => {},
-        onNodeExtractVideoFrames: () => {},
-        onNodeExtractAudioFromVideo: () => {},
-        onNodeTrimVideoSegments: () => {},
-        onNodeSubtitles: () => {},
-        onNodeTimeline: () => {},
-        onNodeReversePrompt: () => {},
-        onNodeToggleFreeResize: () => {},
-        onNodeToggleLocked: () => {},
-        onNodeCopyPrompt: () => {},
+        onAlign: () => {}, onArrange: () => {}, onCreateStoryboard: () => {}, onCreateReferenceGroup: () => {}, onBatchConnect: () => {}, onMergeVideos: () => {}, onSendSelectionToAgent: () => {},
+        onNodeInfo: () => {}, onNodeDelete: () => {}, onNodeRetry: () => {}, onNodeEditText: () => {}, onNodeDecreaseFont: () => {}, onNodeIncreaseFont: () => {},
+        onNodeToggleDialog: () => {}, onNodeAnnotate: () => {}, onNodeGenerateImage: () => {}, onNodeUpload: () => {}, onNodeDownload: () => {}, onNodeSaveAsset: () => {},
+        onNodeMaskEdit: () => {}, onNodeImageEdit: () => {}, onNodeRemoveBackground: () => {}, onNodeEmotion: () => {}, onNodePortraitTexture: () => {}, onNodeCrop: () => {}, onNodeSplit: () => {}, onNodeUpscale: () => {},
+        onNodeSuperResolve: () => {}, onNodeAngle: () => {}, onNodeViewImage: () => {}, onNodeExtractVideoFrames: () => {}, onNodeExtractAudioFromVideo: () => {}, onNodeTrimVideoSegments: () => {}, onNodeSubtitles: () => {}, onNodeTimeline: () => {}, onNodeReversePrompt: () => {},
+        onNodeToggleFreeResize: () => {}, onNodeToggleLocked: () => {}, onNodeCopyPrompt: () => {},
     } as ToolbarHandlers;
 
     const ctx: ToolContext = {
@@ -234,8 +210,16 @@ export function CanvasToolbar({
     const createCommands = useCanvasCreateCommands(ctx, runAddAction);
 
     return (
-        <div ref={rootRef} data-canvas-no-zoom className="pointer-events-auto relative shrink-0 flex justify-center">
-            <AnimatePresence>{addOpen ? <AddNodeMenu x={panelX} theme={theme} commands={createCommands} /> : null}</AnimatePresence>
+        <div ref={rootRef} data-canvas-no-zoom className="pointer-events-none absolute inset-x-[var(--canvas-inset-x)] bottom-[var(--canvas-inset-y)] flex justify-center" style={{ zIndex }} onPointerDownCapture={bringToFront} onFocusCapture={bringToFront}>
+            <AnimatePresence>
+                {addOpen ? (
+                    <AddNodeMenu
+                        x={panelX}
+                        theme={theme}
+                        commands={createCommands}
+                    />
+                ) : null}
+            </AnimatePresence>
 
             <FloatingDock ref={dockRef} items={items} size={compact ? "compact" : "default"} maxVisible={maxVisible} className="canvas-floating-dock pointer-events-auto w-fit" style={canvasDockStyle(theme)} />
 

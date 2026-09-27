@@ -8,7 +8,7 @@ import { buildGenerationConfig } from "../src/lib/canvas/canvas-project-generati
 import { modelRequestOptions } from "../src/lib/model-selection";
 import { CanvasNodeType, type CanvasNodeData } from "../src/types/canvas";
 
-function systemConfig(input: { capability?: "image" | "video"; logicalModelId?: string; channelModelId?: string; tiers: Array<{ selector: Record<string, string>; billingMode: "fixed_request" | "per_second" | "token"; unitPriceMicrocredits: number }> }) {
+function systemConfig(input: { capability?: "image" | "video"; logicalModelId?: string; channelModelId?: string; tiers: Array<{ selector: Record<string, string>; billingMode: "fixed_request" | "per_second" | "token"; unitPriceMicrocredits: number; outputTokenPriceMicrocredits?: number }> }) {
     const capability = input.capability || "video";
     const model = capability === "video" ? "agnes-video-2.5" : "image-model";
     const channel = createModelChannel({
@@ -33,7 +33,7 @@ function systemConfig(input: { capability?: "image" | "video"; logicalModelId?: 
                     resolution: tier.selector.vquality || "*",
                     videoSeconds: Number(tier.selector.videoSeconds || 0),
                     inputTokenPriceMicrocredits: 0,
-                    outputTokenPriceMicrocredits: 0,
+                    outputTokenPriceMicrocredits: tier.outputTokenPriceMicrocredits ?? 0,
                     cachedTokenPriceMicrocredits: 0,
                 })),
             },
@@ -244,7 +244,7 @@ describe("model request pricing", () => {
         const quote = modelQuoteRequest(config, config.model, "video", textVideoRequirements);
 
         expect(quote).toMatchObject({
-            modelID: "logical-video-1",
+            logicalModelID: "logical-video-1",
             intent: {
                 capability: "video",
                 operation: "text_to_video",
@@ -255,23 +255,50 @@ describe("model request pricing", () => {
     });
 
     test("builds a system channel quote when frontend logical models are disabled", () => {
-        const config = systemConfig({
-            channelModelId: "channel-video-1",
-            tiers: [{ selector: {}, billingMode: "fixed_request", unitPriceMicrocredits: 0 }],
-        });
-        expect(modelQuoteRequest(config, config.model, "video", textVideoRequirements)).toMatchObject({ modelID: "channel-video-1" });
+        const config = systemConfig({ tiers: [{ selector: {}, billingMode: "fixed_request", unitPriceMicrocredits: 0 }] });
+        expect(modelQuoteRequest(config, config.model, "video", textVideoRequirements)).toMatchObject({ channelId: "system-channel", modelKey: "agnes-video-2.5" });
     });
 
-    test("does not call the quote endpoint for a known unpriced system-channel specification", () => {
-        const config = systemConfig({
-            channelModelId: "channel-video-1",
-            tiers: [{ selector: { operation: "image_to_video", imageCount: "1", vquality: "720p", videoSeconds: "15" }, billingMode: "per_second", unitPriceMicrocredits: 1 }],
-        });
+    test("does not quote a known unpriced system-channel specification", () => {
+        const config = systemConfig({ tiers: [{ selector: { operation: "image_to_video", imageCount: "1", vquality: "720p", videoSeconds: "15" }, billingMode: "per_second", unitPriceMicrocredits: 1 }] });
         const unavailable = { ...textVideoRequirements, videoSeconds: "30", options: { ...textVideoRequirements.options, videoSeconds: 30, vquality: "1080p" } };
         expect(modelQuoteValidationError({ ...config, videoSeconds: "30", vquality: "1080p" }, config.model, "video", unavailable)).toContain("尚未配置所选规格的价格");
         expect(modelQuoteRequest({ ...config, videoSeconds: "30", vquality: "1080p" }, config.model, "video", unavailable)).toBeUndefined();
-
         const priced = { ...textVideoRequirements, input: { ...textVideoRequirements.input!, imageCount: 1 }, videoSeconds: "15", options: { ...textVideoRequirements.options, videoSeconds: 15 } };
-        expect(modelQuoteRequest({ ...config, videoSeconds: "15" }, config.model, "video", priced)).toMatchObject({ modelID: "channel-video-1" });
+        expect(modelQuoteRequest({ ...config, videoSeconds: "15" }, config.model, "video", priced)).toMatchObject({ channelId: "system-channel", modelKey: "agnes-video-2.5" });
+    });
+
+    test("matches video audio, resolution and duration from actual request overrides", () => {
+        const config = systemConfig({ tiers: [
+            { selector: {}, billingMode: "token", unitPriceMicrocredits: 0, outputTokenPriceMicrocredits: 1_000_000 },
+            { selector: { vquality: "1080p", videoSeconds: "10", videoGenerateAudio: "false" }, billingMode: "token", unitPriceMicrocredits: 0, outputTokenPriceMicrocredits: 2_000_000 },
+            { selector: { vquality: "1080p", videoSeconds: "10", videoGenerateAudio: "true" }, billingMode: "token", unitPriceMicrocredits: 0, outputTokenPriceMicrocredits: 3_000_000 },
+        ] });
+        const tiers = resolveModelChannel(config, config.model).modelCosts![0]!.logicalPriceTiers!;
+        for (const videoGenerateAudio of [false, "false", true, "true"]) {
+            const requirements = { ...textVideoRequirements, videoSeconds: "10", options: { vquality: "1080P", videoSeconds: 5, videoGenerateAudio } };
+            const matched = priceTiersForCurrentSelection(tiers, "video", config, requirements);
+            expect(matched).toHaveLength(1);
+            expect(matched[0]?.outputTokenPriceMicrocredits).toBe(videoGenerateAudio === true || videoGenerateAudio === "true" ? 3_000_000 : 2_000_000);
+            expect(requestCreditCost({ channelMode: "remote", modelCosts: resolveModelChannel(config, config.model).modelCosts, model: "agnes-video-2.5", capability: "video", config, requirements })).toBeNull();
+        }
+    });
+
+    test("shows the configured video Token rate including free and fractional rates", () => {
+        const config = systemConfig({ tiers: [
+            { selector: { videoGenerateAudio: "false" }, billingMode: "token", unitPriceMicrocredits: 0, outputTokenPriceMicrocredits: 0 },
+            { selector: { videoGenerateAudio: "true" }, billingMode: "token", unitPriceMicrocredits: 0, outputTokenPriceMicrocredits: 1 },
+        ] });
+        const tiers = resolveModelChannel(config, config.model).modelCosts![0]!.logicalPriceTiers!;
+        expect(priceTierSummaryLabel(tiers, "video")).toBe("0-0.000001 积分/百万视频 Token");
+        expect(priceTierSummaryLabel(tiers.slice(0, 1), "video")).toBe("0 积分/百万视频 Token");
+    });
+
+    test("builds a direct system-video quote without inventing a logical model ID", () => {
+        const config = systemConfig({ tiers: [{ selector: {}, billingMode: "token", unitPriceMicrocredits: 0 }] });
+        const requirements = { ...textVideoRequirements, options: { videoGenerateAudio: false, vquality: "1080p" } };
+        expect(modelQuoteRequest(config, config.model, "video", requirements)).toMatchObject({ channelId: "system-channel", modelKey: "agnes-video-2.5", intent: { options: { videoGenerateAudio: false, vquality: "1080p" } } });
+        expect(modelQuoteRequest(config, config.model, "video", requirements)?.logicalModelID).toBeUndefined();
+        expect(modelQuoteRequest(config, config.model, "image", requirements)).toBeUndefined();
     });
 });

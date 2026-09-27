@@ -1,9 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Input, Modal } from "antd";
+import { Input } from "antd";
 import { BookOpenText, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { PaginationBar } from "@/components/layout/workspace-page";
+import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 import type { ProjectUnit } from "@/services/api/projects";
 
 type Props = {
@@ -70,7 +71,7 @@ export function WorkflowChapterNavigator({ projectId, units, unitId, stage }: Pr
                     <ChevronRight />
                 </button>
             </div>
-            <Modal open={open} footer={null} title={null} destroyOnHidden className="workspace-modal workspace-modal-wide workflow-chapter-modal" onCancel={() => setOpen(false)} styles={{ body: { padding: 0 } }}>
+            <AppModal flush open={open} footer={null} title={null} className="workspace-modal workspace-modal-wide workflow-chapter-modal" onCancel={() => setOpen(false)}>
                 <div className="workflow-chapter-modal-shell">
                     <header className="workflow-chapter-modal-head">
                         <div className="workflow-chapter-modal-title">
@@ -145,7 +146,7 @@ export function WorkflowChapterNavigator({ projectId, units, unitId, stage }: Pr
                         />
                     </footer>
                 </div>
-            </Modal>
+            </AppModal>
         </>
     );
 }

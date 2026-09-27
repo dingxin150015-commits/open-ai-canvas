@@ -7,7 +7,7 @@ export const COMFYUI_PLUGIN_ID = "comfyui-workflow-provider";
 export type WorkflowProvider = "runninghub" | "comfyui";
 
 export function workflowPluginId(provider: WorkflowProvider) {
-    return provider === "runninghub" ? RUNNINGHUB_PLUGIN_ID : COMFYUI_PLUGIN_ID;
+	return provider === "runninghub" ? RUNNINGHUB_PLUGIN_ID : COMFYUI_PLUGIN_ID;
 }
 
 export function workflowProviderPluginEnabled(statuses: Record<string, string>, provider: WorkflowProvider) {

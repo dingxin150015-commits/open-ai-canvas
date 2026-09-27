@@ -3,7 +3,7 @@ import { App, Button, Checkbox, Input, Modal, Popconfirm, Select, Space } from "
 import type { ColumnsType } from "antd/es/table";
 import { Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 
-import { PaginationBar } from "@/components/layout/workspace-page";
+import { PaginationBar } from "@/pages/admin/components/admin-ui";
 import { ModelIcon } from "@/components/model-picker";
 import { modelProtocolDefinition, modelProtocolLabel, type ModelProtocol } from "@/lib/model-protocols";
 import { fetchPluginProviderCatalog } from "@/services/api/plugin-catalog";
@@ -13,6 +13,7 @@ import { ChannelModelEditor } from "./channel-model-editor";
 import { AdminPageFrame } from "./admin-shell";
 import { AdminBatchBar, AdminDataTable, AdminFilterChip, AdminStatusBadge } from "./admin-ui";
 import { channelModelFetchSummary, channelModelSupportMeta, channelModelExecutionMeta, channelModelExecutionStatus, isChannelModelReadOnly } from "./channel-model-support";
+import { ChannelOrderDialog } from "./channel-order-dialog";
 
 export function ChannelModelManager({ channel, onClose, onChanged }: { channel: ModelChannel; onClose: () => void; onChanged: () => void | Promise<void> }) {
     const { message, modal } = App.useApp();
@@ -180,6 +181,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                     <div className="min-w-0">
                         <div className="truncate font-medium">{item.displayName || item.modelKey}</div>
                         <div className="admin-monospace truncate text-xs text-foreground/45">{item.modelKey}</div>
+                        {item.channelLabel ? <div className="truncate text-xs text-foreground/60">渠道展示名：{item.channelLabel}</div> : null}
                         {item.providerModelKey && item.providerModelKey !== item.modelKey ? <div className="admin-monospace truncate text-xs text-foreground/35">上游：{item.providerModelKey}</div> : null}
                     </div>
                 </div>
@@ -232,7 +234,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
 
     const filteredItems = items.filter((item) => {
         const query = keyword.trim().toLowerCase();
-        if (query && !`${item.modelKey} ${item.providerModelKey} ${item.displayName}`.toLowerCase().includes(query)) return false;
+        if (query && !`${item.modelKey} ${item.providerModelKey} ${item.displayName} ${item.channelLabel || ""}`.toLowerCase().includes(query)) return false;
         if (capability !== "all" && item.capability !== capability) return false;
         if (status === "enabled" && !item.enabled) return false;
         if (status === "disabled" && item.enabled) return false;
@@ -240,7 +242,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
         return true;
     });
     const pagedItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
-    const existingFetchModelKeys = new Set(items.map((item) => normalizeFetchModelKey(item.modelKey)));
+    const existingFetchModelKeys = new Set(items.flatMap((item) => [item.modelKey, item.providerModelKey].filter(Boolean).map(normalizeFetchModelKey)));
     const selectedNewFetchModels = selectedFetchModels.filter((name) => !existingFetchModelKeys.has(normalizeFetchModelKey(name)));
     const selectedExistingFetchCount = selectedFetchModels.length - selectedNewFetchModels.length;
     const allFetchModelsSelected = fetchPreviewModels.length > 0 && fetchPreviewModels.every((name) => selectedFetchModels.includes(name));
@@ -262,9 +264,17 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
     return (
         <AdminPageFrame
             title={`${channel.name} / 模型管理`}
+            description="模型按用户端展示顺序排列，点击“设置排序”即可调整。"
             back={{ label: "返回系统渠道", onClick: onClose }}
             actions={
                 <Space wrap>
+                    <ChannelOrderDialog
+                        channelId={channel.id}
+                        onSaved={async () => {
+                            await reload();
+                            await onChanged();
+                        }}
+                    />
                     <Button loading={fetching} icon={<RefreshCw className="size-4" />} onClick={() => void fetchModels()}>
                         拉取模型
                     </Button>
@@ -409,7 +419,7 @@ export function ChannelModelManager({ channel, onClose, onChanged }: { channel: 
                     columns,
                     dataSource: pagedItems,
                     pagination: false,
-                    scroll: { x: 990 },
+                    scroll: { x: 1150 },
                 }}
                 footer={
                     <PaginationBar
@@ -501,14 +511,14 @@ function billingSummary(item: ChannelModel) {
     return (
         <div className="space-y-1 text-xs leading-5">
             {tiers.slice(0, 3).map((tier) => (
-                <div key={tier.id}>{priceTierLabel(tier)}</div>
+                <div key={tier.id}>{priceTierLabel(tier, item.capability)}</div>
             ))}
             {tiers.length > 3 ? <div className="text-foreground/45">另有 {tiers.length - 3} 个规格价格档</div> : null}
         </div>
     );
 }
 
-function priceTierLabel(tier: ChannelModelPriceTier) {
+function priceTierLabel(tier: ChannelModelPriceTier, capability: ChannelModel["capability"]) {
     const selector = tier.selector || {};
     const specParts = [
         selector.operation && selector.operation !== "*" ? operationLabel(selector.operation) : "任意生成方式",
@@ -517,9 +527,10 @@ function priceTierLabel(tier: ChannelModelPriceTier) {
         tier.resolution === "*" ? "" : tier.resolution.toUpperCase(),
         tier.videoSeconds ? `${tier.videoSeconds} 秒` : "",
         selector.imageCount && selector.imageCount !== "*" ? `${selector.imageCount} 张参考图` : "",
+        selector.videoGenerateAudio === "true" ? "有声" : selector.videoGenerateAudio === "false" ? "无声" : "",
     ].filter(Boolean);
     const spec = specParts.length ? specParts.join(" / ") : "默认规格";
-    if (tier.billingMode === "token") return `${spec} · ${formatCredits(tier.outputTokenPriceMicrocredits)} / 百万 Token`;
+    if (tier.billingMode === "token") return `${spec} · ${formatCredits(tier.outputTokenPriceMicrocredits)} 积分 / 百万${capability === "video" ? "视频 " : " "}Token`;
     return `${spec} · ${formatCredits(tier.unitPriceMicrocredits)} 积分 / ${tier.billingMode === "per_second_usage" ? "实际计费秒" : tier.billingMode === "per_second" ? "秒" : "次"}`;
 }
 

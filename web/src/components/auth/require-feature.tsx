@@ -17,8 +17,6 @@ const featureNames: Record<FeatureKey, string> = {
     pluginCenterEnabled: "插件中心",
 };
 
-let featureAvailabilityCheckedOnce = false;
-
 export function RequireFeature({ feature, children }: { feature: FeatureKey; children: ReactNode }) {
     const navigate = useNavigate();
     const user = useUserStore((state) => state.user);
@@ -28,8 +26,6 @@ export function RequireFeature({ feature, children }: { feature: FeatureKey; chi
     const [error, setError] = useState("");
 
     useEffect(() => {
-        if (featureAvailabilityCheckedOnce) return;
-        featureAvailabilityCheckedOnce = true;
         let cancelled = false;
         setError("");
         refreshFeatureAvailability()
@@ -42,7 +38,7 @@ export function RequireFeature({ feature, children }: { feature: FeatureKey; chi
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [feature, user?.id]);
 
     if (checking)
         return (

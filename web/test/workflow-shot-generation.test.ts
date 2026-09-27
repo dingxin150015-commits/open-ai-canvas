@@ -1,38 +1,32 @@
 import { expect, test } from "bun:test";
 
-import { defaultConfig } from "../src/stores/use-config-store";
+import { createModelChannel, defaultConfig, encodeChannelModel } from "../src/stores/use-config-store";
 import { submitBackendGenerationTask, type GenerationTaskDependencies } from "../src/services/api/generation-task";
 import type { GenerationTask } from "../src/services/api/task-center";
 import type { ProjectDetail } from "../src/services/api/projects";
 import { buildShotAssetReferenceContext, resolveShotAssetMentionPrompt } from "../src/pages/projects/detail/workflow-shot-references";
 
-const backendVideoConfig = {
-    ...defaultConfig,
-    model: "test::MiniMax-H3",
-    videoModel: "test::MiniMax-H3",
-    models: ["test::MiniMax-H3"],
-    videoModels: ["test::MiniMax-H3"],
-    channels: [
-        {
-            id: "test",
-            name: "测试视频渠道",
-            baseUrl: "https://api.example.com",
-            apiKey: "test-key",
-            apiFormat: "openai" as const,
-            interfaceType: "newapi-channel-2" as const,
-            models: ["MiniMax-H3"],
-            scope: "user" as const,
-        },
-    ],
-};
+function videoTaskConfig() {
+    const channel = createModelChannel({
+        id: "minimax",
+        name: "MiniMax",
+        baseUrl: "https://api.minimaxi.com",
+        apiKey: "test-key",
+        interfaceType: "minimax-video",
+        models: ["MiniMax-H3"],
+        modelCosts: [{ model: "MiniMax-H3", capability: "video", protocol: "minimax-video", billingMode: "fixed_request", unitPriceMicrocredits: 1 }],
+    });
+    const model = encodeChannelModel(channel.id, "MiniMax-H3");
+    return { ...defaultConfig, channels: [channel], model, videoModel: model };
+}
 
 test("production workbench does not silently drop bound voice samples before backend validation", async () => {
     const source = await Bun.file(new URL("../src/pages/projects/detail/workflow-production-workbench.tsx", import.meta.url)).text();
 
     expect(source).toContain('const generationReferenceAudios = generationCapability === "video" ? shotAssetReferenceContext.referenceAudios : [];');
     expect(source).not.toContain("selectedVideoProfile?.references.maxAudios");
-    expect(source).toContain("quoteModelCatalog(quoteRequest.modelID");
-    expect(source).not.toContain("quoteRequest.logicalModelID");
+    expect(source).toContain("quoteModel(quoteRequest, controller.signal)");
+    expect(source).not.toContain("quoteModelCatalog(quoteRequest.modelID");
 });
 
 test("shot generation submits historical character image, current voice and asset prompt", async () => {
@@ -113,29 +107,21 @@ test("shot generation submits historical character image, current voice and asse
         createdAt: "2026-08-30T00:00:00.000Z",
         updatedAt: "2026-08-30T00:00:00.000Z",
     } satisfies GenerationTask;
-    await submitBackendGenerationTask(
-        {
-            projectId: "project-1",
-            mode: "video",
-            prompt,
-            config: backendVideoConfig,
-            referenceImages: context.referenceImages,
-            referenceAudios: context.referenceAudios,
-            metadata: { shotId: "shot-1", videoEditOperation: "reference_to_video" },
-        },
-        {
-            createTask: async (input) => {
-                createdInput = input;
-                return task;
-            },
-            waitTask: async () => {
-                throw new Error("should not wait");
-            },
-            runLocal: async () => ({ mode: "video" }),
-            createId: () => "id-1",
-            now: () => "2026-08-30T00:00:00.000Z",
-        },
-    );
+    await submitBackendGenerationTask({
+        projectId: "project-1",
+        mode: "video",
+        prompt,
+        config: videoTaskConfig(),
+        referenceImages: context.referenceImages,
+        referenceAudios: context.referenceAudios,
+        metadata: { shotId: "shot-1", videoEditOperation: "reference_to_video" },
+    }, {
+        createTask: async (input) => { createdInput = input; return task; },
+        waitTask: async () => { throw new Error("should not wait"); },
+        runLocal: async () => ({ mode: "video" }),
+        createId: () => "id-1",
+        now: () => "2026-08-30T00:00:00.000Z",
+    });
 
     expect(createdInput?.prompt).toContain("【资产参考】");
     expect(createdInput?.input.referenceImages.map((reference) => reference.storageKey)).toEqual(["resource:character-image-1", "resource:scene-image-1"]);
@@ -164,16 +150,13 @@ test("background generation submission returns after task creation without waiti
         now: () => "2026-08-30T00:00:00.000Z",
     };
 
-    const submitted = await submitBackendGenerationTask(
-        {
-            projectId: "project-1",
-            mode: "video",
-            prompt: "角色表演",
-            config: backendVideoConfig,
-            metadata: { shotId: "shot-1", videoEditOperation: "reference_to_video" },
-        },
-        dependencies,
-    );
+    const submitted = await submitBackendGenerationTask({
+        projectId: "project-1",
+        mode: "video",
+        prompt: "角色表演",
+        config: videoTaskConfig(),
+        metadata: { shotId: "shot-1", videoEditOperation: "reference_to_video" },
+    }, dependencies);
 
     expect(submitted).toBe(task);
     expect(waitCalls).toBe(0);

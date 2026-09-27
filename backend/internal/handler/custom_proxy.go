@@ -18,7 +18,8 @@ import (
 
 const maxCustomRelayErrorResponseBytes int64 = 64 << 10
 
-var customRelayClient = service.CustomRelayHTTPClientForChannel
+var customRelayClient = service.CustomRelayHTTPClient
+var customRelayClientForChannel = service.CustomRelayHTTPClientForChannel
 
 func RegisterCustomRelayRoutes(r *gin.RouterGroup, svc *service.Service) {
 	r.Any("/ai/custom", func(c *gin.Context) {
@@ -46,20 +47,17 @@ func RegisterCustomRelayRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		defer release()
-		proxyCustomRelayRequestWithService(c, policy.Request, svc.DesktopLocalChannelsEnabled(), svc)
+		proxyCustomRelayRequestWithService(c, policy.Request, svc)
 	})
 }
 
 func proxyCustomRelayRequest(c *gin.Context, policy service.RuntimeRequestPolicy) {
-	proxyCustomRelayRequestWithCapabilities(c, policy, false)
+	proxyCustomRelayRequestWithService(c, policy, nil)
 }
 
-func proxyCustomRelayRequestWithCapabilities(c *gin.Context, policy service.RuntimeRequestPolicy, desktopLocalChannelsEnabled bool) {
-	proxyCustomRelayRequestWithService(c, policy, desktopLocalChannelsEnabled, nil)
-}
-
-func proxyCustomRelayRequestWithService(c *gin.Context, policy service.RuntimeRequestPolicy, desktopLocalChannelsEnabled bool, svc *service.Service) {
+func proxyCustomRelayRequestWithService(c *gin.Context, policy service.RuntimeRequestPolicy, svc *service.Service) {
 	requestedAllowLocal := strings.TrimSpace(c.GetHeader(service.LocalChannelRequestHeader)) == "1"
+	desktopLocalChannelsEnabled := svc != nil && svc.DesktopLocalChannelsEnabled()
 	target, err := service.ValidateCustomRelayChannelURL(c.GetHeader("X-Canvas-Upstream-URL"), c.GetHeader(service.LocalChannelBaseURLHeader), requestedAllowLocal, desktopLocalChannelsEnabled)
 	if err != nil {
 		failService(c, err)
@@ -127,7 +125,11 @@ func proxyCustomRelayRequestWithService(c *gin.Context, policy service.RuntimeRe
 		upstreamReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 
-	resp, err := customRelayClient(time.Duration(policy.CustomRelayTimeoutMinutes)*time.Minute, target, requestedAllowLocal, desktopLocalChannelsEnabled).Do(upstreamReq)
+	client := customRelayClient(time.Duration(policy.CustomRelayTimeoutMinutes) * time.Minute)
+	if requestedAllowLocal {
+		client = customRelayClientForChannel(time.Duration(policy.CustomRelayTimeoutMinutes)*time.Minute, target, true, desktopLocalChannelsEnabled)
+	}
+	resp, err := client.Do(upstreamReq)
 	if err != nil {
 		fail(c, http.StatusBadGateway, errors.New(userFacingRelayError(svc, errors.New("自定义渠道上游连接失败"))))
 		return

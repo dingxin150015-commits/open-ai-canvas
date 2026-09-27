@@ -1,5 +1,6 @@
+import { apiBaseURL } from "@/services/api/request";
 import { projectDesktopLocalChannelRuntime } from "@/lib/desktop-local-channel";
-import { isSystemProxyBaseUrl, resolveBackendApiUrl, type AiConfig, type ChannelHeader } from "@/stores/use-config-store";
+import { isSystemProxyBaseUrl, type AiConfig, type ChannelHeader } from "@/stores/use-config-store";
 
 type RelayConfig = Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat"> & { allowLocalChannel?: boolean; headers?: ChannelHeader[] };
 
@@ -13,6 +14,8 @@ export type ChannelRequest = {
 export function channelRequest(config: RelayConfig, upstreamUrl: string, headers: HeadersInit = {}): ChannelRequest {
     const runtimeConfig = projectDesktopLocalChannelRuntime(config);
     const normalizedHeaders = new Headers(headers);
+    normalizedHeaders.delete("X-Canvas-Allow-Local-Channel");
+    normalizedHeaders.delete("X-Canvas-Upstream-Base-URL");
     if (isSystemProxyBaseUrl(runtimeConfig.baseUrl)) {
         return { url: upstreamUrl, headers: Object.fromEntries(normalizedHeaders.entries()), credentials: "include" };
     }
@@ -27,13 +30,10 @@ export function channelRequest(config: RelayConfig, upstreamUrl: string, headers
     if (runtimeConfig.allowLocalChannel === true) {
         normalizedHeaders.set("X-Canvas-Allow-Local-Channel", "1");
         normalizedHeaders.set("X-Canvas-Upstream-Base-URL", normalizedBaseUrl);
-    } else {
-        normalizedHeaders.delete("X-Canvas-Allow-Local-Channel");
-        normalizedHeaders.delete("X-Canvas-Upstream-Base-URL");
     }
     if (runtimeConfig.headers?.length) normalizedHeaders.set("X-Canvas-Upstream-Headers", encodeChannelHeaders(runtimeConfig.headers));
     return {
-        url: resolveBackendApiUrl("/api/ai/custom"),
+        url: `${apiBaseURL.replace(/\/+$/u, "")}/ai/custom`,
         headers: Object.fromEntries(normalizedHeaders.entries()),
         credentials: "include",
     };

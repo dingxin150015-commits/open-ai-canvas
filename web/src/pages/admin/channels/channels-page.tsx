@@ -1,30 +1,31 @@
 import { App, Button, Form, Input, InputNumber, Modal, Select, Switch } from "antd";
 import type { FormInstance } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Pencil, Plus, Power, Search, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Power, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { ChannelHeadersEditor, validateChannelHeaders } from "@/components/channel-headers-editor";
-import { PaginationBar } from "@/components/layout/workspace-page";
+import { PaginationBar } from "@/pages/admin/components/admin-ui";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { desktopLocalChannelFormState, desktopLocalChannelPayloadValue, DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL } from "@/lib/desktop-local-channel";
 import { refreshSystemChannels } from "@/lib/user-session";
-import { createAdminChannel, deleteAdminChannel, listAdminChannels, updateAdminChannel } from "@/services/api/auth";
+import { desktopLocalChannelFormState, desktopLocalChannelPayloadValue, DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL } from "@/lib/desktop-local-channel";
+import { createAdminChannel, deleteAdminChannel, duplicateAdminChannel, listAdminChannels, updateAdminChannel } from "@/services/api/auth";
 import { type ApiCallFormat, type ChannelHeader, type ModelChannel } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAdminContext } from "../admin-context";
 import { AdminPageFrame } from "../components/admin-shell";
-import { AdminDataTable, AdminFilterChip, AdminRowActions, AdminStatusBadge, AdminTableEmpty, configuredSecretText } from "../components/admin-ui";
+import { AdminDataTable, AdminRowActions, AdminStatusBadge, AdminTableEmpty, configuredSecretText } from "../components/admin-ui";
 import { ChannelModelManager } from "../components/channel-model-manager";
+import { ChannelOrderDialog } from "../components/channel-order-dialog";
 
 type ChannelFormValues = {
     name: string;
     baseUrl: string;
     allowLocalChannel?: boolean;
+    apiFormat?: ApiCallFormat;
     apiKey?: string;
     secretKey?: string;
-    apiFormat?: ApiCallFormat;
     headers?: ChannelHeader[];
     useGlobalConcurrency?: boolean;
     concurrencyLimit?: number;
@@ -38,32 +39,17 @@ export function adminLocalChannelFormOwner(desktopLocalChannelsEnabled: boolean,
 
 export function AdminLocalChannelSwitch({ visible, checked, onChange }: { visible: boolean; checked: boolean; onChange: (checked: boolean) => void }) {
     if (!visible) return null;
-    return (
-        <Form.Item name="allowLocalChannel" label="允许本机渠道" valuePropName="checked" extra={`仅放行精确 localhost 或 127.0.0.1；示例：${DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL}`}>
-            <Switch checked={checked} onChange={onChange} />
-        </Form.Item>
-    );
+    return <Form.Item name="allowLocalChannel" label="允许本机渠道" valuePropName="checked" extra={`仅放行精确 localhost 或 127.0.0.1；示例：${DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL}`}><Switch checked={checked} onChange={onChange} /></Form.Item>;
 }
 
-export function AdminLocalChannelFields({ visible, checked, form }: { visible: boolean; checked: boolean; form: Pick<FormInstance<ChannelFormValues>, "setFieldValue"> }) {
-    return (
-        <>
-            <Form.Item name="baseUrl" label="Base URL" rules={[{ required: true, message: "请填写 Base URL" }]}>
-                <Input placeholder={checked ? DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL : "填写渠道 Base URL"} />
-            </Form.Item>
-            <AdminLocalChannelSwitch visible={visible} checked={checked} onChange={(value) => form.setFieldValue("allowLocalChannel", value)} />
-        </>
-    );
-}
-
-export function adminChannelSavePayload(values: ChannelFormValues, desktopLocalChannelsEnabled: boolean, hostname: string) {
+export function adminChannelSavePayload(values: ChannelFormValues, desktopLocalChannelsEnabled = false, hostname = "") {
     return {
         name: values.name.trim(),
         baseUrl: values.baseUrl.trim(),
         allowLocalChannel: adminLocalChannelFormOwner(desktopLocalChannelsEnabled, hostname, values.allowLocalChannel).payloadValue,
+        apiFormat: values.apiFormat || "openai",
         apiKey: values.apiKey?.trim() || "",
         secretKey: values.secretKey?.trim() || "",
-        apiFormat: values.apiFormat || "openai",
         headers: values.headers || [],
         useGlobalConcurrency: values.useGlobalConcurrency !== false,
         concurrencyLimit: values.useGlobalConcurrency === false ? values.concurrencyLimit : undefined,
@@ -86,16 +72,15 @@ export default function ChannelsPage() {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [editingChannel, setEditingChannel] = useState<ModelChannel | null>(null);
     const [saving, setSaving] = useState(false);
+    const [duplicatingChannelId, setDuplicatingChannelId] = useState<string | null>(null);
     const [managingChannel, setManagingChannel] = useState<ModelChannel | null>(null);
     const requestSequence = useRef(0);
     const [form] = Form.useForm<ChannelFormValues>();
     const useGlobalConcurrency = Form.useWatch("useGlobalConcurrency", form) !== false;
-    const requestedAllowLocalChannel = Form.useWatch("allowLocalChannel", form) === true;
+    const allowLocalChannel = Form.useWatch("allowLocalChannel", form) === true;
     const desktopLocalChannelsEnabled = useUserStore((state) => state.features.desktopLocalChannelsEnabled);
     const desktopLocalChannelHostname = typeof window === "undefined" ? "" : window.location.hostname;
-    const desktopLocalChannelControl = adminLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, requestedAllowLocalChannel);
-    const allowLocalChannel = desktopLocalChannelControl.checked;
-    const showDesktopLocalChannelControl = desktopLocalChannelControl.visible;
+    const showDesktopLocalChannelControl = adminLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, allowLocalChannel).visible;
     const hasFilters = Boolean(keyword || status !== "all");
 
     const updateUrl = (patch: Record<string, string | number>, replace = false) => {
@@ -112,7 +97,7 @@ export default function ChannelsPage() {
         const sequence = ++requestSequence.current;
         setLoading(true);
         try {
-            const result = await listAdminChannels({ keyword: debouncedKeyword || undefined, status: status === "all" ? undefined : status, page, limit: pageSize });
+            const result = await listAdminChannels({ keyword: debouncedKeyword || undefined, status: status === "all" ? undefined : status, page, pageSize });
             if (sequence !== requestSequence.current) return;
             setChannels(result.channels);
             setTotal(result.total);
@@ -146,15 +131,15 @@ export default function ChannelsPage() {
                       name: channel.name,
                       baseUrl: channel.baseUrl,
                       allowLocalChannel: adminLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, channel.allowLocalChannel).checked,
+                      apiFormat: channel.apiFormat || "openai",
                       apiKey: "",
                       secretKey: "",
-                      apiFormat: channel.apiFormat || "openai",
                       headers: channel.headers || [],
                       useGlobalConcurrency: !channel.concurrencyLimit,
                       concurrencyLimit: channel.concurrencyLimit || undefined,
                       enabled: channel.enabled !== false,
                   }
-                : { name: "", baseUrl: "", allowLocalChannel: false, apiKey: "", secretKey: "", apiFormat: "openai", headers: [], useGlobalConcurrency: true, concurrencyLimit: undefined, enabled: true },
+                : { name: "", baseUrl: "", allowLocalChannel: false, apiFormat: "openai", apiKey: "", secretKey: "", headers: [], useGlobalConcurrency: true, concurrencyLimit: undefined, enabled: true },
         );
         setDrawerOpen(true);
     };
@@ -206,6 +191,20 @@ export default function ChannelsPage() {
         }
     };
 
+    const duplicateChannel = async (channel: ModelChannel) => {
+        setDuplicatingChannelId(channel.id);
+        try {
+            await duplicateAdminChannel(channel.id);
+            await syncChannels();
+            await reload();
+            message.success("系统渠道已复制");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "复制系统渠道失败");
+        } finally {
+            setDuplicatingChannelId(null);
+        }
+    };
+
     const removeChannel = async (channel: ModelChannel) => {
         try {
             await deleteAdminChannel(channel.id);
@@ -241,6 +240,7 @@ export default function ChannelsPage() {
                     primary={{ label: "模型管理", onClick: () => setManagingChannel(channel) }}
                     actions={[
                         { key: "edit", label: "编辑", icon: <Pencil className="size-3.5" />, onClick: () => openDrawer(channel) },
+                        { key: "duplicate", label: "复制渠道", icon: <Copy className="size-3.5" />, disabled: Boolean(duplicatingChannelId), onClick: () => duplicateChannel(channel) },
                         {
                             key: "toggle",
                             label: channel.enabled !== false ? "停用渠道" : "启用渠道",
@@ -283,11 +283,19 @@ export default function ChannelsPage() {
     return (
         <AdminPageFrame
             title="系统渠道"
-            description="渠道、模型与售价"
+            description="列表顺序就是用户端展示顺序，点击“设置排序”即可调整。"
             actions={
-                <Button type="primary" icon={<Plus className="size-4" />} onClick={() => openDrawer()}>
-                    新增系统渠道
-                </Button>
+                <div className="flex gap-2">
+                    <ChannelOrderDialog
+                        onSaved={async () => {
+                            await syncChannels();
+                            await reload();
+                        }}
+                    />
+                    <Button type="primary" icon={<Plus className="size-4" />} onClick={() => openDrawer()}>
+                        新增系统渠道
+                    </Button>
+                </div>
             }
         >
             <AdminDataTable
@@ -300,15 +308,9 @@ export default function ChannelsPage() {
                         className="app-list-search"
                         prefix={<Search className="size-4 text-foreground/40" />}
                         value={keyword}
-                        placeholder="搜索渠道名称或地址"
+                        placeholder="搜索渠道名称、别名或地址"
                         onChange={(event) => updateUrl({ filter: event.target.value, page: 1 }, true)}
                     />
-                }
-                toolbarActiveFilters={
-                    <>
-                        {keyword ? <AdminFilterChip label={`搜索：${keyword}`} onRemove={() => updateUrl({ filter: "", page: 1 })} /> : null}
-                        {status !== "all" ? <AdminFilterChip label={`状态：${status === "enabled" ? "已启用" : "已停用"}`} onRemove={() => updateUrl({ status: "all", page: 1 })} /> : null}
-                    </>
                 }
                 toolbarFilters={
                     <Select
@@ -325,7 +327,7 @@ export default function ChannelsPage() {
                 }
                 toolbarActive={hasFilters}
                 onReset={() => updateUrl({ filter: "", status: "all", page: 1 })}
-                skeletonColumns={6}
+                skeletonColumns={7}
                 table={{
                     className: "app-data-table",
                     size: "small",
@@ -349,7 +351,7 @@ export default function ChannelsPage() {
                         ),
                     },
                     pagination: false,
-                    scroll: { x: 820 },
+                    scroll: { x: 1150 },
                 }}
                 footer={<PaginationBar alwaysShow current={page} pageSize={pageSize} total={total} onChange={(nextPage, nextSize) => updateUrl({ page: nextSize !== pageSize ? 1 : nextPage, pageSize: nextSize })} />}
             />
@@ -375,16 +377,12 @@ export default function ChannelsPage() {
                     <Form.Item name="name" label="渠道名称" rules={[{ required: true, message: "请填写渠道名称" }]}>
                         <Input placeholder="例如：OpenAI 官方渠道" />
                     </Form.Item>
-                    <AdminLocalChannelFields visible={showDesktopLocalChannelControl} checked={allowLocalChannel} form={form} />
-                    <Form.Item name="apiFormat" label="API 格式" extra="仅用于拉取模型目录；模型能力和请求协议在模型管理中统一配置。" rules={[{ required: true, message: "请选择 API 格式" }]}>
-                        <Select
-                            placeholder="选择 API 格式"
-                            options={[
-                                { label: "OpenAI 兼容", value: "openai" },
-                                { label: "Gemini 原生", value: "gemini" },
-                                { label: "Claude 原生", value: "claude" },
-                            ]}
-                        />
+                    <Form.Item name="baseUrl" label="Base URL" rules={[{ required: true, message: "请填写 Base URL" }]}>
+                        <Input placeholder={allowLocalChannel ? DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL : "填写渠道 Base URL"} />
+                    </Form.Item>
+                    <AdminLocalChannelSwitch visible={showDesktopLocalChannelControl} checked={allowLocalChannel} onChange={(value) => form.setFieldValue("allowLocalChannel", value)} />
+                    <Form.Item name="apiFormat" label="API 格式" extra="仅用于拉取模型目录；模型能力和请求协议在模型管理中配置。" rules={[{ required: true, message: "请选择 API 格式" }]}>
+                        <Select options={[{ label: "OpenAI 兼容", value: "openai" }, { label: "Gemini 原生", value: "gemini" }, { label: "Claude 原生", value: "claude" }]} />
                     </Form.Item>
                     <Form.Item
                         name="apiKey"

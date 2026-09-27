@@ -192,7 +192,7 @@ export function WorkflowTestWorkbench({ provider, workflowId, workflowKind = "wo
                 <div className="min-w-0">
                     <strong>{title || workflowId || "未选择工作流"}</strong>
                     <span>
-                        {provider === "runninghub" ? "RunningHub" : "ComfyUI Bridge"} · {capabilityName(capability)}工作流 · 测试值不会覆盖保存配置
+                        RunningHub · {capabilityName(capability)}工作流 · 测试值不会覆盖保存配置
                     </span>
                 </div>
                 <div className="workflow-test-toolbar-actions">
@@ -412,7 +412,12 @@ function buildTestConfig(config: AiConfig, provider: WorkflowProvider, workflowI
             workflows: config.runningHub.workflows.map((item) => (item.workflowId.trim() === workflowId.trim() && (item.kind === "app" ? "app" : "workflow") === workflowKind ? { ...item, fields: patchedFields } : item)),
         };
     } else {
-        next.comfyBridge = { ...config.comfyBridge, enabled: true, workflowId, workflows: config.comfyBridge.workflows.map((item) => (item.workflowId.trim() === workflowId.trim() ? { ...item, fields: patchedFields } : item)) };
+        next.comfyBridge = {
+            ...config.comfyBridge,
+            enabled: true,
+            workflowId,
+            workflows: config.comfyBridge.workflows.map((item) => item.workflowId.trim() === workflowId.trim() ? { ...item, fields: patchedFields } : item),
+        };
     }
     return next;
 }

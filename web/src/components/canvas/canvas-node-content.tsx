@@ -6,26 +6,28 @@ import { CONTENT_MODERATION_ERROR_CODE, generationErrorMessage, isContentModerat
 import { generationTaskShowsProgress, generationTaskStageLabel, generationTaskStatusLabel, isGenerationTaskSubmissionUncertain } from "@/lib/generation-task-display";
 import { canvasRichTextHTML } from "@/lib/canvas/canvas-rich-text";
 import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
+import { canvasTextFontSize } from "@/lib/canvas/canvas-text-scale";
 import { loadCanvasDrawingPreview } from "@/lib/canvas/canvas-drawing-storage";
 import { canvasNodeVideoPreviewUrl } from "@/lib/canvas/canvas-media-preview";
+import { bindCanvasVideoHoverPreview } from "@/lib/canvas/canvas-video-hover-preview";
 import { buildLibTVImagePreviewUrl, buildLibTVVideoSourceUrl } from "@/lib/canvas/libtv-import";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
-import { resourceIdFromStorageKey } from "@/services/api/resources";
+import { resourceFileUrl, resourceIdFromStorageKey } from "@/services/api/resources";
 import type { GenerationTask } from "@/services/api/task-center";
-import { cacheResourceObjectUrl, getCachedResourceObjectUrl, scheduleResourceBlobCache } from "@/services/resource-blob-cache";
+import { scheduleResourceBlobCache } from "@/services/resource-blob-cache";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { hydrateCanvasVideoPreview } from "@/services/canvas-video-preview";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
-import { PORTRAIT_CLEARANCE_NODE_TYPE } from "@/lib/portrait-clearance/contracts";
 import { ART_CRITIQUE_NODE_TYPE } from "@/lib/art-critique/contracts";
 import { createDefaultSubtitleStyle } from "@/types/timeline";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasAudioPlayer } from "./canvas-audio-player";
 import { useCanvasNodeActions } from "./canvas-node-action-context";
 import { CanvasSubtitleOverlay } from "./canvas-subtitle-overlay";
+import { CanvasFileUploadContent } from "./canvas-file-upload-content";
 import { MarkdownNodeContent } from "./nodes/markdown-node";
 import { ChartNodeContent } from "./nodes/chart-node";
 import { CompareNodeContent } from "./nodes/compare-node";
@@ -33,8 +35,11 @@ import { ColorGradeNodeContent } from "./nodes/color-grade-node";
 import { HtmlNodeContent } from "./nodes/html-node";
 import { PanoramaNodeContent } from "./nodes/panorama-node";
 import { SvgNodeContent } from "./nodes/svg-node";
-import { PortraitClearanceNodeContent } from "./nodes/portrait-clearance-node";
 import { ArtCritiqueNodeContent } from "./nodes/ai-art-critique-node";
+import { MediaConversionNodeContent } from "./nodes/media-conversion-node";
+import { MEDIA_CONVERSION_NODE_TYPE } from "@/lib/media-conversion/contracts";
+import { PORTRAIT_CLEARANCE_NODE_TYPE } from "@/lib/portrait-clearance/contracts";
+import { PortraitClearanceNodeContent } from "./nodes/portrait-clearance-node";
 
 export type CanvasNodeContentProps = {
     node: CanvasNodeData;
@@ -62,16 +67,18 @@ export type CanvasNodeContentProps = {
 };
 
 export function CanvasNodeContent(props: CanvasNodeContentProps) {
-    const hasCustomContent =
-        props.node.type === CanvasNodeType.Config ||
-        props.node.type === CanvasNodeType.Script ||
-        Boolean(props.node.metadata?.directorSceneId) ||
-        (props.node.metadata?.workflowKind === "character" && Boolean(props.node.metadata.characterAssetId)) ||
-        (props.node.metadata?.workflowKind === "story_input" && !props.isEditingContent) ||
-        (props.node.metadata?.workflowKind === "styleboard" && !props.node.metadata.content);
+    if (props.node.metadata?.fileUpload) return <CanvasFileUploadContent node={props.node} theme={props.theme} reduceMotion={props.reduceMediaEffects} />;
+    const hasCustomContent = props.node.type === CanvasNodeType.Config
+        || props.node.type === CanvasNodeType.Script
+        || props.node.type === CanvasNodeType.BatchTable
+        || Boolean(props.node.metadata?.directorSceneId)
+        || (props.node.metadata?.workflowKind === "character" && Boolean(props.node.metadata.characterAssetId))
+        || (props.node.metadata?.workflowKind === "story_input" && !props.isEditingContent)
+        || (props.node.metadata?.workflowKind === "styleboard" && !props.node.metadata.content);
     if (hasCustomContent && props.renderNodeContent) return props.renderNodeContent(props.node);
     if (props.node.type === PORTRAIT_CLEARANCE_NODE_TYPE) return <PortraitClearanceNodeContent node={props.node} />;
     if (props.node.type === ART_CRITIQUE_NODE_TYPE) return <ArtCritiqueNodeContent node={props.node} />;
+    if (props.node.type === MEDIA_CONVERSION_NODE_TYPE) return <MediaConversionNodeContent node={props.node} theme={props.theme} />;
     if (props.isBatchRoot) return <ImageNodeContent {...props} />;
     if (props.node.metadata?.status === "loading") return <LoadingContent node={props.node} theme={props.theme} onOpenTaskDetails={props.onOpenTaskDetails} />;
     if (props.node.metadata?.status === "error") return <ErrorContent node={props.node} theme={props.theme} onRetry={props.onRetry} onReloadResource={props.onReloadResource} />;
@@ -344,7 +351,7 @@ function UnknownNodeContent({ theme }: Pick<CanvasNodeContentProps, "theme">) {
 }
 
 function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, onContentChange, onStopEditing }: CanvasNodeContentProps) {
-    const fontSize = node.metadata?.fontSize || 14;
+    const fontSize = canvasTextFontSize(node.width, node.height, node.metadata?.fontSize);
     const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as CSSProperties;
     const richTextHTML = useMemo(() => canvasRichTextHTML(node.metadata?.richText), [node.metadata?.richText]);
 
@@ -612,6 +619,14 @@ function InactiveVideoPreview({ node, theme, onPlay }: Pick<CanvasNodeContentPro
     const [hydrating, setHydrating] = useState(false);
 
     useEffect(() => {
+        const element = previewRef.current;
+        if (!element) return;
+        const content = node.metadata?.content || "";
+        const fallback = node.metadata?.importSource?.provider === "libtv" ? buildLibTVVideoSourceUrl(content) : content;
+        return bindCanvasVideoHoverPreview(element, () => resolveMediaUrl(node.metadata?.storageKey, fallback));
+    }, [node.metadata?.content, node.metadata?.storageKey, node.metadata?.importSource?.provider]);
+
+    useEffect(() => {
         updateMetadataRef.current = updateMetadata;
     }, [updateMetadata]);
 
@@ -815,43 +830,33 @@ function useNodeResourceUrl(node: CanvasNodeData, eager: boolean) {
     // `previewContent` is intentionally passive-only.  When a media node is
     // activated, VideoPlayer/Audio must receive the playable asset, never the
     // LibTV OSS snapshot URL stored for the thumbnail.
-    const fallback =
-        node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio
-            ? content
-            : node.metadata?.previewContent || (node.type === CanvasNodeType.Image && node.metadata?.importSource?.provider === "libtv" ? buildLibTVImagePreviewUrl(content) : content);
-    const isRemoteResource = Boolean(resourceIdFromStorageKey(storageKey));
+    const fallback = node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio
+        ? content
+        : node.metadata?.previewContent
+            || (node.type === CanvasNodeType.Image && node.metadata?.importSource?.provider === "libtv" ? buildLibTVImagePreviewUrl(content) : content);
+    const resourceId = resourceIdFromStorageKey(storageKey);
+    const isRemoteResource = Boolean(resourceId);
+    // 远程资源展示统一走稳定的云端资源文件地址。Blob 缓存只服务于导出、抽帧和
+    // 供应商输入等字节处理，不再把缓存生成的 blob: URL 写入媒体展示链路。
+    const remoteUrl = isRemoteResource ? resourceFileUrl(resourceId) : "";
     // Inline data URLs are already local, but decoding thousands of them is
     // still expensive. Images must wait for the same viewport gate as remote
     // resources; otherwise DOM virtualization does not reduce image work.
     const isLazyVisual = node.type === CanvasNodeType.Image;
-    const [url, setUrl] = useState(isRemoteResource || isLazyVisual ? "" : fallback);
-    const [loading, setLoading] = useState(isRemoteResource && eager);
+    const isHttpUrl = Boolean(fallback && !fallback.startsWith("data:"));
+    const initialUrl = eager && isRemoteResource ? remoteUrl : (eager && isLazyVisual && isHttpUrl ? fallback : (isRemoteResource || isLazyVisual ? "" : fallback));
+    const [url, setUrl] = useState(() => initialUrl);
+    const [loading, setLoading] = useState(() => !initialUrl && isRemoteResource && eager);
 
     useEffect(() => {
-        let cancelled = false;
         if (!isRemoteResource) {
             setUrl(isLazyVisual && !eager ? "" : fallback);
             setLoading(false);
             return;
         }
-        setUrl("");
-        setLoading(eager);
-        // 只有进入视口或被激活的节点才下载远程媒体；缓存层会复用已有 Blob URL 和 in-flight 请求。
-        const resolve = eager ? cacheResourceObjectUrl(storageKey) : getCachedResourceObjectUrl(storageKey);
-        void resolve
-            .then((cached) => {
-                if (!cancelled) setUrl(cached || (eager ? fallback : ""));
-            })
-            .catch(() => {
-                if (!cancelled && eager) setUrl(fallback);
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [eager, fallback, isLazyVisual, isRemoteResource, storageKey]);
+        setUrl(eager ? remoteUrl : "");
+        setLoading(false);
+    }, [eager, fallback, isLazyVisual, isRemoteResource, remoteUrl]);
 
     return { url, loading };
 }
