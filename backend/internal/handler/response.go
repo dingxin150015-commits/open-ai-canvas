@@ -79,7 +79,7 @@ func writeAppError(c *gin.Context, appErr *service.AppError) {
 		}
 		logHandlerFailure(c, appErr.Status, reason, appErr.Retryable, diagnosticErr)
 	}
-	writeFailure(c, appErr.Status, code, reason, message, appErr.Retryable)
+	writeFailureWithDetails(c, appErr.Status, code, reason, message, appErr.Retryable, appErr.Details)
 }
 
 // failInternal 保留真实 HTTP 状态，但绝不把未分类错误原文写入响应。
@@ -93,6 +93,10 @@ func failInternal(c *gin.Context, status int, err error) {
 }
 
 func writeFailure(c *gin.Context, status int, code int, reason service.ErrorReason, message string, retryable bool) {
+	writeFailureWithDetails(c, status, code, reason, message, retryable, nil)
+}
+
+func writeFailureWithDetails(c *gin.Context, status int, code int, reason service.ErrorReason, message string, retryable bool, details map[string]any) {
 	body := gin.H{"code": code, "data": nil, "msg": message}
 	if reason != "" {
 		body["reason"] = reason
@@ -105,6 +109,9 @@ func writeFailure(c *gin.Context, status int, code int, reason service.ErrorReas
 	body["errorCategory"] = category
 	body["retryable"] = retryable || defaultRetryable
 	body["requestId"] = RequestID(c)
+	if len(details) > 0 {
+		body["details"] = details
+	}
 	c.JSON(status, body)
 }
 

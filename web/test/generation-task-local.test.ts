@@ -2,13 +2,11 @@ import { expect, test } from "bun:test";
 
 import { createModelChannel, defaultConfig } from "../src/stores/use-config-store";
 import { runBackendGenerationTask, runBackendGenerationTaskBatch } from "../src/services/api/generation-task";
-import { deleteGenerationTask, formatTaskLog, listGenerationTasks, projectBackendSafeTaskLog, splitGenerationTaskObservationIds, type GenerationTask } from "../src/services/api/task-center";
+import { deleteGenerationTask, formatTaskLog, listGenerationTasks, projectBackendSafeTaskLog, type GenerationTask } from "../src/services/api/task-center";
 import { isLocalDreaminaBackgroundTask, localDreaminaCancellationCopy, localDreaminaDetachOutcome, projectLocalDreaminaTask } from "../src/services/local-dreamina-task-projection";
 import { LocalDreaminaGenerationClientError, runLocalDreaminaGenerationTask, type LocalDreaminaGenerationInput } from "../src/services/local-dreamina-generation";
 import { createGenerationBatchRetryContexts, createGenerationRetryContext, generationTaskMetadata, runBackendCanvasGenerationTask, runCanvasGenerationTaskToConsumer } from "../src/lib/canvas/canvas-project-generation";
-import { runCanvasAgentGenerationOps } from "../src/pages/canvas/use-canvas-agent-operations";
 import { CanvasNodeType, type CanvasNodeData } from "../src/types/canvas";
-import { onlineToolToOps } from "../src/components/canvas/canvas-assistant-panel";
 import { generationTaskShowsProgress, generationTaskStageLabel, generationTaskStatusLabel } from "../src/lib/generation-task-display";
 import { generationErrorMessage } from "../src/lib/generation-error";
 import { generationTaskNodeId } from "../src/lib/canvas/canvas-generation-task-sync";
@@ -164,12 +162,13 @@ test("task display does not claim a submitted Dreamina receipt is actively gener
     expect(generationTaskStatusLabel(officialCompleted)).toBe("官方已完成");
     expect(generationTaskStageLabel(officialCompleted)).toBe("官方返回状态：completed");
     expect(generationTaskStatusLabel(generating)).toBe("生成中");
-    expect(generationTaskShowsProgress(generating)).toBe(true);
+    expect(generationTaskShowsProgress(generating)).toBe(false);
+    expect(generationTaskShowsProgress({ ...generating, progress: 15 })).toBe(true);
 
     for (const stage of ["等待队列调度", "后端接管任务", "正在连接上游", "调用生成模型"]) {
         expect(generationTaskShowsProgress({ ...generating, provider: "managed", stage })).toBe(false);
     }
-    expect(generationTaskShowsProgress({ ...generating, provider: "managed", stage: "上游生成中" })).toBe(true);
+    expect(generationTaskShowsProgress({ ...generating, provider: "managed", stage: "上游生成中", progress: 15 })).toBe(true);
     expect(generationTaskStatusLabel(remoteRunning)).toBe("生成中");
 });
 
@@ -961,13 +960,6 @@ test("four identical Dreamina user operations receive four independent task ids"
     expect(submitted).toEqual(ids);
 });
 
-test("Create observes local Dreamina tasks by wait while remote providers keep polling", () => {
-    expect(splitGenerationTaskObservationIds(["remote-task-0001", "dreamina:dreamina-local-task-0001", "remote-task-0002"])).toEqual({
-        localWaitIds: ["dreamina:dreamina-local-task-0001"],
-        remotePollIds: ["remote-task-0001", "remote-task-0002"],
-    });
-});
-
 test("task center cursor-merges more than 100 Backend/local tasks and preserves project filtering for local history", async () => {
     const makeBackendTask = (id: string, projectId: string, updatedAt: string): GenerationTask => ({
         id,
@@ -1387,7 +1379,8 @@ test("remote provider keeps Create resolution semantics and still creates one Ba
         },
     );
 
-    expect(backendInput?.input.config).toMatchObject({ vquality: "720", quality: "auto" });
+    expect(backendInput?.input.config).toMatchObject({ vquality: "720", allowLocalChannel: false });
+    expect(backendInput?.input.config.quality).toBeUndefined();
     expect(localCalls).toBe(0);
 });
 
@@ -1513,106 +1506,6 @@ test("shared task subscription reconnects Create and agents to one durable task 
     expect(queryCalls).toBe(1);
     expect(waitCalls).toBe(1);
     expect(second.at(-1)).toMatchObject({ id: running.id, projectId: running.projectId, clientContext: context, status: "succeeded" });
-});
-
-test("online and local agent run_generation persists conversation and message context through shared task creation", async () => {
-    const node: CanvasNodeData = {
-        id: "video-node",
-        type: CanvasNodeType.Video,
-        title: "Video",
-        position: { x: 0, y: 0 },
-        width: 320,
-        height: 180,
-        metadata: { generationMode: "video", composerContent: "A shared agent prompt", vquality: "720" },
-    };
-    const localInputs: LocalDreaminaGenerationInput[] = [];
-    const createdTasks: GenerationTask[] = [];
-    const subscriptions = new Map<string, (task: GenerationTask) => void>();
-    const dependencies = {
-        createTask: async () => {
-            throw new Error("must not post /tasks");
-        },
-        waitTask: async () => {
-            throw new Error("must not wait Backend task");
-        },
-        runLocal: async (input: LocalDreaminaGenerationInput) => {
-            localInputs.push(input);
-            return { mode: "video" as const, video: { dataUrl: "data:video/mp4;base64,AAAA", mimeType: "video/mp4", bytes: 3 } };
-        },
-        createId: () => `agent-task-${localInputs.length + 1}`,
-        now: () => "2026-08-13T00:00:00.000Z",
-    };
-    const generate = async (
-        nodeId: string,
-        generationMode: Parameters<typeof runBackendCanvasGenerationTask>[0]["mode"],
-        generationPrompt: string,
-        options?: { context?: { conversationId?: string; messageId?: string }; onTaskUpdate?: (task: GenerationTask) => void },
-    ) => {
-        await runBackendCanvasGenerationTask(
-            {
-                projectId: "agent-project-0001",
-                nodeId,
-                mode: generationMode,
-                prompt: generationPrompt,
-                config: { ...defaultConfig, model: "local:dreamina-cli:seedance2.0mini", videoSeconds: "4", vquality: "720" },
-                metadata: options?.context,
-                onTaskCreated: (task) => {
-                    createdTasks.push(task);
-                    options?.onTaskUpdate?.(task);
-                    subscriptions.get(task.id)?.(task);
-                },
-            },
-            dependencies,
-        );
-    };
-    const subscribeTasks = (ids: readonly string[], listener: (task: GenerationTask) => void) => {
-        ids.forEach((id) => subscriptions.set(id, listener));
-        return () => ids.forEach((id) => subscriptions.delete(id));
-    };
-
-    for (const source of ["online", "local"] as const) {
-        await runCanvasAgentGenerationOps({
-            generationOps: [{ type: "run_generation", nodeId: node.id }],
-            nodes: [node],
-            generate,
-            subscribeTasks,
-            consumeTask: async (task, continuationId, consumer) => {
-                await consumer({ task, effectKey: `agent-resume:${task.id}:${continuationId}` });
-                return task;
-            },
-            context: { source, conversationId: `${source}-conversation-0001`, messageId: `${source}-message-0001` },
-        });
-    }
-
-    expect(localInputs.map((input) => input.context)).toEqual([
-        { scope: "scoped", projectId: "agent-project-0001", nodeId: node.id, conversationId: "online-conversation-0001", messageId: "online-message-0001" },
-        { scope: "scoped", projectId: "agent-project-0001", nodeId: node.id, conversationId: "local-conversation-0001", messageId: "local-message-0001" },
-    ]);
-    expect(
-        createdTasks
-            .filter((task) => task.status === "running")
-            .map((task) => ({
-                projectId: task.projectId,
-                clientContext: task.clientContext,
-            })),
-    ).toEqual([
-        { projectId: "agent-project-0001", clientContext: { nodeId: node.id, conversationId: "online-conversation-0001", messageId: "online-message-0001" } },
-        { projectId: "agent-project-0001", clientContext: { nodeId: node.id, conversationId: "local-conversation-0001", messageId: "local-message-0001" } },
-    ]);
-});
-
-test("online agent generation tools preserve product values and emit the same generic run operation", () => {
-    const snapshot = { projectId: "canvas-project", title: "Canvas", nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } };
-    const generated = onlineToolToOps("canvas_generate_video", { prompt: "A short test clip", seconds: "4", vquality: "720" }, snapshot, defaultConfig);
-    const target = generated.find((op) => op.type === "add_node" && op.nodeType === CanvasNodeType.Video);
-    const run = generated.find((op) => op.type === "run_generation");
-    expect(target?.metadata?.vquality).toBe("720");
-    expect(run && { type: run.type, nodeId: run.nodeId, mode: run.mode }).toEqual({ type: "run_generation", nodeId: target?.id, mode: "video" });
-
-    expect(onlineToolToOps("canvas_run_generation", { nodeId: "video-node", mode: "video", prompt: "Retry video" }, snapshot, defaultConfig)).toEqual([{ type: "run_generation", nodeId: "video-node", mode: "video", prompt: "Retry video" }]);
-    expect(onlineToolToOps("canvas_run_generation", { nodeId: "video-node", mode: "video", prompt: "Retry video", retry: true }, snapshot, defaultConfig)).toEqual([
-        { type: "run_generation", nodeId: "video-node", mode: "video", prompt: "Retry video", retry: true },
-    ]);
 });
 
 test("Canvas image video audio executors hand one terminal task to the unified consumer", async () => {
@@ -1904,248 +1797,6 @@ test("node retry creates one new product operation identity and forwards durable
     expect(competingConsumes).toBe(1);
 });
 
-test("real node generation binding persists the first task before an Agent retry derives lineage", async () => {
-    let nodes: CanvasNodeData[] = [
-        {
-            id: "agent-sequence-node-0001",
-            type: CanvasNodeType.Video,
-            title: "Sequence retry",
-            position: { x: 0, y: 0 },
-            width: 320,
-            height: 180,
-            metadata: {
-                generationMode: "video",
-                composerContent: "Sequence fixture",
-            },
-        },
-    ];
-    const generatedOptions: Array<{ retryContext?: { retryOf: string; attemptGroupId: string; clientOperationId: string } }> = [];
-    let sequence = 0;
-    let terminalTask: GenerationTask | undefined;
-
-    const run = async (retry: boolean) => {
-        sequence += 1;
-        await runCanvasAgentGenerationOps({
-            generationOps: [
-                {
-                    type: "run_generation",
-                    nodeId: nodes[0]!.id,
-                    mode: "video",
-                    ...(retry ? { retry: true } : {}),
-                },
-            ],
-            nodes,
-            context: {
-                source: "online",
-                conversationId: "agent-sequence-conversation-0001",
-                messageId: `agent-sequence-message-000${sequence}`,
-            },
-            generate: async (nodeId, mode, prompt, options) => {
-                generatedOptions.push(options);
-                const running: GenerationTask = {
-                    id: `dreamina:agent-sequence-running-000${sequence}`,
-                    projectId: "agent-sequence-project-0001",
-                    type: "canvas_video",
-                    status: "running",
-                    prompt,
-                    attempts: sequence,
-                    clientOperationId: options.retryContext?.clientOperationId,
-                    retryOf: options.retryContext?.retryOf,
-                    attemptGroupId: options.retryContext?.attemptGroupId,
-                    clientContext: {
-                        nodeId,
-                        conversationId: "agent-sequence-conversation-0001",
-                        messageId: `agent-sequence-message-000${sequence}`,
-                    },
-                    createdAt: "2026-08-13T00:00:00.000Z",
-                    updatedAt: "2026-08-13T00:00:00.000Z",
-                };
-                terminalTask = { ...running, status: "succeeded", updatedAt: "2026-08-13T00:01:00.000Z" };
-                await runCanvasGenerationTaskToConsumer(
-                    {
-                        projectId: running.projectId,
-                        nodeId,
-                        mode,
-                        prompt,
-                        config: defaultConfig,
-                        ...(options.retryContext || {}),
-                    },
-                    {
-                        runTask: async (taskOptions) => {
-                            taskOptions.onTaskCreated?.(running);
-                            options.onTaskUpdate?.(running);
-                            taskOptions.onTaskCreated?.(terminalTask!);
-                            return { mode: "video", video: { dataUrl: "opaque://video" } };
-                        },
-                        bindTask: (task) => {
-                            nodes = nodes.map((node) =>
-                                node.id === nodeId
-                                    ? {
-                                          ...node,
-                                          metadata: { ...node.metadata, ...generationTaskMetadata(task) },
-                                      }
-                                    : node,
-                            );
-                        },
-                        consumeTask: async () => undefined,
-                    },
-                );
-            },
-            subscribeTasks: (_ids, listener) => {
-                queueMicrotask(() => {
-                    if (terminalTask) listener(terminalTask);
-                });
-                return () => undefined;
-            },
-            consumeTask: async (task, _continuationId, resume) => {
-                await resume({ task, effectKey: `agent-sequence-effect:${task.id}` });
-                return task;
-            },
-        });
-    };
-
-    await run(false);
-    const priorTaskId = nodes[0]?.metadata?.taskId;
-    expect(priorTaskId).toBe("dreamina:agent-sequence-running-0001");
-    expect(generatedOptions[0]?.retryContext).toBeUndefined();
-
-    await run(true);
-
-    expect(generatedOptions[1]?.retryContext).toMatchObject({
-        retryOf: priorTaskId,
-        attemptGroupId: priorTaskId,
-    });
-    expect(generatedOptions[1]?.retryContext?.clientOperationId).toMatch(/^retry:[a-f0-9]{64}$/);
-    expect(nodes[0]?.metadata).toMatchObject({
-        taskId: "dreamina:agent-sequence-running-0002",
-        retryOf: priorTaskId,
-        attemptGroupId: priorTaskId,
-    });
-});
-
-test("real canvas agent generation entry persists continuation, observes terminal state, and resumes refresh idempotently", async () => {
-    const module = await import("../src/pages/canvas/use-canvas-agent-operations");
-    const runAgentGenerationOps = (
-        module as {
-            runCanvasAgentGenerationOps?: (input: {
-                generationOps: Array<{ type: "run_generation"; nodeId: string; mode?: "video"; prompt?: string; retry?: boolean }>;
-                nodes: CanvasNodeData[];
-                context?: { conversationId?: string; messageId?: string; source?: "online" | "local" };
-                generate: (
-                    nodeId: string,
-                    mode: "video",
-                    prompt: string,
-                    options: {
-                        context?: { conversationId?: string; messageId?: string };
-                        retryContext?: { retryOf: string; attemptGroupId: string; clientOperationId: string };
-                        onTaskUpdate(task: GenerationTask): void;
-                    },
-                ) => Promise<void>;
-                subscribeTasks: (ids: readonly string[], listener: (task: GenerationTask) => void) => () => void;
-                consumeTask: (task: GenerationTask, continuationId: string, resume: () => Promise<void>) => Promise<unknown>;
-                resumeAgent: (task: GenerationTask) => Promise<void>;
-                onContinuation?: (nodeId: string, continuation: NonNullable<NonNullable<CanvasNodeData["metadata"]>["agentGenerationContinuation"]>) => void;
-            }) => Promise<void>;
-        }
-    ).runCanvasAgentGenerationOps;
-    expect(typeof runAgentGenerationOps).toBe("function");
-    if (!runAgentGenerationOps) return;
-
-    const priorTaskId = "dreamina:agent-prior-task-0001";
-    const node: CanvasNodeData = {
-        id: "agent-video-node",
-        type: CanvasNodeType.Video,
-        title: "Video",
-        position: { x: 0, y: 0 },
-        width: 320,
-        height: 180,
-        metadata: {
-            generationMode: "video",
-            composerContent: "Retry this clip",
-            taskId: priorTaskId,
-            attemptGroupId: "agent-attempt-group-0001",
-        },
-    };
-    const running: GenerationTask = {
-        id: "dreamina:agent-retry-task-0002",
-        projectId: "agent-project-0001",
-        type: "canvas_video",
-        status: "running",
-        prompt: "Retry this clip",
-        attempts: 2,
-        clientContext: {
-            nodeId: node.id,
-            conversationId: "conversation-agent-entry-0001",
-            messageId: "message-agent-entry-0001",
-        },
-        createdAt: "2026-08-13T00:00:00.000Z",
-        updatedAt: "2026-08-13T00:00:00.000Z",
-    };
-    const terminal = { ...running, status: "succeeded" as const, updatedAt: "2026-08-13T00:01:00.000Z" };
-    const generatedOptions: Array<{ retryContext?: { retryOf: string; attemptGroupId: string; clientOperationId: string } }> = [];
-    const subscriptions: string[][] = [];
-    const consumed: string[] = [];
-    let continuations = 0;
-    let pendingContinuation: NonNullable<NonNullable<CanvasNodeData["metadata"]>["agentGenerationContinuation"]> | undefined;
-
-    await runAgentGenerationOps({
-        generationOps: [{ type: "run_generation", nodeId: node.id, mode: "video", retry: true }],
-        nodes: [node],
-        context: { source: "online", conversationId: "conversation-agent-entry-0001", messageId: "message-agent-entry-0001" },
-        generate: async (_nodeId, _mode, _prompt, options) => {
-            generatedOptions.push(options);
-            options.onTaskUpdate(running);
-        },
-        subscribeTasks: (ids, listener) => {
-            subscriptions.push([...ids]);
-            queueMicrotask(() => listener(terminal));
-            return () => undefined;
-        },
-        consumeTask: async (task, continuationId, resume) => {
-            consumed.push(`${task.id}:${continuationId}`);
-            await resume();
-        },
-        resumeAgent: async () => {
-            continuations += 1;
-        },
-        onContinuation: (_nodeId, continuation) => {
-            if (continuation.status === "pending") pendingContinuation = continuation;
-        },
-    });
-
-    const retryContext = await createGenerationRetryContext(priorTaskId, "agent-attempt-group-0001");
-    expect(generatedOptions[0]?.retryContext).toEqual(retryContext);
-    expect(subscriptions).toEqual([[running.id]]);
-    expect(consumed).toHaveLength(1);
-    expect(consumed[0]).toMatch(new RegExp(`^${terminal.id}:agent:[a-f0-9]{64}$`));
-    expect(continuations).toBe(1);
-    expect(pendingContinuation).toMatchObject({
-        taskId: running.id,
-        source: "online",
-        status: "pending",
-    });
-
-    subscriptions.length = 0;
-    await runAgentGenerationOps({
-        generationOps: [],
-        nodes: [{ ...node, metadata: { ...node.metadata, taskId: running.id, agentGenerationContinuation: pendingContinuation } }],
-        context: { source: "online", conversationId: "conversation-agent-entry-0001", messageId: "message-agent-entry-0001" },
-        generate: async () => {
-            throw new Error("refresh must not submit again");
-        },
-        subscribeTasks: (ids, listener) => {
-            subscriptions.push([...ids]);
-            queueMicrotask(() => listener(terminal));
-            return () => undefined;
-        },
-        consumeTask: async (_task, _continuationId, resume) => resume(),
-        resumeAgent: async () => {
-            continuations += 1;
-        },
-    });
-    expect(subscriptions).toEqual([[running.id]]);
-});
-
 test("canvas refresh recovery consumes shared task subscriptions instead of querying and waiting per page", async () => {
     const module = await import("../src/pages/canvas/use-canvas-generation");
     const subscribeRecovery = (
@@ -2336,157 +1987,6 @@ test("canvas project switch aborts and drains stale recovery before applying the
     }
 });
 
-test("cinematic continuation failure boundary keeps retryable errors pending and marks provider failures", async () => {
-    const panelModule = await import("../src/components/canvas/canvas-assistant-panel");
-    const consumerModule = await import("../src/services/canvas-generation-consumer");
-    const handleFailure = (
-        panelModule as {
-            handleCinematicContinuationFailure?: (error: unknown, failProvider: (error: unknown) => void) => "abort" | "durable-ack" | "provider-failed";
-        }
-    ).handleCinematicContinuationFailure;
-    expect(typeof handleFailure).toBe("function");
-    if (!handleFailure) return;
-
-    const cases = [
-        { name: "online-tool abort", error: new DOMException("The operation was aborted", "AbortError"), expected: "pending", disposition: "abort" },
-        { name: "durable ack", error: new consumerModule.CanvasGenerationDurableAckError(new Error("local durable write failed")), expected: "pending", disposition: "durable-ack" },
-        { name: "provider failure", error: new Error("provider failed"), expected: "failed", disposition: "provider-failed" },
-    ] as const;
-    for (const scenario of cases) {
-        let status: "pending" | "failed" = "pending";
-        const disposition = handleFailure(scenario.error, () => {
-            status = "failed";
-        });
-        expect(disposition, scenario.name).toBe(scenario.disposition);
-        expect(status, scenario.name).toBe(scenario.expected);
-    }
-});
-
-test("all cinematic production entry adapters are the shared continuation boundary", async () => {
-    const panelModule = await import("../src/components/canvas/canvas-assistant-panel");
-    const sharedBoundary = (
-        panelModule as {
-            runCanvasCinematicContinuationBoundary?: (...args: never[]) => Promise<unknown>;
-        }
-    ).runCanvasCinematicContinuationBoundary;
-    const entryAdapters = (
-        panelModule as {
-            canvasCinematicContinuationEntryAdapters?: Record<"online-tool" | "submit-cinematic" | "resume-cinematic", (...args: never[]) => Promise<unknown>>;
-        }
-    ).canvasCinematicContinuationEntryAdapters;
-
-    expect(typeof sharedBoundary).toBe("function");
-    expect(entryAdapters).toBeDefined();
-    if (!sharedBoundary || !entryAdapters) return;
-    for (const entry of ["online-tool", "submit-cinematic", "resume-cinematic"] as const) expect(entryAdapters[entry], entry).toBe(sharedBoundary);
-});
-
-test("agent run_generation waits for the shared task, persists one continuation, and shares retry identity with node retry", async () => {
-    const priorTaskId = "dreamina:agent-prior-task-0001";
-    const attemptGroupId = "dreamina:agent-attempt-group-0001";
-    const node: CanvasNodeData = {
-        id: "agent-retry-node-0001",
-        type: CanvasNodeType.Video,
-        title: "Agent retry",
-        position: { x: 0, y: 0 },
-        width: 320,
-        height: 180,
-        metadata: {
-            generationMode: "video",
-            composerContent: "Retry from agent",
-            taskId: priorTaskId,
-            attemptGroupId,
-        },
-    };
-    const expectedRetry = await createGenerationRetryContext(priorTaskId, attemptGroupId);
-    const terminal: GenerationTask = {
-        id: "dreamina:agent-retry-terminal-0001",
-        clientOperationId: expectedRetry.clientOperationId,
-        retryOf: priorTaskId,
-        attemptGroupId,
-        projectId: "agent-project-retry-0001",
-        type: "canvas_video",
-        status: "succeeded",
-        prompt: "Retry from agent",
-        attempts: 1,
-        createdAt: "2026-08-13T00:00:00.000Z",
-        updatedAt: "2026-08-13T00:01:00.000Z",
-    };
-    let releaseGeneration!: () => void;
-    const generationGate = new Promise<void>((resolve) => {
-        releaseGeneration = resolve;
-    });
-    let generationStarted!: () => void;
-    const started = new Promise<void>((resolve) => {
-        generationStarted = resolve;
-    });
-    const order: string[] = [];
-    let generateOptions: Record<string, unknown> | undefined;
-    const continuations: Array<{ nodeId: string; continuation: Record<string, unknown> }> = [];
-    let continuationCompletionStartedResolve!: () => void;
-    const continuationCompletionStarted = new Promise<void>((resolve) => {
-        continuationCompletionStartedResolve = resolve;
-    });
-    let releaseContinuationCompletion!: () => void;
-    const continuationCompletionGate = new Promise<void>((resolve) => {
-        releaseContinuationCompletion = resolve;
-    });
-    let taskListener: ((task: GenerationTask) => void) | undefined;
-    const pending = runCanvasAgentGenerationOps({
-        generationOps: [{ type: "run_generation", nodeId: node.id, mode: "video", retry: true }],
-        nodes: [node],
-        context: { source: "online", conversationId: "online-agent-conversation-0001", messageId: "online-agent-message-0001" },
-        subscribeTasks: (_ids, listener) => {
-            taskListener = listener;
-            return () => {
-                taskListener = undefined;
-            };
-        },
-        generate: async (_nodeId, _mode, _prompt, options) => {
-            generateOptions = options as unknown as Record<string, unknown>;
-            generationStarted();
-            await generationGate;
-            options.onTaskUpdate?.({ ...terminal, status: "running" });
-            taskListener?.(terminal);
-        },
-        onContinuation: async (nodeId, continuation) => {
-            continuations.push({ nodeId, continuation: continuation as unknown as Record<string, unknown> });
-            if (continuation.status === "completed") {
-                continuationCompletionStartedResolve();
-                await continuationCompletionGate;
-            }
-        },
-        consumeTask: async (task, continuationId, consumer) => {
-            expect(task.id).toBe(terminal.id);
-            await consumer({ task, effectKey: `agent-resume:${task.id}:${continuationId}` });
-            return task;
-        },
-    }).then(() => {
-        order.push("dispatch-resolved");
-    });
-
-    await started;
-    order.push("before-release");
-    releaseGeneration();
-    await continuationCompletionStarted;
-    try {
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        expect(order).toEqual(["before-release"]);
-    } finally {
-        releaseContinuationCompletion();
-    }
-    await pending;
-
-    expect(order).toEqual(["before-release", "dispatch-resolved"]);
-    expect(generateOptions?.retryContext).toEqual(expectedRetry);
-    expect(continuations.map(({ nodeId, continuation }) => ({ nodeId, status: continuation.status, taskId: continuation.taskId }))).toEqual([
-        { nodeId: node.id, status: "pending", taskId: terminal.id },
-        { nodeId: node.id, status: "completed", taskId: terminal.id },
-    ]);
-    expect(String(continuations[0]?.continuation.id)).toMatch(/^agent:[a-f0-9]{64}$/);
-    expect(continuations[1]?.continuation.effectKey).toBe(`agent-resume:${terminal.id}:${continuations[0]?.continuation.id}`);
-});
-
 test("Create image batch retry keeps one attempt group while each new task points to its matching prior batch task", async () => {
     const priorTaskIds = ["dreamina:create-prior-batch-0001", "dreamina:create-prior-batch-0002", "dreamina:create-prior-batch-0003"];
     const retryContexts = await createGenerationBatchRetryContexts(priorTaskIds, "dreamina:create-batch-attempt-group-0001");
@@ -2522,14 +2022,6 @@ test("Create image batch retry keeps one attempt group while each new task point
     expect(inputs.map((input) => input.context?.retryOf)).toEqual(priorTaskIds);
     expect(inputs.map((input) => input.context?.attemptGroupId)).toEqual(["dreamina:create-batch-attempt-group-0001", "dreamina:create-batch-attempt-group-0001", "dreamina:create-batch-attempt-group-0001"]);
     expect(inputs.map((input) => input.clientOperationId)).toEqual(retryContexts.map((context) => context.clientOperationId));
-});
-
-test("Canvas refresh recovery delegates task observation to the shared subscription and resumes pending agent continuations", async () => {
-    const source = await Bun.file(new URL("../src/pages/canvas/use-canvas-generation.ts", import.meta.url)).text();
-    expect(source).toContain("subscribeGenerationTasks");
-    expect(source).toContain("consumeCanvasAgentGenerationContinuation");
-    expect(source).not.toContain("taskIds.map((id) => queryGenerationTask(id");
-    expect(source).not.toContain("await waitForGenerationTask(task.id");
 });
 
 test("local Dreamina diagnostics project only safe structured stage/error/provenance fields", async () => {

@@ -1,5 +1,6 @@
-import { Button, InputNumber, Modal, Popconfirm, Segmented, Select, Tag } from "antd";
+import { Button, InputNumber, Popconfirm, Segmented, Select, Tag } from "antd";
 import { Switch } from "@/components/ui/base/switch";
+import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 import { Callout } from "@/components/ui/product/callout";
 import { StatusBadge } from "@/components/ui/base/badges";
 import { CircleAlert, Download, History, Image as ImageIcon, Pause, Play, ScanFace, ShieldCheck } from "lucide-react";
@@ -339,18 +340,7 @@ export function PortraitClearanceModal({ projectId, node, upstreamNodes, open, o
     };
 
     return (
-        <Modal
-            open={open}
-            onCancel={onClose}
-            footer={null}
-            title={null}
-            closable={false}
-            width="min(1600px, calc(100vw - 32px))"
-            centered
-            destroyOnHidden={false}
-            className="portrait-clearance-modal"
-            styles={{ container: { padding: 0, overflow: "hidden" }, body: { padding: 0 } }}
-        >
+        <AppModal open={open} onCancel={onClose} footer={null} title={null} closable={false} width="min(1600px, calc(100vw - 32px))" centered destroyOnHidden={false} className="portrait-clearance-modal" flush>
             <div className="flex max-h-[calc(100dvh-32px)] min-h-[min(680px,calc(100dvh-32px))] flex-col overflow-hidden bg-background text-foreground">
                 <header className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
                     <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background">
@@ -652,7 +642,7 @@ export function PortraitClearanceModal({ projectId, node, upstreamNodes, open, o
                     </div>
                 </footer>
             </div>
-        </Modal>
+        </AppModal>
     );
 }
 

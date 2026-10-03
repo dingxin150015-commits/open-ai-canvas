@@ -53,6 +53,10 @@ func TestGeminiOrdinaryTextTaskUsesInstalledCreateContract(t *testing.T) {
 	}))
 	defer server.Close()
 	svc, _ := newChannelModelTestService(t)
+	adapter, installed := svc.protocolRegistry().Resolve("gemini-generate-content")
+	if !installed || adapter.Metadata().Execution != "declarative" {
+		t.Fatalf("Gemini create plugin unavailable: installed=%v", installed)
+	}
 	svc.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
 	stream := false
 	input := canvasGenerationInput{Mode: "text", Prompt: "fixture prompt", Config: providerConfig{BaseURL: server.URL, APIKey: "fixture", Model: "gemini-fixture", InterfaceType: "gemini-generate-content", APIFormat: "gemini", AllowLocalChannel: true}, TextOptions: canvasTextOptions{Stream: &stream}}

@@ -131,6 +131,17 @@ func TestMigrationPlanAcceptsProviderDurationVersionNineLineage(t *testing.T) {
 	if plan[9].version != 10 || plan[9].name != "channel_presentation" {
 		t.Fatalf("migration 10 = %#v", plan[9])
 	}
+	if plan[30].version != 31 || plan[30].name != "builtin_tools" {
+		t.Fatalf("legacy migration 31 = %#v", plan[30])
+	}
+	if plan[40].version != 41 || plan[40].name != "builtin_skill_tombstones" {
+		t.Fatalf("legacy migration 41 = %#v", plan[40])
+	}
+	for index, item := range plan {
+		if item.version != int64(index+1) {
+			t.Fatalf("legacy migration gap at %d: %#v", index+1, item)
+		}
+	}
 	last := plan[len(plan)-1]
 	if last.version != CurrentSchemaVersion || last.name != "comfy_bridge_runtime" {
 		t.Fatalf("last migration = %#v", last)
@@ -154,6 +165,12 @@ func TestMigrationPlanKeepsOfficialVersionNineLineage(t *testing.T) {
 	}
 	if plan[8].version != 9 || plan[8].name != "channel_presentation" {
 		t.Fatalf("migration 9 = %#v", plan[8])
+	}
+	if plan[29].version != 30 || plan[29].name != "builtin_tools" {
+		t.Fatalf("official migration 30 = %#v", plan[29])
+	}
+	if plan[40].version != 41 || plan[40].name != "provider_duration_metering" || plan[40].checksum != providerDurationMeteringV41Checksum {
+		t.Fatalf("official migration 41 = %#v", plan[40])
 	}
 	last := plan[len(plan)-1]
 	if last.version != CurrentSchemaVersion || last.name != "comfy_bridge_runtime" {

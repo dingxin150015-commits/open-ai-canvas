@@ -86,6 +86,20 @@ func (r *Repository) ChannelModels(channelID string, includeDisabled bool) ([]mo
 	return items, r.attachChannelModelPriceTiers(pointers)
 }
 
+func (r *Repository) ChannelModelReferences(channelIDs []string) ([]model.ChannelModel, error) {
+	if len(channelIDs) == 0 {
+		return []model.ChannelModel{}, nil
+	}
+	var items []model.ChannelModel
+	if err := r.db.Select("id", "channel_id", "model_key", "display_name", "sort_order", "enabled").
+		Where("channel_id IN ?", channelIDs).
+		Order("channel_id asc, sort_order asc, created_at asc, id asc").
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func (r *Repository) CreateDuplicatedSystemChannel(channel *model.ModelChannel, channelModels []model.ChannelModel, priceTiers []model.ChannelModelPriceTier) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(channel).Error; err != nil {
@@ -846,17 +860,23 @@ func (r *Repository) settleBillingOrder(id string, providerRequestID string, rev
 			observedActualAvailable = true
 			refund := max(reserved-actual, int64(0))
 			supplement := max(actual-reserved, int64(0))
-			updated := tx.Model(&model.CreditAccount{}).
-				Where("user_id = ? AND reserved_microcredits >= ?", order.UserID, reserved).
-				Updates(map[string]any{
-					"available_microcredits": gorm.Expr("available_microcredits + ?", refund-supplement),
-					"reserved_microcredits":  gorm.Expr("reserved_microcredits - ?", reserved),
-					"version":                gorm.Expr("version + 1"), "updated_at": time.Now(),
-				})
+			accountUpdate := tx.Model(&model.CreditAccount{}).
+				Where("user_id = ? AND reserved_microcredits >= ?", order.UserID, reserved)
+			if reviewedDuration && supplement > refund {
+				accountUpdate = accountUpdate.Where("available_microcredits >= ?", supplement-refund)
+			}
+			updated := accountUpdate.Updates(map[string]any{
+				"available_microcredits": gorm.Expr("available_microcredits + ?", refund-supplement),
+				"reserved_microcredits":  gorm.Expr("reserved_microcredits - ?", reserved),
+				"version":                gorm.Expr("version + 1"), "updated_at": time.Now(),
+			})
 			if updated.Error != nil {
 				return updated.Error
 			}
 			if updated.RowsAffected != 1 {
+				if reviewedDuration && supplement > refund {
+					return ErrInsufficientCredits
+				}
 				return errors.New("reserved credit balance is inconsistent")
 			}
 			var account model.CreditAccount

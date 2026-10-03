@@ -12,7 +12,9 @@
 | --- | --- | --- | --- |
 | `web/` | Vite、React 19、TypeScript、React Router、Ant Design、Tailwind、Zustand、TanStack Query | `web/src/application.tsx`、`web/src/router.tsx` | 工作区 UI、画布交互、浏览器缓存、API 调用和模型协议适配 |
 | `backend/` | Go 1.25、Gin、GORM、SQLite/PostgreSQL、Redis 协调 | `backend/cmd/server/main.go` | 登录、权限、业务 API、任务队列、资源、模型中转和后台管理 |
-| `docs/` | Next.js、Fumadocs、MDX | `docs/content/docs/` | 面向用户和开发者的专题文档；构建配置见 `docs/source.config.ts` |
+| `canvas-agent/` | Node.js 18+、TypeScript、Express、MCP SDK、Codex SDK | `canvas-agent/src/index.ts` | 独立本机 Agent、MCP、画布会话桥接和本地渠道 |
+| `plugins/yingce/` | Codex App 插件清单和 skills | `.codex-plugin/plugin.json` | 将 Canvas Agent MCP 接入 Codex App |
+| `docs/` | MDX 专题内容与项目说明 | `docs/content/docs/`、`docs/index.md` | 面向用户和开发者的专题文档；当前目录没有独立 `package.json`/站点构建入口 |
 
 根目录的 `Dockerfile` 构建前端静态镜像；`nginx.conf` 托管 SPA 并代理后端。`docker-compose.dev.yml` 是源码热更新开发编排，`docker-compose.local.yml` 是本地构建运行，`docker-compose.deploy.yml` 是 PostgreSQL + Redis 部署编排。
 
@@ -42,7 +44,7 @@
 
 - `backend/internal/handler/`：HTTP 入参、鉴权上下文、调用 service、返回统一响应；不放业务判断和数据库查询。
 - `backend/internal/service/`：稳定导入面。只再导出 `internal/app` 的类型、常量和包级函数（`aliases_*.go`）。handler/cmd 继续 import 本包。
-- `backend/internal/app/`：HTTP 组合根和尚未拆出的业务实现。校验、权限、跨域编排从这里进入。画布生成调度仍主要在 `provider.go`；文本 / 图片 / 视频遗留 / 音频 / HTTP / 声明式协议分别在 `provider_text.go`、`provider_image.go`、`provider_video.go`、`provider_audio.go`、`provider_http_client.go`、`provider_protocol.go`。技能库在 `internal/skills`，提示词与风格在 `internal/prompts`，登录注册在 `internal/auth`，画布分享在 `internal/canvas`，资源引用解析在 `internal/assets`，运行时策略/限流/worker 在 `internal/platform`，错误码与通用工具在 `internal/kernel`，出站 SSRF 在 `internal/outbound`。域包不得 import `internal/service` 或 `internal/app`。
+- `backend/internal/app/`：HTTP 组合根和尚未拆出的业务实现。校验、权限、跨域编排从这里进入。画布生成调度仍主要在 `provider.go`；文本 / 图片 / 视频遗留 / 音频 / HTTP / 声明式协议分别在 `provider_text.go`、`provider_image.go`、`provider_video.go`、`provider_audio.go`、`provider_http_client.go`、`provider_protocol.go`。技能库在 `internal/skills`，提示词与风格在 `internal/prompts`，登录注册在 `internal/auth`，画布分享在 `internal/canvas`，资源引用解析在 `internal/assets`，运行时策略/限流/worker 在 `internal/platform`，错误码与通用工具在 `internal/kernel`，出站 SSRF 在 `internal/outbound`，Agent 上下文检查点契约在 `internal/agentcontext`。域包不得 import `internal/service` 或 `internal/app`。
 - `backend/internal/repository/`：GORM 查询和持久化；不承载业务策略。
 - `backend/internal/model/`：结构、枚举和简单模型方法；不调用外部服务。
 - `backend/internal/provider/`：模型供应商能力和协议实现。
@@ -53,6 +55,8 @@
 
 ### Agent、插件和文档
 
+- 修改 `canvas-agent/` 前先读 `canvas-agent/README.md`，它有独立的 Node 版本、构建、发布和 token 边界。
+- 修改 `plugins/yingce/` 前先读插件 README、manifest 和对应 skill；不要把主应用的页面约定套到插件运行时。
 - 修改 `docs/` 前确认内容属于专题文档，而不是把长篇说明重新复制到根 README。目录索引见 `docs/index.md`。
 
 ## 4. 前端 API 和状态合同
@@ -124,7 +128,8 @@
 - 前端：`cd web && bun run build`；专项测试用 `bun test ...`。UI 退场规则用 `bun run lint`（只禁 antd Empty 和静态 `Modal.confirm`，不是风格检查）。
 - 后端：`cd backend && go test ./...`；涉及 PostgreSQL、资源、任务或权限时补对应集成/冒烟路径。
 - 云端 Agent：前端事件流和审批路径依赖后端 `/api/agent` 接口；在该接口实现后补充后端冒烟、Worker 运行和 SSE 断线重连验证。
-- 文档站：`cd docs && bun run types:check` 或 `bun run build`。
+- 独立本机 Canvas Agent：`cd canvas-agent && npm test`，构建用 `npm run build`。
+- 文档：`docs/` 当前没有独立包或站点构建命令；修改 MDX 时检查链接、索引及对应应用/后端测试，不运行不存在的 `bun run types:check`。
 - UI 变更能浏览器验证时，检查关键路由、明暗主题、滚动、弹窗、空态和核心交互；不能验证时说明替代依据，不把静态阅读或 `git diff` 写成运行验证。
 - 验证必须针对真实实现：优先专项测试、类型检查、项目 build 或真实路由浏览器验收。独立 HTML、静态仿制页面和脱离应用状态的截图不能作为真实页面通过的证据。
 

@@ -1,19 +1,22 @@
 import { Button, Modal } from "antd";
 import { Check, Star } from "lucide-react";
 
+import { CanvasVideoPreviewImage } from "@/components/canvas/canvas-video-preview-image";
+import { producedModelLabel } from "@/lib/canvas/produced-model";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { canvasNodeVideoPreviewUrl } from "@/lib/canvas/canvas-media-preview";
+import { useEffectiveConfig } from "@/stores/use-config-store";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 
 export function CanvasVersionCompareModal({ open, versions, onClose, onSetPrimary, onFocus }: { open: boolean; versions: CanvasNodeData[]; onClose: () => void; onSetPrimary: (nodeId: string) => void; onFocus: (nodeId: string) => void }) {
     const theme = canvasThemes[useActiveTheme()];
+    const config = useEffectiveConfig();
     const modalWidth = Math.min(1180, Math.max(440, 112 + versions.length * 340));
     return (
         <Modal title="版本对比" open={open} footer={null} width={modalWidth} centered onCancel={onClose} styles={{ body: { overflow: "hidden" } }}>
             <div className="thin-scrollbar grid max-h-[70vh] grid-flow-col auto-cols-[328px] gap-3 overflow-x-auto pb-2">
                 {versions.map((node) => {
-                    const videoPreview = canvasNodeVideoPreviewUrl(node);
+                    const producedModelText = producedModelLabel(config, node.metadata?.producedModel);
                     return (
                         <article
                             key={node.id}
@@ -46,8 +49,19 @@ export function CanvasVersionCompareModal({ open, versions, onClose, onSetPrimar
                             <button type="button" className="block h-52 w-full overflow-hidden" style={{ background: theme.node.fill }} onClick={() => onFocus(node.id)}>
                                 {node.type === CanvasNodeType.Image && node.metadata?.content ? (
                                     <img src={node.metadata.content} alt={node.title || "版本图片"} className="size-full object-contain" />
-                                ) : videoPreview ? (
-                                    <img src={videoPreview} alt={node.title || "版本视频"} className="size-full object-contain" loading="lazy" decoding="async" />
+                                ) : node.type === CanvasNodeType.Video ? (
+                                    <CanvasVideoPreviewImage
+                                        node={node}
+                                        alt={node.title || "版本视频"}
+                                        className="size-full object-contain"
+                                        loading="lazy"
+                                        decoding="async"
+                                        fallback={
+                                            <span className="grid size-full place-items-center px-4 text-center text-xs" style={{ color: theme.node.muted }}>
+                                                暂无视频首帧
+                                            </span>
+                                        }
+                                    />
                                 ) : (
                                     <span className="grid size-full place-items-center px-4 text-center text-xs" style={{ color: theme.node.muted }}>
                                         点击定位到画布节点
@@ -55,7 +69,7 @@ export function CanvasVersionCompareModal({ open, versions, onClose, onSetPrimar
                                 )}
                             </button>
                             <div className="space-y-2 p-3 text-[var(--fs-label)]">
-                                <Info label="模型" value={node.metadata?.model || "默认模型"} />
+                                {producedModelText ? <Info label="产出模型" value={producedModelText} /> : null}
                                 <Info label="尺寸" value={node.metadata?.size || "默认尺寸"} />
                                 <div>
                                     <div className="whitespace-nowrap opacity-45">提示词</div>
@@ -84,7 +98,7 @@ export function CanvasVersionCompareModal({ open, versions, onClose, onSetPrimar
 function Info({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex min-w-0 items-center gap-3">
-            <span className="w-9 shrink-0 whitespace-nowrap opacity-45">{label}</span>
+            <span className="w-16 shrink-0 whitespace-nowrap opacity-45">{label}</span>
             <span className="min-w-0 flex-1 truncate text-right font-medium" title={value}>
                 {value}
             </span>

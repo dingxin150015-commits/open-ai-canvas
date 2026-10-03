@@ -168,7 +168,8 @@ func TestDuplicateSystemChannelCopiesSecretsModelsAndPriceTiers(t *testing.T) {
 }
 
 func TestChannelFromRequestStoresAndClearsHeaders(t *testing.T) {
-	request := ChannelRequest{Name: "Headers", BaseURL: "https://example.com/v1", Headers: []OutboundHeader{{Name: "User-Agent", Value: "Custom Agent"}}}
+	// URL validation is real, but this non-network test must not depend on DNS.
+	request := ChannelRequest{Name: "Headers", BaseURL: "https://93.184.216.34/v1", Headers: []OutboundHeader{{Name: "User-Agent", Value: "Custom Agent"}}}
 	channel, err := channelFromRequest(request, model.ModelChannel{})
 	if err != nil {
 		t.Fatal(err)
@@ -238,14 +239,14 @@ func TestRuntimeConcurrencyUsesEnvironmentFallback(t *testing.T) {
 	}
 
 	useGlobal := true
-	channel, err := channelFromRequest(ChannelRequest{Name: "Global", BaseURL: "https://example.com/v1", UseGlobalConcurrency: &useGlobal}, model.ModelChannel{ConcurrencyLimit: 4})
+	channel, err := channelFromRequest(ChannelRequest{Name: "Global", BaseURL: "https://93.184.216.34/v1", UseGlobalConcurrency: &useGlobal}, model.ModelChannel{ConcurrencyLimit: 4})
 	if err != nil || channel.ConcurrencyLimit != 0 {
 		t.Fatalf("global concurrency channel = %#v, error = %v", channel, err)
 	}
 }
 
 func TestFetchAdminChannelModelsReaddsDeletedModel(t *testing.T) {
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "")
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"id":"model-a"}]}`))
@@ -253,8 +254,9 @@ func TestFetchAdminChannelModelsReaddsDeletedModel(t *testing.T) {
 	defer upstream.Close()
 
 	svc, db := newChannelModelTestService(t)
+	svc.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
 	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin}
-	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`}
+	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", AllowLocalChannel: true, APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`}
 	deleted := model.ChannelModel{ID: "deleted-model", ChannelID: channel.ID, ModelKey: "model-a", DisplayName: "model-a", BillingMode: "fixed_request", PriceVersion: 1}
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
@@ -290,7 +292,7 @@ func TestFetchAdminChannelModelsReaddsDeletedModel(t *testing.T) {
 }
 
 func TestImportAdminChannelModelsOnlyImportsSelectedModels(t *testing.T) {
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "")
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"id":"model-a"},{"id":"model-b"}]}`))
@@ -298,8 +300,9 @@ func TestImportAdminChannelModelsOnlyImportsSelectedModels(t *testing.T) {
 	defer upstream.Close()
 
 	svc, db := newChannelModelTestService(t)
+	svc.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
 	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin}
-	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`}
+	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", AllowLocalChannel: true, APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`}
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +392,7 @@ func TestImportAdminChannelModelsEnrichesSelectedUntouchedModelIdempotently(t *t
 }
 
 func TestImportAdminChannelModelsRejectsUnknownSelection(t *testing.T) {
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "")
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"id":"model-a"}]}`))
@@ -397,8 +400,9 @@ func TestImportAdminChannelModelsRejectsUnknownSelection(t *testing.T) {
 	defer upstream.Close()
 
 	svc, db := newChannelModelTestService(t)
+	svc.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
 	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin}
-	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`}
+	channel := model.ModelChannel{ID: "channel-1", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Test", BaseURL: upstream.URL + "/v1", AllowLocalChannel: true, APIKey: "key", APIFormat: "openai", ModelsJSON: `[]`}
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}

@@ -49,7 +49,7 @@ test("creation settings parser fails closed for malformed documents and bounds f
 
 test("creation settings writes serialize per user scope without losing another operation", async () => {
     const values = new Map<string, string>();
-    globalThis.window = {} as Window & typeof globalThis;
+    globalThis.window = { localStorage: {} } as Window & typeof globalThis;
     localforage.getItem = (async (key: string) => values.get(key) ?? null) as typeof localforage.getItem;
     localforage.setItem = (async (key: string, value: string) => {
         values.set(key, value);

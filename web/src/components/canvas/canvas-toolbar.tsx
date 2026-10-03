@@ -53,6 +53,7 @@ export function CanvasToolbar({
     onSaveAppearanceDefault,
     onBackgroundModeChange,
     onShowImageInfoChange,
+    onOpenWorkspace,
     onOpenMyAssets,
     onOpenProjectCharacters,
 }: {
@@ -90,6 +91,7 @@ export function CanvasToolbar({
     onSaveAppearanceDefault: (appearance: CanvasAppearance) => void;
     onBackgroundModeChange: (mode: CanvasBackgroundMode) => void;
     onShowImageInfoChange: (show: boolean) => void;
+    onOpenWorkspace?: () => void;
     onOpenMyAssets: () => void;
     onOpenProjectCharacters: () => void;
 }) {
@@ -154,7 +156,8 @@ export function CanvasToolbar({
         onChooseStyle,
         onOpenDirector,
         onUpload,
-        onOpenMyAssets,
+        onOpenWorkspace,
+    onOpenMyAssets,
         onOpenProjectCharacters,
         onBackgroundModeChange,
         onShowImageInfoChange,
@@ -256,7 +259,7 @@ export function CanvasToolbar({
                             <div className="mt-2.5 flex items-center justify-between gap-2 rounded-[var(--dock-item-radius-labeled)] border px-2.5 py-2" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border }}>
                                 <span className="inline-flex min-w-0 items-center gap-1.5 text-[var(--fs-tiny)] font-semibold">
                                     <Info className="size-3" />
-                                    图片信息
+                                    媒体信息
                                 </span>
                                 <Switch size="sm" checked={showImageInfo} onChange={onShowImageInfoChange} />
                             </div>

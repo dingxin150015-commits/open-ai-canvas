@@ -244,13 +244,6 @@ test("Canvas local Agent setup generates exact-origin commands for Unix and Wind
     expect(module.detectLocalAgentSetupPlatform("Macintosh Intel Mac OS X")).toBe("unix");
 });
 
-test("Canvas local Agent tutorial replaces the conversation only while disconnected", async () => {
-    const source = await Bun.file(new URL("../src/components/canvas/canvas-local-agent-panel.tsx", import.meta.url)).text();
-    expect(source).toContain('!connected ? (\n                <AgentConnectView');
-    expect(source).toContain("连接成功后，这里会自动恢复原对话");
-    expect(source).toContain("当前支持范围");
-});
-
 test("Canvas reconnect wait resolves quietly when component cleanup aborts", async () => {
     const module = await import("../src/lib/canvas/local-runtime-connection");
     const waitForReconnect = (

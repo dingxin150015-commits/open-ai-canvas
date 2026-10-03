@@ -13,7 +13,7 @@ import { getActiveUserScope } from "@/lib/user-scope";
 import { continueCreationConversationOnCanvas } from "@/services/creation-canvas-conversation";
 import { useExternalAssetSources } from "@/hooks/use-external-asset-sources";
 import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationAllowed, videoDurationOptions } from "@/lib/model-capabilities";
-import { inferVideoOperation, resolveCompatibleModel, mergedImageCapabilityConfig, type ModelRequirements } from "@/lib/model-selection";
+import { inferVideoOperation, modelGroupReferenceLimits, resolveCompatibleModel, mergedImageCapabilityConfig, type ModelRequirements } from "@/lib/model-selection";
 import type { BackendGenerationResult } from "@/services/api/generation-task";
 import type { Skill } from "@/services/api/skills";
 import type { GenerationTask } from "@/services/api/task-center";
@@ -30,13 +30,14 @@ import type { PromptOptimizerProvider } from "@/lib/plugins/plugin-types";
 import { promptOptimizerPlugin, PROMPT_OPTIMIZER_PLUGIN_ID } from "@/lib/plugins/builtin/prompt-optimizer";
 import { createPluginHostContext } from "@/services/plugin-host";
 import { usePluginStore } from "@/stores/use-plugin-store";
-import { buildCreationMentionReferences, expandCreationPrompt, reconcileCreationAttachmentLimit, removeCreationReferenceTokens, replaceCreationAttachmentReference, selectedCreationReferences, type CreationReference } from "./creation-references";
+import { buildCreationMentionReferences, expandCreationPrompt, reconcileCreationAttachmentLimit, reconcileCreationAttachmentLimits, removeCreationReferenceTokens, replaceCreationAttachmentReference, selectedCreationReferences, type CreationReference, type CreationReferenceLimits } from "./creation-references";
 import { creationAttachmentFromAsset, creationAttachmentFromAudio, creationAttachmentFromAudioAsset, creationAttachmentFromDocument, creationAttachmentFromExternalAsset, creationAttachmentFromImage, creationAttachmentFromVideo, creationAttachmentFromVideoAsset, creationAttachmentKind, creationAudioAsset, creationFileAccepted, creationImageAsset, creationMediaAspectRatio, creationUploadAccept, creationVideoAsset, removeCreationAttachment, splitCreationAttachments, type CreationAttachment } from "./creation-assets";
 import { defaultCreationMode, modeLabels, type CreationConversation, type CreationMessage, type CreationMode, type CreationRetryContext, type CreationSettings, type CreationShotRailEntry, type CreationStatus } from "./creation-types";
 import { attachCreationTaskContexts, completedCreationGenerationTask, conversationTimestamp, creationShotRail, creationVideoShotOrdinal, isImageAttachment, isVideoAttachment, materializeCreationTaskResults, newConversation, newMessage, reconcileCreationTaskMessages } from "./creation-conversations";
 import { CreationComposer, CreationEmptySuggest, CreationFeaturedWorks, CreationHistoryDrawer, CreationMessageView, CreationModeTabs, CreationWorkspaceToolbar, creationAssetCategoryLabels } from "./creation-workspace";
 import { CreationAgentEntry } from "./creation-agent-entry";
 import { createCreationSubmitGate } from "./creation-submit-gate";
+import { creationVideoConfig } from "./creation-generation-config";
 
 const AssetLibraryPickerModal = lazy(() => import("@/components/assets/asset-library-picker-modal").then((module) => ({ default: module.AssetLibraryPickerModal })));
 const loadCreationRuntime = () => import("./creation-runtime");
@@ -45,6 +46,18 @@ type CreationRuntime = Awaited<ReturnType<typeof loadCreationRuntime>>;
 
 const TEXT_STREAMING_PREF_KEY = "creation.composer.text-streaming";
 const TEXT_THINKING_PREF_KEY = "creation.composer.text-thinking";
+
+function creationLibraryDisabledReason(mode: CreationMode, kind: string | undefined, videoLimits?: CreationReferenceLimits) {
+    if (!kind) return undefined;
+    if (mode === "image") return kind === "image" ? undefined : "图片创作仅支持参考图";
+    if (mode !== "video") return undefined;
+
+    const maximum = kind === "image" ? videoLimits?.maxImages : kind === "video" ? videoLimits?.maxVideos : kind === "audio" ? videoLimits?.maxAudios : 0;
+    if ((maximum || 0) > 0) return undefined;
+    const label = kind === "video" ? "视频" : kind === "audio" ? "音频" : kind === "image" ? "图片" : "此类素材";
+    return `当前视频模型不支持参考${label}`;
+}
+
 function readComposerPref(key: string, fallback: boolean): boolean {
     try {
         const stored = window.localStorage.getItem(key);
@@ -181,6 +194,9 @@ export default function CreatePage() {
         [attachments, config.transparentBackground, count, hasPrompt, mode, preferredVideoProfile.ratios.length, quality, ratio, seconds, videoGenerateAudio, videoQuality, videoWatermark],
     );
     const selectedModel = resolveCompatibleModel(config, preferredModel, modelRequirements) || preferredModel;
+    const generationConfig = useMemo(() => mode === "video"
+        ? creationVideoConfig(config, selectedModel, { ratio, seconds, videoQuality, videoGenerateAudio, videoWatermark })
+        : config, [config, mode, ratio, seconds, selectedModel, videoGenerateAudio, videoQuality, videoWatermark]);
     const imageProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).image!, [config, selectedModel]);
     const videoProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).video!, [config, selectedModel]);
     const settingsDraftIdentity = useMemo<CreationSettingsDraftIdentity | undefined>(
@@ -197,7 +213,14 @@ export default function CreatePage() {
     const settingsDraftKey = settingsDraftIdentity ? creationSettingsDraftKey(settingsDraftIdentity) : "text";
     const settingsDraftPersistenceKey = `${creationSettingsScope}\0${settingsDraftKey}`;
     const settingsDraftReadyKeyRef = useRef("");
-    const maxReferences = mode === "video" ? videoAttachmentLimit(videoProfile) : mode === "image" ? imageProfile.references.maxImages : 6;
+    // 同名逻辑模型可能把文生视频、图生视频和全模态参考拆到不同路由。
+    // 入口需要展示整个模型组的引用能力，添加素材后再由兼容路由选择具体模型。
+    const videoReferenceLimits = useMemo(() => mode === "video"
+        ? modelGroupReferenceLimits(config, preferredModel || selectedModel, "video") || { maxImages: 0, maxVideos: 0, maxAudios: 0 }
+        : undefined, [config, mode, preferredModel, selectedModel]);
+    const maxReferences = mode === "video"
+        ? (videoReferenceLimits?.maxImages || 0) + (videoReferenceLimits?.maxVideos || 0) + (videoReferenceLimits?.maxAudios || 0)
+        : mode === "image" ? imageProfile.references.maxImages : 6;
     const referenceImageSize = useMemo(() => {
         const imageAttachments = attachments.filter(isImageAttachment);
         if (imageAttachments.length !== 1) return undefined;
@@ -314,11 +337,13 @@ export default function CreatePage() {
     }, [count, creationSettingsScope, mode, quality, ratio, seconds, settingsDraftIdentity, settingsDraftPersistenceKey, videoGenerateAudio, videoQuality, videoWatermark, generationOptions]);
 
     useEffect(() => {
-        const reconciled = reconcileCreationAttachmentLimit(attachments, mentionReferences, maxReferences);
+        const reconciled = mode === "video" && videoReferenceLimits
+            ? reconcileCreationAttachmentLimits(attachments, mentionReferences, videoReferenceLimits)
+            : reconcileCreationAttachmentLimit(attachments, mentionReferences, maxReferences);
         if (reconciled.attachments === attachments) return;
         setAttachments(reconciled.attachments);
         if (reconciled.removedReferences.length) setPrompt((current) => removeCreationReferenceTokens(current, reconciled.removedReferences));
-    }, [attachments, maxReferences, mentionReferences]);
+    }, [attachments, maxReferences, mentionReferences, mode, videoReferenceLimits]);
 
     useEffect(() => {
         const ids = new Set(attachments.map((item) => item.id));
@@ -369,27 +394,15 @@ export default function CreatePage() {
             const persistedTasks = await materializeCreationTaskResults(runtime, contextual, observationController.signal);
             if (cancelled) return;
             taskSyncWarningRef.current = false;
-            const attachable = persistedTasks.filter((task) => task.status === "succeeded" && Boolean(task.clientContext?.messageId) && Boolean(task.creationResultUrls?.length));
+            const attachable = persistedTasks.filter((task) => task.status === "succeeded" && Boolean(task.clientContext?.messageId) && Boolean(task.creationResultUrls?.length || task.creationResultStorageKeys?.length));
             for (const task of attachable) {
                 try {
-                    await runtime.consumeGenerationTaskMessage(
-                        task,
-                        task.clientContext!.messageId!,
-                        async ({ effectKey, resultUrls }) => {
-                            if (cancelled) return;
-                            await updateConversationMessage(
-                                task.clientContext!.conversationId!,
-                                task.clientContext!.messageId!,
-                                (item) =>
-                                    runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({
-                                        ...current,
-                                        status: "done" as const,
-                                        resultUrls: Array.from(new Set([...(current.resultUrls || []), ...resultUrls])),
-                                    })).value,
-                            );
-                        },
-                        { signal: observationController.signal, materialize: async () => task, materializedUrls: runtime.generationTaskMaterializedUrls },
-                    );
+                    await runtime.consumeGenerationTaskMessage(task, task.clientContext!.messageId!, async ({ effectKey, resultUrls, resultStorageKeys }) => {
+                        if (cancelled) return;
+                        await updateConversationMessage(task.clientContext!.conversationId!, task.clientContext!.messageId!, (item) =>
+                            runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({ ...current, status: "done" as const, ...(resultUrls.length ? { resultUrls: Array.from(new Set([...(current.resultUrls || []), ...resultUrls])) } : {}), ...(resultStorageKeys.length ? { resultStorageKeys: Array.from(new Set([...(current.resultStorageKeys || []), ...resultStorageKeys])) } : {}) })).value,
+                        );
+                    }, { signal: observationController.signal, materialize: async () => task, materializedUrls: runtime.generationTaskMaterializedUrls, materializedStorageKeys: runtime.generationTaskMaterializedStorageKeys });
                 } catch (error) {
                     if (cancelled || observationController.signal.aborted) return;
                     console.warn("创作任务结果挂载失败，将使用已物化结果收敛消息状态", error);
@@ -493,30 +506,26 @@ export default function CreatePage() {
     };
 
     const externalLibraryItems = useMemo<AssetLibraryPickerItem[]>(
-        () =>
-            externalAssetSources.items.map((item) => ({
-                ...item,
-                disabledReason: mode === "image" && item.external?.item.kind !== "image" ? "图片创作仅支持参考图" : undefined,
+        () => externalAssetSources.items.map((item) => ({
+            ...item,
+            disabledReason: creationLibraryDisabledReason(mode, item.external?.item.kind, videoReferenceLimits),
+        })),
+        [externalAssetSources.items, mode, videoReferenceLimits],
+    );
+    const libraryItems = useMemo<AssetLibraryPickerItem[]>(() => [
+        ...assets
+            .filter((asset): asset is Extract<Asset, { kind: "image" | "video" | "audio" }> => asset.kind === "image" || asset.kind === "video" || asset.kind === "audio")
+            .map((asset) => ({
+                id: asset.id,
+                title: asset.title,
+                category: asset.category || "other",
+                kindLabel: asset.kind === "video" ? "视频" : asset.kind === "audio" ? "音频" : "图片",
+                asset,
+                searchText: (asset.tags || []).join(" "),
+                disabledReason: creationLibraryDisabledReason(mode, asset.kind, videoReferenceLimits),
             })),
-        [externalAssetSources.items, mode],
-    );
-    const libraryItems = useMemo<AssetLibraryPickerItem[]>(
-        () => [
-            ...assets
-                .filter((asset): asset is Extract<Asset, { kind: "image" | "video" | "audio" }> => asset.kind === "image" || asset.kind === "video" || asset.kind === "audio")
-                .map((asset) => ({
-                    id: asset.id,
-                    title: asset.title,
-                    category: asset.category || "other",
-                    kindLabel: asset.kind === "video" ? "视频" : asset.kind === "audio" ? "音频" : "图片",
-                    asset,
-                    searchText: asset.tags.join(" "),
-                    disabledReason: mode === "image" && asset.kind !== "image" ? "图片创作仅支持参考图" : undefined,
-                })),
-            ...externalLibraryItems,
-        ],
-        [assets, externalLibraryItems, mode],
-    );
+        ...externalLibraryItems,
+    ], [assets, externalLibraryItems, mode, videoReferenceLimits]);
     const uploadCreationAsset = async (file: File) => {
         const { uploadImage, uploadMediaFile } = await loadCreationRuntime();
         if (file.type.startsWith("video/")) {
@@ -595,13 +604,14 @@ export default function CreatePage() {
             return external ? [creationAttachmentFromExternalAsset(external)] : [];
         });
         if (!next.length) return;
-        const merged = [...attachments.filter((item) => !next.some((candidate) => candidate.id === item.id)), ...next];
-        const error = mode === "video" ? videoAttachmentError(videoProfile, merged.map(creationAttachmentKind)) : "";
-        if (error || merged.length > maxReferences) {
-            toast.warning(error || `最多支持 ${maxReferences} 个参考素材`);
-            return;
-        }
-        setAttachments(merged);
+        setAttachments((current) => {
+            const candidates = [...current.filter((item) => !next.some((candidate) => candidate.id === item.id)), ...next];
+            const reconciled = mode === "video" && videoReferenceLimits
+                ? reconcileCreationAttachmentLimits(candidates, [], videoReferenceLimits)
+                : reconcileCreationAttachmentLimit(candidates, [], maxReferences);
+            if (reconciled.attachments.length < candidates.length) toast.warning("部分素材超出当前模型的参考内容上限，未添加到创作中");
+            return reconciled.attachments;
+        });
         setLibraryOpen(false);
     };
 
@@ -714,7 +724,10 @@ export default function CreatePage() {
             releaseSubmitGate();
             return;
         }
-        if (attachments.length > maxReferences) {
+        const reconciledAttachments = mode === "video" && videoReferenceLimits
+            ? reconcileCreationAttachmentLimits(attachments, mentionReferences, videoReferenceLimits)
+            : reconcileCreationAttachmentLimit(attachments, mentionReferences, maxReferences);
+        if (reconciledAttachments.attachments !== attachments) {
             toast.warning("参考内容正在按当前模型能力调整，请稍后重试");
             releaseRetryLock();
             releaseSubmitGate();
@@ -811,9 +824,8 @@ export default function CreatePage() {
         const requestLifecycle = runtime.beginGenerationConsumer(controller.signal);
         abortRef.current = controller;
         const normalizedImage = mode === "image" ? normalizeImageValue(imageProfile, { size: ratio, quality, count }) : undefined;
-        const normalizedVideo = mode === "video" ? normalizeVideoValue(videoProfile, { seconds, ratio, resolution: videoQuality }) : undefined;
         const requestConfig = {
-            ...config,
+            ...generationConfig,
             generationOptions: mode === "text" ? undefined : generationOptions,
             model: selectedModel,
             imageModel: selectedModel,
@@ -821,15 +833,7 @@ export default function CreatePage() {
             textModel: selectedModel,
             ...(mode === "image"
                 ? { size: normalizedImage?.size || ratio, quality: normalizedImage?.quality || quality, count: normalizedImage?.count || count, videoSeconds: config.videoSeconds }
-                : mode === "video"
-                  ? {
-                        size: videoProfile.ratios.length > 0 ? (normalizedVideo?.ratio ?? ratio) : "",
-                        videoSeconds: normalizedVideo?.seconds || seconds,
-                        vquality: (normalizedVideo?.resolution ?? videoQuality).replace(/p$/i, ""),
-                        videoGenerateAudio: String(videoProfile.generateAudio.supported && videoGenerateAudio),
-                        videoWatermark: String(videoProfile.watermark.supported && videoWatermark),
-                    }
-                  : {}),
+                : {}),
         };
         try {
             if (mode === "text") {
@@ -897,14 +901,15 @@ export default function CreatePage() {
                         const materialized = await runtime.consumeGenerationTaskMessage(
                             task,
                             assistantMessage.id,
-                            async ({ resultUrls, effectKey }) => {
+                            async ({ resultUrls, resultStorageKeys, effectKey }) => {
                                 await updateOriginAssistant(
                                     (item) =>
                                         runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({
                                             ...current,
                                             status: "done" as const,
                                             content: "图片已生成",
-                                            resultUrls: Array.from(new Set([...(current.resultUrls || []), ...resultUrls])),
+                                            ...(resultUrls.length ? { resultUrls: Array.from(new Set([...(current.resultUrls || []), ...resultUrls])) } : {}),
+                                            ...(resultStorageKeys.length ? { resultStorageKeys: Array.from(new Set([...(current.resultStorageKeys || []), ...resultStorageKeys])) } : {}),
                                         })).value,
                                 );
                             },
@@ -960,8 +965,8 @@ export default function CreatePage() {
                 const materialized = await runtime.consumeGenerationTaskMessage(
                     task,
                     assistantMessage.id,
-                    async ({ resultUrls, effectKey }) => {
-                        await updateOriginAssistant((item) => runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({ ...current, status: "done" as const, content: "视频已生成", resultUrls })).value);
+                    async ({ resultUrls, resultStorageKeys, effectKey }) => {
+                        await updateOriginAssistant((item) => runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({ ...current, status: "done" as const, content: "视频已生成", resultUrls, ...(resultStorageKeys.length ? { resultStorageKeys } : {}) })).value);
                     },
                     { signal: requestLifecycle.signal },
                 );
@@ -1023,9 +1028,11 @@ export default function CreatePage() {
         try {
             const assets = useAssetStore.getState().assets;
             const generatedAssetIds = selectedAssetIds || source.messages.flatMap((item) => {
-                if (!item.resultUrls?.length) return [];
-                const ids = creationResultAssetIds(assets, { messageId: item.id, taskIds: item.taskIds || [], resultUrls: item.resultUrls });
-                if (ids.length !== item.resultUrls.length) throw new Error("部分生成素材还未保存完成，请稍后转入画布。");
+                const resultStorageKeys = item.resultStorageKeys || [];
+                const resultUrls = item.resultUrls || [];
+                if (!resultStorageKeys.length && !resultUrls.length) return [];
+                const ids = creationResultAssetIds(assets, { messageId: item.id, taskIds: item.taskIds || [], resultUrls, resultStorageKeys });
+                if (ids.length !== Math.max(resultStorageKeys.length, resultUrls.length)) throw new Error("部分生成素材还未保存完成，请稍后转入画布。");
                 return ids;
             });
             const referenceKeys = new Set(source.messages.flatMap((item) => (item.attachments || []).map((attachment) => attachment.storageKey).filter(Boolean)));
@@ -1226,7 +1233,7 @@ export default function CreatePage() {
         modelRequirements,
         imageProfile,
         videoProfile,
-        config,
+        config: generationConfig,
         onModelChange: (value: string) => updateConfig(mode === "text" ? "textModel" : mode === "image" ? "imageModel" : "videoModel", value),
         videoGenerateAudio,
         videoWatermark,

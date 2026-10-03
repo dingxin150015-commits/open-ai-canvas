@@ -1,5 +1,16 @@
 # 影策备份登记簿
 
+## 2026-09-29 隔离预览空数据卷（不是备份）
+
+- `open-ai-canvas-v158-edge-preview-data-20260929` 是用户批准的 A′ Edge 预览新空卷，挂载到 `open-ai-canvas-v158-preview-backend-20260929:/data`；2026-09-29 启动后由候选后端初始化到 Schema42。它不包含生产数据、密钥或素材，不能当作恢复点，也不得与生产卷 `open-ai-canvas_backend-data` 混淆。
+- 预览 Web 仅发布在 `127.0.0.1:3001`，网络为 `open-ai-canvas-v158-edge-preview-net-20260929`。当前为用户手验而保留；清理前核对挂载与精确名称，绝不使用 `docker compose down -v`、卷通配删除或改写生产卷。
+
+## 2026-09-29 A′ v1.5.8 隔离迁移验证卷（不是生产恢复点）
+
+- `open-ai-canvas-v158-a-prime-legacy-clone-20260928`：来源为 2026-09-13 已验证的私有 `catalog-clone` 备份，只读导入后升级本地旧 Schema 9→42；重复迁移、完整性、外键与脱敏业务计数保持通过。源备份和生产 `open-ai-canvas_backend-data` 均未写入。
+- `open-ai-canvas-v158-a-prime-official-clone-20260929`：固定官方 v1.5.8 迁移程序生成的 Schema 40 结构源卷；`open-ai-canvas-v158-a-prime-official-upgrade-20260929`：其逐字节复制后由 A′ 升至 42 的验证卷。官方谱系使用空业务数据，结构、重复迁移、完整性和外键通过。
+- 这些卷仅是测试副本，未登记为 `verified/protected` 生产备份，也不能替代匹配真实镜像、DB/WAL/SHM、设置密钥和 ACL 的恢复点。当前保留供复核；后续若清理，须先核对精确卷名、与运行容器的挂载关系及用户批准边界。
+
 ## 2026-09-13 统一模型目录与Gemini文本插件收尾
 
 - 恢复点catalog-predeploy-20260913-143843 / catalog-postdeploy-20260913-144131，以及catalog-predeploy-20260913-145155 / catalog-postdeploy-20260913-145410，文件比对、私有ACL、DB完整性/外键/解密检查均通过；旧恢复点保留。

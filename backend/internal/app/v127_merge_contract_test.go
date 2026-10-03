@@ -35,7 +35,8 @@ func TestV127BatchDeleteAllowsUnreferencedDiscoveryCandidates(t *testing.T) {
 }
 
 func TestV127DashScopeHydrationRequiresPublicURL(t *testing.T) {
-	policy := providerMediaHydrationPolicyFor(context.Background(), canvasGenerationInput{Mode: "video", Config: providerConfig{InterfaceType: "dashscope-video"}})
+	ctx := withProtocolRegistry(context.Background(), loadOfficialFallbackRegistry())
+	policy := providerMediaHydrationPolicyFor(ctx, canvasGenerationInput{Mode: "video", Config: providerConfig{InterfaceType: "dashscope-video"}})
 	if !policy.requireURL || !policy.preferURL {
 		t.Fatalf("policy=%#v", policy)
 	}

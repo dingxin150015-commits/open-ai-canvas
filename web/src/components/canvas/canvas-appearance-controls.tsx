@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button, ColorPicker, Input, Segmented, Slider } from "antd";
 import { CircleDot, Grid2x2, Moon, Paintbrush, RotateCcw, Save, Square, Sun } from "lucide-react";
 
-import { canvasAppearanceForTheme, customCanvasAppearanceFromTheme, enterCustomCanvasAppearance, normalizeHexColor, type CanvasAppearance, type CanvasCustomAppearance } from "@/lib/canvas/canvas-appearance";
+import { canvasAppearanceForTheme, DEFAULT_CANVAS_BACKGROUND_MODE, customCanvasAppearanceFromTheme, enterCustomCanvasAppearance, normalizeHexColor, type CanvasAppearance, type CanvasCustomAppearance } from "@/lib/canvas/canvas-appearance";
 import type { CanvasBackgroundMode, CanvasColorTheme, CanvasTheme } from "@/lib/canvas-theme";
 
 const LIGHT_PRESETS = ["#F0F0F0", "#F3DCE5", "#EEE5D8", "#DFE9E6"];
@@ -33,6 +33,7 @@ export function CanvasAppearanceControls({
         const next = canvasAppearanceForTheme(target, draft);
         setDraft(next);
         onAppearanceChange(next);
+        onBackgroundModeChange(DEFAULT_CANVAS_BACKGROUND_MODE);
     };
     const selectCustomTheme = () => {
         const next = enterCustomCanvasAppearance(draft, colorTheme);

@@ -1,5 +1,25 @@
 # 开发历史时间线
 
+## 2026-10-03 11:45 CST：用户批准从 v1.5.8 WIP 继续固定 v1.6.0
+
+官方 GitHub Release `v1.6.0` 经只读 API 确认为正式版，远端标签为 `42f14cd7`。当前 v1.5.8 A′ 仍是 `HEAD=56e9b124`、`MERGE_HEAD=25842275` 的未提交候选，未通过用户 Edge；用户明确选择先以仅本地 WIP 双父检查点封存该候选，再新建隔离 A″ 合入固定 v1.6.0。旧 A、A′、生产服务与数据不替换；当前记录是启动时事实，后续 SHA/测试/冲突以 `UPSTREAM_V160_EXECUTION_20261003.md` 更新。
+
+## 2026-09-29 11:37 CST：候选隔离预览与百炼 PR 文案分层
+
+用户批准不替换生产服务的隔离预览。候选 Backend/Web 使用各自独立镜像，在专用 Docker 网络与新空数据卷运行；只开放 `127.0.0.1:3001`，HTTP `/build-info.json`、`/api/health/ready` 和首页均为 200，前后端 healthy、Schema42/42。生产两容器镜像仍为 `d67ee794`/`9bfc9c67`、healthy、RestartCount 0；预览未复制生产数据、账号或密钥。用户 Edge 手验尚未执行，未晋升/提交/push。百炼上游贡献提案改为先给合并大模型的精简操作卡，再给维护者的自然语言说明；Issue #332 架构门禁仍在。见 `HANDOFF_V158_20260928.md` 与 `docs/plans/bailian-upstream-pr-v158.md`。
+
+## 2026-09-29：A′ 隔离自动化验收闭合，待 Edge
+
+Docker Desktop 由用户启动后，A′ 在独立 Linux CGO 测试容器与隔离 PostgreSQL/Redis 下完成后端全仓测试，CI 五项依赖用例实际通过；Web 2380、Canvas Agent 328 及候选 Backend/Web 镜像构建均通过。两条数据库谱系分别以旧 Schema9 真实业务备份克隆与固定官方 v1.5.8 Schema40 结构克隆升至 42；重复迁移、完整性/外键和脱敏业务计数保持通过。无宿主端口的隔离 Backend/Web HTTP 冒烟返回相同 WIP 树标识，ready/Schema42/三平台 Comfy Bridge 下载可用。没有正式提交、push、部署或付费调用；用户 Edge、远端 CI 与旧 A 删除仍待明确门禁。临时官方代码 worktree 已核对干净后删除，可从固定 SHA 恢复；生产 Compose/卷不变。详情见 `UPSTREAM_V158_EXECUTION_20260927.md`。
+
+## 2026-09-28：固定 v1.5.8 A′ 源码门禁与发布阻断
+
+隔离 A′ 的 59 个显式冲突已清零；Web 全量 2379、类型、生产源码构建、Canvas Agent 328 与构建通过。修正了自动合并造成的 4 处 Compose 缩进错误，两个百炼 v4 归档重新打包后逐字节核对源文件；旧 v2 生成器加入防降级。Windows 无 CGO 编译器，Docker Desktop Engine 未启动，Linux 后端全量/两谱系克隆/镜像/Edge 均未完成。官方 v1.5.8 标签保持 `25842275`，移动 main 已到 `f9b8c5a4`；本轮不追尾差。Issue #332 在 2026-09-07 被维护者无评论地标为 completed，贡献方案改为先确认架构、再小 PR。详情见 `HANDOFF_V158_20260928.md`。
+
+## 2026-09-27：建立 A′ 并增量合并固定 v1.5.8
+
+把原 v1.5.6 候选完整内容固化为仅本地 WIP `56e9b124`，从它建立 `codex/upstream-v1.5.8-20260927` 并以无提交方式合入 `25842275`。旧 A `6b16d25e`、根目录和原 v1.5.6 工作树保持原状；本轮没有正式提交、push 或部署。
+
 ## 2026-09-13：统一模型资格修复交付
 
 用户批准完整统一方案。ad3efa10沿既有插件Registry加入v4模型合同和目录贡献，恢复受校验配置与停用草稿，补Gemini分页及无调用检查；cc7d0b63以Gemini文本插件4.0.1补媒体防丢失。Backend最终全量、Web1645全量/40专项/类型/构建、源码/运行包哈希及两次断网克隆预演通过，Schema9/9和业务数据保持。主程序catalog1/ad3efa10，插件独立升级不改主程序二进制；停在用户Edge门禁，未生成或push。详见MODEL_CATALOG_UNIFIED_REPAIR_20260913.md。

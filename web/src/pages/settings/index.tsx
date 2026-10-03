@@ -1,7 +1,7 @@
 import { App, Button, InputNumber } from "antd";
 import { SettingsRow } from "@/components/ui/product/settings-row";
 import { ArrowLeft, Boxes, Brain, Bug, Cloud, MessageSquareText, RadioTower, SlidersHorizontal, SquareTerminal, Workflow } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { UserOSSSettingsForm } from "@/components/layout/user-oss-settings-form";
@@ -65,11 +65,6 @@ export default function SettingsPage() {
     );
 
     const isVisibleConfigSection = (value: string | null): value is ConfigSectionKey => isConfigSection(value) && visibleConfigSections.some((section) => section.key === value);
-
-    useLayoutEffect(() => {
-        document.body.classList.add("app-user-overlays");
-        return () => document.body.classList.remove("app-user-overlays");
-    }, []);
 
     useEffect(() => {
         if (isVisibleConfigSection(requestedSection)) {

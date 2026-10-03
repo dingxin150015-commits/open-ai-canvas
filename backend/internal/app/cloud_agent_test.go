@@ -201,6 +201,9 @@ func TestCloudAgentTerminalRunWithOlderCapabilityCanContinueOnCurrentContract(t 
 	if childState.ParentID != parent.ID || len(childState.TextHistory) != 2 || childState.TextHistory[1].Content != "旧合同下的可信回复" {
 		t.Fatalf("historical conversation context was not preserved: %+v", childState)
 	}
+	if childState.ConfirmationRounds != 0 || len(childState.ConfirmationFingerprints) != 0 {
+		t.Fatalf("normal completed parent incorrectly inherited confirmation budget: rounds=%d fingerprints=%v", childState.ConfirmationRounds, childState.ConfirmationFingerprints)
+	}
 	var storedParent model.CloudAgentExecution
 	if err = db.First(&storedParent, "id = ?", parent.ID).Error; err != nil {
 		t.Fatal(err)
@@ -263,6 +266,23 @@ func TestCloudAgentValidation(t *testing.T) {
 		if validateCloudAgentRequest(&req) == nil {
 			t.Fatal("unsupported request accepted")
 		}
+	}
+}
+
+func TestCloudAgentValidationNormalizesFocusNodeIDs(t *testing.T) {
+	req := agentTestRequest()
+	req.FocusNodeIDs = []string{" node-1 ", "node-2"}
+	if err := validateCloudAgentRequest(&req); err != nil {
+		t.Fatalf("trimmed focus node IDs should be normalized consistently: %v", err)
+	}
+	if req.FocusNodeIDs[0] != "node-1" {
+		t.Fatalf("focus node ID was validated but not normalized: %#v", req.FocusNodeIDs)
+	}
+
+	req = agentTestRequest()
+	req.FocusNodeIDs = []string{"node-1", " node-1 "}
+	if err := validateCloudAgentRequest(&req); err == nil {
+		t.Fatal("focus node IDs that normalize to the same node must be rejected")
 	}
 }
 
@@ -362,8 +382,12 @@ func TestCloudAgentAdmissionAcceptsTokenPricingWithQuotedChargeLimit(t *testing.
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
-
-	run, err := s.CreateCloudAgentRun("user", agentTestRequest(), "")
+	if err := db.Model(&model.CreditAccount{}).Where("user_id = ?", "user").Update("available_microcredits", int64(1_000_000_000)).Error; err != nil {
+		t.Fatal(err)
+	}
+	request := agentTestRequest()
+	request.Budget.MaxCredits = 100_000
+	run, err := s.CreateCloudAgentRun("user", request, "")
 	if err != nil {
 		t.Fatalf("token-priced Agent request was rejected: %v", err)
 	}
@@ -377,7 +401,7 @@ func TestCloudAgentAdmissionAcceptsTokenPricingWithQuotedChargeLimit(t *testing.
 }
 
 func TestCloudAgentWorkerPersistsRealResponse(t *testing.T) {
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "")
 	t.Setenv("REDIS_URL", "")
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
@@ -394,8 +418,9 @@ func TestCloudAgentWorkerPersistsRealResponse(t *testing.T) {
 	defer upstream.Close()
 	s, db, _, _ := creationTestService(t)
 	s = New(s.repo, s.dataDir)
+	s.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
 	t.Cleanup(func() { _ = s.Close() })
-	if err := db.Model(&model.ModelChannel{}).Where("id = ?", "channel").Updates(map[string]any{"base_url": upstream.URL, "api_key": "test-only"}).Error; err != nil {
+	if err := db.Model(&model.ModelChannel{}).Where("id = ?", "channel").Updates(map[string]any{"base_url": upstream.URL, "allow_local_channel": true, "api_key": "test-only"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&model.CanvasProject{ID: "agent-canvas", UserID: "user", PayloadJSON: `{"nodes":[]}`}).Error; err != nil {

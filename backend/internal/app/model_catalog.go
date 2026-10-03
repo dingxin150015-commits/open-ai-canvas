@@ -38,6 +38,7 @@ type PublicChannelModel struct {
 	ID               string                        `json:"id"`
 	ModelKey         string                        `json:"modelKey"`
 	ChannelLabel     string                        `json:"channelLabel"`
+	Tags             []model.ChannelModelTag       `json:"tags"`
 	Description      string                        `json:"description"`
 	DisplayName      string                        `json:"displayName"`
 	SortOrder        int                           `json:"sortOrder"`
@@ -45,6 +46,7 @@ type PublicChannelModel struct {
 	Capability       string                        `json:"capability"`
 	Protocol         model.ChannelInterfaceType    `json:"protocol"`
 	CapabilityConfig map[string]any                `json:"capabilityConfig,omitempty"`
+	DefaultOptions   map[string]any                `json:"defaultOptions,omitempty"`
 	PriceTiers       []PublicChannelModelPriceTier `json:"priceTiers"`
 	PricingMode      string                        `json:"pricingMode"`
 	DisplayPrice     *int64                        `json:"displayPrice,omitempty"`
@@ -172,23 +174,31 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) (PublicChannelMod
 	available := s.channelModelSupported(cm) && (len(publicTiers) > 0 || (len(priceTiers) == 0 && HasValidPrice(cm)))
 
 	// Catalog and task admission consume the same durable capability profile.
-	var capabilityConfig map[string]any
-	config, capabilityErr := effectiveChannelModelCapability(cm)
-	if capabilityErr != nil {
-		available = false
-		log.Printf("channel model omitted from available catalog model_id=%s: invalid durable capability profile: %v", cm.ID, capabilityErr)
-	} else {
-		var err error
-		capabilityConfig, err = modelCapabilityConfigToMap(config)
-		if err != nil {
-			return PublicChannelModel{}, fmt.Errorf("投影渠道模型能力配置失败：%w", err)
-		}
+	config, err := effectiveChannelModelCapability(cm)
+	if err != nil {
+		return PublicChannelModel{}, err
+	}
+	if config == nil {
+		return PublicChannelModel{}, fmt.Errorf("渠道模型能力合同为空")
+	}
+	capabilityConfig, err := modelCapabilityConfigToMap(config)
+	if err != nil {
+		return PublicChannelModel{}, fmt.Errorf("投影渠道模型能力配置失败：%w", err)
+	}
+	spec, err := CapabilitySpecFromModelCapabilityConfig(config, cm.Capability)
+	if err != nil {
+		return PublicChannelModel{}, fmt.Errorf("投影渠道模型默认参数失败：%w", err)
+	}
+	defaultOptions, err := channelModelDefaultOptions(*cm, spec)
+	if err != nil {
+		return PublicChannelModel{}, err
 	}
 
 	return PublicChannelModel{
 		ID:               cm.ID,
 		ModelKey:         cm.ModelKey,
 		ChannelLabel:     cm.ChannelLabel,
+		Tags:             cm.Tags,
 		Description:      cm.Description,
 		DisplayName:      cm.DisplayName,
 		SortOrder:        cm.SortOrder,
@@ -196,6 +206,7 @@ func (s *Service) sanitizeChannelModel(cm *model.ChannelModel) (PublicChannelMod
 		Capability:       cm.Capability,
 		Protocol:         cm.Protocol,
 		CapabilityConfig: capabilityConfig,
+		DefaultOptions:   defaultOptions,
 		PriceTiers:       publicTiers,
 		PricingMode:      pricingMode,
 		DisplayPrice:     displayPrice,

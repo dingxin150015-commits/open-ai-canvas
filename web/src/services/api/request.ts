@@ -11,6 +11,7 @@ export type BackendEnvelope<T> = {
     retryable?: boolean;
     requestId?: string;
     reason?: string;
+    details?: Record<string, unknown>;
 };
 
 /**
@@ -25,11 +26,15 @@ export class ApiError extends Error {
     readonly errorCategory?: string;
     readonly requestId?: string;
     readonly reason?: string;
+    readonly details?: Record<string, unknown>;
     readonly retryable: boolean;
     readonly retryAfterMs?: number;
     readonly cause?: unknown;
 
-    constructor(message: string, options: { status?: number; code?: number; reason?: string; errorCode?: string; errorCategory?: string; requestId?: string; retryable?: boolean; retryAfterMs?: number; cause?: unknown } = {}) {
+    constructor(
+        message: string,
+        options: { status?: number; code?: number; reason?: string; errorCode?: string; errorCategory?: string; requestId?: string; details?: Record<string, unknown>; retryable?: boolean; retryAfterMs?: number; cause?: unknown } = {},
+    ) {
         super(message);
         this.name = "ApiError";
         this.status = options.status;
@@ -38,6 +43,7 @@ export class ApiError extends Error {
         this.errorCategory = options.errorCategory;
         this.requestId = options.requestId;
         this.reason = options.reason;
+        this.details = options.details;
         this.retryable = options.retryable ?? isRetryableStatus(options.status ?? options.code);
         this.retryAfterMs = options.retryAfterMs;
         this.cause = options.cause;
@@ -64,6 +70,7 @@ export async function request<T>(promise: Promise<{ data: BackendEnvelope<T>; st
                 errorCode: response.data.errorCode,
                 errorCategory: response.data.errorCategory,
                 requestId: response.data.requestId || responseHeader(response.headers, "x-request-id"),
+                details: response.data.details,
                 retryable: response.data.retryable ?? (isRetryableStatus(response.status) || isRetryableStatus(response.data.code)),
                 retryAfterMs: retryAfterMilliseconds(response.headers),
             });
@@ -92,7 +99,10 @@ function unwrapTransportError(error: unknown): never {
             errorCode: envelope?.errorCode,
             errorCategory: envelope?.errorCategory,
             requestId: envelope?.requestId || responseHeader(error.response?.headers, "x-request-id"),
-            retryable: envelope?.retryable ?? (isRetryableStatus(status) || isRetryableStatus(code)),
+            details: envelope?.details,
+            // 没有 response 的 AxiosError 代表请求没有拿到 HTTP 响应（断网、连接重置、DNS、超时等）。
+            // 这类错误不能靠 status 判断，但对保存来说通常是暂时性的，应交给上层有限退避重试。
+            retryable: envelope?.retryable ?? (status === undefined || isRetryableStatus(status) || isRetryableStatus(code)),
             retryAfterMs: retryAfterMilliseconds(error.response?.headers),
             cause: error,
         });

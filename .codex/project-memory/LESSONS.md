@@ -1,5 +1,19 @@
 # 关键经验、教训与注意事项
 
+## v1.5.8 合并新证据（2026-09-28）
+
+- 2026-09-29：Linux CGO 真跑才暴露 Windows 仅编译门禁看不到的错误；旧 loopback 测试夹具必须按上游显式桌面能力更新，不能把生产 SSRF 改为“允许所有私网”。依赖齐全的全量还要逐个核实 PostgreSQL/Redis 测试确实 RUN/PASS，避免无声 SKIP。
+- `go test ./...` 默认 10 分钟不适合当前大量 SQLite AutoMigrate 用例；超时栈显示 CPU 正在建索引，而非死锁。测试镜像与 CI 统一 `-timeout 30m`，不以反复碰运气取代失败归因。
+- 任务错误要分离机器判断、用户安全文案与日志：内部 `providerPayloadError.raw` 可做精确协议分支，外部只允许类型化、经过 `providerErrorDetail` 过滤的短提示；一般 `err.Error()` 和上游原文不能直接写任务/调用日志。`ModelError` 嵌入 `AppError` 不自动满足 `errors.As`，需要明确 `Unwrap`。
+- 桌面本机渠道的任务请求与同源媒体结果下载必须使用同一“服务端能力 + 渠道显式开关 + 精确回环同源”边界；旧全局私网环境变量不应给桌面功能授权。下载还要拒绝重定向、隐藏签名路径/Query。
+- SQLite 在 WAL 文件已清理但仍采用 WAL 模式时，`sqlite3 -readonly` 挂只读卷可能因无法创建共享内存侧文件报 `unable to open database file`；先检查 DB 文件和 WAL/SHM 状态，在**隔离克隆**中允许目录侧文件写入、数据库仍只读打开做 integrity/foreign-key，不误判为数据损坏。生产卷不作此试探。
+- 两谱系迁移必须用各自真正来源验证：本地旧 Schema9 用受保护备份的业务副本；官方 Schema40 用固定官方二进制建源卷再复制升级。官方空库结构通过不能代替旧业务保持；`migrate-schema up` 应重复执行并核对 key/registry/计数。
+- Git 自动合并无冲突标记不等于配置可解析：4 份 Compose 的 `environment` 键被合出错误缩进，逐份 `docker compose config --quiet` 才暴露。以后每次合并都覆盖默认、本地、开发、Server、Deploy 和叠加 Build，生产仅用占位变量做静态检查，不打印真实环境值。
+- Windows Bun 测试的 `file:` URL 不可用 `.pathname` 当本地路径，需 `fileURLToPath`；否则 `/D:/...` 被误当目录。测试依赖缺失是隔离工作树问题，不应因此恢复已删除的旧功能模块。
+- 生成器可能静默降级独立 v4 包：旧 `generate-catalog.mjs` 不应重写百炼 v4 Manifest；打包只读取已验证的 v4 源，归档后逐字节对照。保护列表与脚本同时检验。
+- Web 源码构建生成 Comfy Bridge 下载文件，不代表 Docker Web 镜像有这些文件。Dockerfile 必须在镜像上下文内交叉编译并复制，实际镜像构建/拉取文件仍是独立门禁。
+- 设计 Issue 被关闭且标 `completed`，若没有维护者文字决策，不能替其推断 Schema/Adapter 取舍。正式上游 PR 从当时官方最新主线重新审计，移动 main 尾差不叠加到正在打开的固定标签 merge。
+
 ## 模型发现与执行资格必须分离
 
 - 静态support_status不能同时决定编辑、启用和执行；手工新增与导入应由同一配置/插件合同判定。旧“only ready”记忆已由用户批准的统一资格方案替代，显式定价和请求级强校验仍保留。

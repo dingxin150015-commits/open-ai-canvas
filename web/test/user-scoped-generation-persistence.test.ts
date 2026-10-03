@@ -5,7 +5,6 @@ import { rebaseCanvasProjects } from "../src/lib/canvas/canvas-storage-revision"
 import { localForageStorageForScope } from "../src/lib/localforage-storage";
 import { getActiveUserScope, setActiveUserScope } from "../src/lib/user-scope";
 import { applyUserSession, switchUserStorageScope } from "../src/lib/user-session";
-import { canvasCinematicContinuationEntryAdapters } from "../src/components/canvas/canvas-assistant-panel";
 import { activeGenerationConsumerController, beginGenerationConsumer, runGenerationConsumer } from "../src/services/generation-consumer-lifecycle";
 import { createCanvasGenerationLiveProjectAdapter, persistCanvasCinematicSessionContinuationEffect, persistCanvasGenerationEffect, registerCanvasGenerationLiveProject } from "../src/services/canvas-generation-consumer";
 import { CREATION_CONVERSATIONS_KEY, loadCreationConversations, pendingCreationTaskIds, pendingCreationTaskKey, saveCreationConversations } from "../src/services/creation-conversation-store";
@@ -2482,306 +2481,6 @@ test("cinematic continuation durable ack failure restores mounted pending sessio
     }
 });
 
-test("cinematic continuation rollback reverts only unacknowledged canvas entities and preserves later ordinary edits", async () => {
-    const originalWindow = (globalThis as { window?: unknown }).window;
-    const originalGetItem = localforage.getItem.bind(localforage);
-    const originalSetItem = localforage.setItem.bind(localforage);
-    const previousScope = getActiveUserScope();
-    const previousProjects = useCanvasStore.getState().projects;
-    const values = new Map<string, string>();
-    const localStorageValues = new Map<string, string>();
-    Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: {
-            localStorage: {
-                getItem: (key: string) => localStorageValues.get(key) ?? null,
-                setItem: (key: string, value: string) => localStorageValues.set(key, value),
-                removeItem: (key: string) => localStorageValues.delete(key),
-            },
-        },
-    });
-
-    let currentEffectKey = "";
-    let failureMode: "error" | "abort" = "error";
-    let abortController: AbortController | undefined;
-    let beforeAckFailure: (() => void) | undefined;
-    let ackTriggered = false;
-    localforage.getItem = (async (key: string) => values.get(key) ?? null) as typeof localforage.getItem;
-    localforage.setItem = (async (key: string, value: string) => {
-        if (!ackTriggered && currentEffectKey && value.includes(currentEffectKey)) {
-            ackTriggered = true;
-            beforeAckFailure?.();
-            if (failureMode === "abort") {
-                abortController?.abort();
-                throw abortController?.signal.reason ?? new DOMException("The operation was aborted", "AbortError");
-            }
-            throw new Error("cinematic canvas durable ack failed");
-        }
-        values.set(key, value);
-        return value;
-    }) as typeof localforage.setItem;
-
-    const node = (id: string, title: string): CanvasNodeData => ({
-        id,
-        type: CanvasNodeType.Text,
-        title,
-        position: { x: 0, y: 0 },
-        width: 320,
-        height: 180,
-        metadata: { content: title },
-    });
-    const connection = (id: string, ratio: number): CanvasConnection => ({ id, fromNodeId: "node-anchor-a", toNodeId: "node-anchor-b", fromAnchorRatio: ratio });
-
-    try {
-        for (const entry of ["online-tool", "submit-cinematic", "resume-cinematic"] as const) {
-            for (const mode of ["error", "abort"] as const) {
-                const scope = `cinematic-canvas-rollback-${entry}-${mode}`;
-                const projectId = `canvas-cinematic-rollback-${entry}-${mode}`;
-                const effectKey = `cinematic-effect:canvas-rollback-${entry}-${mode}`;
-                const backendSessionId = `backend-cinematic-rollback-${entry}-${mode}`;
-                const cinematicSessionId = `session-cinematic-rollback-${entry}-${mode}`;
-                const cinematicMessageId = `message-cinematic-rollback-${entry}-${mode}`;
-                const previousNodes = [
-                    node("node-cinematic-update", "previous update"),
-                    node("node-cinematic-delete", "previous delete"),
-                    node("node-ordinary-update", "ordinary base"),
-                    node("node-ordinary-delete", "ordinary delete base"),
-                    node("node-anchor-a", "anchor a"),
-                    node("node-anchor-b", "anchor b"),
-                ];
-                const attemptedNodes = [
-                    node("node-cinematic-update", "cinematic update"),
-                    node("node-ordinary-update", "ordinary base"),
-                    node("node-ordinary-delete", "ordinary delete base"),
-                    node("node-anchor-a", "anchor a"),
-                    node("node-anchor-b", "anchor b"),
-                    node("node-cinematic-add", "cinematic add"),
-                ];
-                const previousConnections = [connection("connection-cinematic-update", 0.1), connection("connection-cinematic-delete", 0.2), connection("connection-ordinary-update", 0.3), connection("connection-ordinary-delete", 0.4)];
-                const attemptedConnections = [connection("connection-cinematic-update", 0.8), connection("connection-ordinary-update", 0.3), connection("connection-ordinary-delete", 0.4), connection("connection-cinematic-add", 0.5)];
-                const pendingSession: CanvasAssistantSession = {
-                    id: cinematicSessionId,
-                    title: "cinematic pending",
-                    pendingBackendSession: { id: backendSessionId, kind: "cinematic", messageId: cinematicMessageId, status: "pending", startedAt: "2026-08-14T00:00:00.000Z" },
-                    messages: [{ id: cinematicMessageId, role: "assistant", text: "pending", detail: { kind: "cinematic", backendSessionId, status: "pending" } }],
-                    createdAt: "2026-08-14T00:00:00.000Z",
-                    updatedAt: "2026-08-14T00:00:00.000Z",
-                };
-                const ordinarySession = (text: string): CanvasAssistantSession => ({
-                    id: `ordinary-session-${entry}-${mode}`,
-                    title: "ordinary",
-                    messages: [{ id: `ordinary-message-${entry}-${mode}`, role: "user", text }],
-                    createdAt: "2026-08-14T00:00:00.000Z",
-                    updatedAt: "2026-08-14T00:00:00.000Z",
-                });
-                const completedSession: CanvasAssistantSession = {
-                    ...pendingSession,
-                    pendingBackendSession: undefined,
-                    generationEffectKeys: [effectKey],
-                    messages: [{ id: cinematicMessageId, role: "assistant", text: "completed", detail: { kind: "cinematic", backendSessionId, status: "completed" } }],
-                };
-                const previousSessions = [pendingSession, ordinarySession("ordinary base")];
-                const attemptedSessions = [completedSession, ordinarySession("ordinary base")];
-                const baseProject: CanvasProject = {
-                    ...storedCanvasProject(projectId, entry),
-                    nodes: previousNodes,
-                    connections: previousConnections,
-                    chatSessions: previousSessions,
-                    activeChatId: cinematicSessionId,
-                };
-
-                setActiveUserScope(scope);
-                useCanvasStore.setState({ projects: [baseProject] });
-                await flushCanvasStorePersistence();
-
-                let mountedNodes = previousNodes;
-                let mountedConnections = previousConnections;
-                let mountedSessions = previousSessions;
-                let mountedActiveChatId: string | null = cinematicSessionId;
-                const nodesRef = { current: mountedNodes };
-                const connectionsRef = { current: mountedConnections };
-                const chatSessionsRef = { current: mountedSessions };
-                const activeChatIdRef = { current: mountedActiveChatId };
-                let snapshotRef = {
-                    current: {
-                        projectId,
-                        title: entry,
-                        nodes: mountedNodes,
-                        connections: mountedConnections,
-                        selectedNodeIds: [] as string[],
-                        viewport: { x: 0, y: 0, k: 1 },
-                    },
-                };
-                const unregister = registerCanvasGenerationLiveProject({
-                    scope,
-                    projectId,
-                    adapter: createCanvasGenerationLiveProjectAdapter({
-                        nodesRef,
-                        connectionsRef,
-                        chatSessionsRef,
-                        activeChatIdRef,
-                        setNodes: (value) => {
-                            mountedNodes = typeof value === "function" ? value(mountedNodes) : value;
-                            nodesRef.current = mountedNodes;
-                        },
-                        setConnections: (value) => {
-                            mountedConnections = typeof value === "function" ? value(mountedConnections) : value;
-                            connectionsRef.current = mountedConnections;
-                        },
-                        setChatSessions: (value) => {
-                            mountedSessions = typeof value === "function" ? value(mountedSessions) : value;
-                            chatSessionsRef.current = mountedSessions;
-                        },
-                        setActiveChatId: (value) => {
-                            mountedActiveChatId = typeof value === "function" ? value(mountedActiveChatId) : value;
-                            activeChatIdRef.current = mountedActiveChatId;
-                        },
-                    }),
-                });
-
-                const lateNodes = [
-                    node("node-cinematic-update", "late same entity edit"),
-                    node("node-ordinary-update", "ordinary late update"),
-                    node("node-anchor-a", "anchor a"),
-                    node("node-anchor-b", "anchor b"),
-                    node("node-cinematic-add", "late same cinematic add"),
-                    node("node-ordinary-add", "ordinary late add"),
-                ];
-                const lateConnections = [connection("connection-cinematic-update", 0.9), connection("connection-ordinary-update", 0.35), connection("connection-cinematic-add", 0.6), connection("connection-ordinary-add", 0.7)];
-                const lateSessions = [completedSession, ordinarySession("ordinary late during ack")];
-                currentEffectKey = effectKey;
-                failureMode = mode;
-                abortController = mode === "abort" ? new AbortController() : undefined;
-                ackTriggered = false;
-                beforeAckFailure = () => {
-                    mountedNodes = lateNodes;
-                    nodesRef.current = lateNodes;
-                    mountedConnections = lateConnections;
-                    connectionsRef.current = lateConnections;
-                    mountedSessions = lateSessions;
-                    chatSessionsRef.current = lateSessions;
-                    snapshotRef.current = { ...snapshotRef.current, nodes: lateNodes, connections: lateConnections };
-                    useCanvasStore.getState().updateProject(projectId, { nodes: lateNodes, connections: lateConnections, chatSessions: lateSessions });
-                };
-
-                let providerFailed = false;
-                const thrown = await canvasCinematicContinuationEntryAdapters[entry]({
-                    projectId,
-                    effectKey,
-                    signal: abortController?.signal,
-                    readSnapshot: () => snapshotRef.current,
-                    executeOps: async () => {
-                        mountedNodes = attemptedNodes;
-                        nodesRef.current = attemptedNodes;
-                        mountedConnections = attemptedConnections;
-                        connectionsRef.current = attemptedConnections;
-                        snapshotRef.current = { ...snapshotRef.current, nodes: attemptedNodes, connections: attemptedConnections };
-                        useCanvasStore.getState().updateProject(projectId, { nodes: attemptedNodes, connections: attemptedConnections });
-                        return { entry, mode };
-                    },
-                    completeSession: (key) => {
-                        expect(key, `${entry}/${mode} effect key`).toBe(effectKey);
-                        mountedSessions = attemptedSessions;
-                        chatSessionsRef.current = attemptedSessions;
-                        useCanvasStore.getState().updateProject(projectId, { chatSessions: attemptedSessions });
-                        return attemptedSessions;
-                    },
-                    readLiveSessionState: () => ({ sessions: mountedSessions, activeChatId: mountedActiveChatId }),
-                    restoreLiveSessions: (sessions: CanvasAssistantSession[], activeId: string | null) => {
-                        mountedSessions = sessions;
-                        chatSessionsRef.current = sessions;
-                        mountedActiveChatId = activeId;
-                        activeChatIdRef.current = activeId;
-                    },
-                    restoreLiveSnapshot: (state) => {
-                        snapshotRef.current = { ...snapshotRef.current, ...state };
-                    },
-                    failProvider: () => {
-                        providerFailed = true;
-                    },
-                }).then(
-                    () => undefined,
-                    (error) => error,
-                );
-                expect(providerFailed, `${entry}/${mode}`).toBe(false);
-                expect(thrown, `${entry}/${mode}`).toBeDefined();
-                if (mode === "abort") expect(thrown, entry).toMatchObject({ name: "AbortError" });
-                else expect(thrown, entry).toMatchObject({ name: "CanvasGenerationDurableAckError" });
-
-                await flushCanvasStorePersistence();
-                const byNodeId = new Map(mountedNodes.map((item) => [item.id, item]));
-                const byConnectionId = new Map(mountedConnections.map((item) => [item.id, item]));
-                expect(byNodeId.get("node-cinematic-update")?.title, `${entry}/${mode}`).toBe("previous update");
-                expect(byNodeId.get("node-cinematic-delete")?.title, `${entry}/${mode}`).toBe("previous delete");
-                expect(byNodeId.has("node-cinematic-add"), `${entry}/${mode}`).toBe(false);
-                expect(byNodeId.get("node-ordinary-update")?.title, `${entry}/${mode}`).toBe("ordinary late update");
-                expect(byNodeId.has("node-ordinary-delete"), `${entry}/${mode}`).toBe(false);
-                expect(byNodeId.get("node-ordinary-add")?.title, `${entry}/${mode}`).toBe("ordinary late add");
-                expect(byConnectionId.get("connection-cinematic-update")?.fromAnchorRatio, `${entry}/${mode}`).toBe(0.1);
-                expect(byConnectionId.get("connection-cinematic-delete")?.fromAnchorRatio, `${entry}/${mode}`).toBe(0.2);
-                expect(byConnectionId.has("connection-cinematic-add"), `${entry}/${mode}`).toBe(false);
-                expect(byConnectionId.get("connection-ordinary-update")?.fromAnchorRatio, `${entry}/${mode}`).toBe(0.35);
-                expect(byConnectionId.has("connection-ordinary-delete"), `${entry}/${mode}`).toBe(false);
-                expect(byConnectionId.get("connection-ordinary-add")?.fromAnchorRatio, `${entry}/${mode}`).toBe(0.7);
-                expect(mountedSessions.find((session) => session.id === cinematicSessionId)?.pendingBackendSession?.status, `${entry}/${mode}`).toBe("pending");
-                expect(mountedSessions.find((session) => session.id === ordinarySession("x").id)?.messages[0]?.text, `${entry}/${mode}`).toBe("ordinary late during ack");
-                expect(snapshotRef.current.nodes, `${entry}/${mode}`).toEqual(mountedNodes);
-                expect(snapshotRef.current.connections, `${entry}/${mode}`).toEqual(mountedConnections);
-                expect(nodesRef.current, `${entry}/${mode}`).toEqual(mountedNodes);
-                expect(connectionsRef.current, `${entry}/${mode}`).toEqual(mountedConnections);
-
-                const durable = JSON.parse(values.get(`${CANVAS_STORE_KEY}:user:${scope}`)!) as { state: { projects: CanvasProject[] } };
-                const durableProject = durable.state.projects.find((project) => project.id === projectId)!;
-                const durableNodes = new Map(durableProject.nodes.map((item) => [item.id, item]));
-                const durableConnections = new Map(durableProject.connections.map((item) => [item.id, item]));
-                expect(durableNodes.get("node-cinematic-update")?.title, `${entry}/${mode} durable`).toBe("previous update");
-                expect(durableNodes.has("node-cinematic-add"), `${entry}/${mode} durable`).toBe(false);
-                expect(durableNodes.get("node-ordinary-update")?.title, `${entry}/${mode} durable`).toBe("ordinary late update");
-                expect(durableNodes.get("node-ordinary-add")?.title, `${entry}/${mode} durable`).toBe("ordinary late add");
-                expect(durableConnections.get("connection-cinematic-update")?.fromAnchorRatio, `${entry}/${mode} durable`).toBe(0.1);
-                expect(durableConnections.has("connection-cinematic-add"), `${entry}/${mode} durable`).toBe(false);
-                expect(durableConnections.get("connection-ordinary-update")?.fromAnchorRatio, `${entry}/${mode} durable`).toBe(0.35);
-                expect(durableConnections.get("connection-ordinary-add")?.fromAnchorRatio, `${entry}/${mode} durable`).toBe(0.7);
-
-                unregister();
-                currentEffectKey = "";
-                beforeAckFailure = undefined;
-                abortController = undefined;
-            }
-
-            const providerError = new Error(`provider failed ${entry}`);
-            let providerFailed = false;
-            const providerThrown = await canvasCinematicContinuationEntryAdapters[entry]({
-                projectId: `provider-project-${entry}`,
-                readSnapshot: () => ({ projectId: `provider-project-${entry}`, title: entry, nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } }),
-                executeOps: async () => {
-                    throw providerError;
-                },
-                completeSession: () => [],
-                readLiveSessionState: () => ({ sessions: [], activeChatId: null }),
-                restoreLiveSessions: () => undefined,
-                restoreLiveSnapshot: () => undefined,
-                failProvider: (error) => {
-                    expect(error, `${entry} provider error identity`).toBe(providerError);
-                    providerFailed = true;
-                },
-            }).then(
-                () => undefined,
-                (error) => error,
-            );
-            expect(providerThrown, `${entry} provider throw identity`).toBe(providerError);
-            expect(providerFailed, `${entry} provider failed`).toBe(true);
-        }
-    } finally {
-        setActiveUserScope(previousScope);
-        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
-        localforage.getItem = originalGetItem;
-        localforage.setItem = originalSetItem;
-        if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-        else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
-    }
-});
-
 test("cinematic active rollback restores previous only while live still equals attempted", async () => {
     const originalWindow = (globalThis as { window?: unknown }).window;
     const originalGetItem = localforage.getItem.bind(localforage);
@@ -2922,650 +2621,6 @@ test("cinematic active rollback restores previous only while live still equals a
     } finally {
         currentEffectKey = "";
         beforeAckFailure = undefined;
-        setActiveUserScope(previousScope);
-        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
-        localforage.getItem = originalGetItem;
-        localforage.setItem = originalSetItem;
-        if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-        else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
-    }
-});
-
-test("cinematic shared boundary derives attempted active chat from the completed live session state", async () => {
-    const projectId = "canvas-cinematic-attempted-active";
-    const effectKey = "cinematic-effect:attempted-active";
-    const cinematicSessionId = "session-a-attempted-active";
-    const activeSessionId = "session-b-attempted-active";
-    const pendingSession: CanvasAssistantSession = {
-        id: cinematicSessionId,
-        title: "cinematic pending",
-        pendingBackendSession: { id: "backend-attempted-active", kind: "cinematic", messageId: "message-attempted-active", status: "pending", startedAt: "2026-08-14T00:00:00.000Z" },
-        messages: [{ id: "message-attempted-active", role: "assistant", text: "pending" }],
-        createdAt: "2026-08-14T00:00:00.000Z",
-        updatedAt: "2026-08-14T00:00:00.000Z",
-    };
-    const activeSession: CanvasAssistantSession = { id: activeSessionId, title: "active B", messages: [], createdAt: "2026-08-14T00:00:00.000Z", updatedAt: "2026-08-14T00:00:00.000Z" };
-    const completedSession: CanvasAssistantSession = {
-        ...pendingSession,
-        pendingBackendSession: undefined,
-        generationEffectKeys: [effectKey],
-        updatedAt: "2026-08-14T00:01:00.000Z",
-    };
-    let liveState = { sessions: [pendingSession, activeSession], activeChatId: activeSessionId as string | null };
-    let persistedActiveChatId: string | null | undefined;
-
-    await canvasCinematicContinuationEntryAdapters["resume-cinematic"]({
-        projectId,
-        effectKey,
-        readSnapshot: () => ({ projectId, title: "attempted active", nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } }),
-        executeOps: async () => undefined,
-        completeSession: () => {
-            liveState = { sessions: [completedSession, activeSession], activeChatId: activeSessionId };
-            return liveState.sessions;
-        },
-        readLiveSessionState: () => liveState,
-        restoreLiveSessions: () => undefined,
-        restoreLiveSnapshot: () => undefined,
-        failProvider: () => {
-            throw new Error("provider failure must not run");
-        },
-        persistContinuation: async (input) => {
-            persistedActiveChatId = input.activeChatId;
-            return { ...storedCanvasProject(projectId, "attempted active"), chatSessions: input.chatSessions, activeChatId: input.activeChatId };
-        },
-    });
-
-    expect(persistedActiveChatId).toBe(activeSessionId);
-});
-
-test("resume cinematic continuation preserves a non-current active chat across failure switches", async () => {
-    const originalWindow = (globalThis as { window?: unknown }).window;
-    const originalGetItem = localforage.getItem.bind(localforage);
-    const originalSetItem = localforage.setItem.bind(localforage);
-    const previousScope = getActiveUserScope();
-    const previousProjects = useCanvasStore.getState().projects;
-    const values = new Map<string, string>();
-    const localStorageValues = new Map<string, string>();
-    Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: {
-            localStorage: {
-                getItem: (key: string) => localStorageValues.get(key) ?? null,
-                setItem: (key: string, value: string) => localStorageValues.set(key, value),
-                removeItem: (key: string) => localStorageValues.delete(key),
-            },
-        },
-    });
-
-    let currentEffectKey = "";
-    let failureMode: "error" | "abort" = "error";
-    let abortController: AbortController | undefined;
-    let beforeGenerationWrite: (() => void) | undefined;
-    localforage.getItem = (async (key: string) => values.get(key) ?? null) as typeof localforage.getItem;
-    localforage.setItem = (async (key: string, value: string) => {
-        if (currentEffectKey && value.includes(currentEffectKey)) {
-            beforeGenerationWrite?.();
-            if (failureMode === "abort") {
-                abortController?.abort();
-                throw abortController?.signal.reason ?? new DOMException("The operation was aborted", "AbortError");
-            }
-            throw new Error("resume cinematic durable ack failed");
-        }
-        values.set(key, value);
-        return value;
-    }) as typeof localforage.setItem;
-
-    try {
-        for (const mode of ["error", "abort"] as const) {
-            const scope = `resume-active-${mode}`;
-            const projectId = `canvas-resume-active-${mode}`;
-            const effectKey = `cinematic-effect:resume-active-${mode}`;
-            const backendSessionId = `backend-resume-active-${mode}`;
-            const cinematicSessionId = `session-a-${mode}`;
-            const sessionBId = `session-b-${mode}`;
-            const sessionCId = `session-c-${mode}`;
-            const cinematicMessageId = `message-a-${mode}`;
-            const pendingSession: CanvasAssistantSession = {
-                id: cinematicSessionId,
-                title: "cinematic pending",
-                pendingBackendSession: { id: backendSessionId, kind: "cinematic", messageId: cinematicMessageId, status: "pending", startedAt: "2026-08-14T00:00:00.000Z" },
-                messages: [{ id: cinematicMessageId, role: "assistant", text: "pending", detail: { kind: "cinematic", backendSessionId, status: "pending" } }],
-                createdAt: "2026-08-14T00:00:00.000Z",
-                updatedAt: "2026-08-14T00:00:00.000Z",
-            };
-            const ordinarySession = (id: string, title: string): CanvasAssistantSession => ({
-                id,
-                title,
-                messages: [{ id: `${id}-message`, role: "user", text: title }],
-                createdAt: "2026-08-14T00:00:00.000Z",
-                updatedAt: "2026-08-14T00:00:00.000Z",
-            });
-            const sessionB = ordinarySession(sessionBId, "session B");
-            const sessionC = ordinarySession(sessionCId, "session C");
-            const completedSession: CanvasAssistantSession = {
-                ...pendingSession,
-                pendingBackendSession: undefined,
-                generationEffectKeys: [effectKey],
-                messages: [{ id: cinematicMessageId, role: "assistant", text: "completed", detail: { kind: "cinematic", backendSessionId, status: "completed" } }],
-                updatedAt: "2026-08-14T00:01:00.000Z",
-            };
-            const previousSessions = [pendingSession, sessionB, sessionC];
-            const completedSessions = [completedSession, sessionB, sessionC];
-            const baseProject: CanvasProject = { ...storedCanvasProject(projectId, mode), chatSessions: previousSessions, activeChatId: sessionBId };
-
-            setActiveUserScope(scope);
-            useCanvasStore.setState({ projects: [baseProject] });
-            await flushCanvasStorePersistence();
-
-            let panelSessions = previousSessions;
-            let panelActiveChatId: string | null = sessionBId;
-            const nodesRef = { current: [] as CanvasNodeData[] };
-            const connectionsRef = { current: [] as CanvasConnection[] };
-            const chatSessionsRef = { current: previousSessions };
-            const activeChatIdRef = { current: sessionBId as string | null };
-            let reactSessions = previousSessions;
-            let reactActiveChatId: string | null = sessionBId;
-            const snapshotRef = {
-                current: { projectId, title: mode, nodes: [] as CanvasNodeData[], connections: [] as CanvasConnection[], selectedNodeIds: [] as string[], viewport: { x: 0, y: 0, k: 1 } },
-            };
-            const unregister = registerCanvasGenerationLiveProject({
-                scope,
-                projectId,
-                adapter: createCanvasGenerationLiveProjectAdapter({
-                    nodesRef,
-                    connectionsRef,
-                    chatSessionsRef,
-                    activeChatIdRef,
-                    setNodes: (value) => {
-                        nodesRef.current = typeof value === "function" ? value(nodesRef.current) : value;
-                    },
-                    setConnections: (value) => {
-                        connectionsRef.current = typeof value === "function" ? value(connectionsRef.current) : value;
-                    },
-                    setChatSessions: (value) => {
-                        reactSessions = typeof value === "function" ? value(reactSessions) : value;
-                        chatSessionsRef.current = reactSessions;
-                    },
-                    setActiveChatId: (value) => {
-                        reactActiveChatId = typeof value === "function" ? value(reactActiveChatId) : value;
-                        activeChatIdRef.current = reactActiveChatId;
-                    },
-                }),
-            });
-
-            currentEffectKey = effectKey;
-            failureMode = mode;
-            abortController = mode === "abort" ? new AbortController() : undefined;
-            beforeGenerationWrite = () => {
-                panelActiveChatId = sessionCId;
-                activeChatIdRef.current = sessionCId;
-                reactActiveChatId = sessionCId;
-                useCanvasStore.getState().updateProject(projectId, { activeChatId: sessionCId });
-            };
-
-            let providerFailed = false;
-            const thrown = await canvasCinematicContinuationEntryAdapters["resume-cinematic"]({
-                projectId,
-                effectKey,
-                signal: abortController?.signal,
-                readSnapshot: () => snapshotRef.current,
-                executeOps: async () => undefined,
-                completeSession: (key) => {
-                    expect(key, mode).toBe(effectKey);
-                    panelSessions = completedSessions;
-                    return completedSessions;
-                },
-                readLiveSessionState: () => ({ sessions: panelSessions, activeChatId: panelActiveChatId }),
-                restoreLiveSessions: (sessions, activeChatId) => {
-                    panelSessions = sessions;
-                    panelActiveChatId = activeChatId;
-                },
-                restoreLiveSnapshot: () => undefined,
-                failProvider: () => {
-                    providerFailed = true;
-                },
-            }).then(
-                () => undefined,
-                (error) => error,
-            );
-
-            expect(providerFailed, mode).toBe(false);
-            if (mode === "abort") expect(thrown, mode).toMatchObject({ name: "AbortError" });
-            else expect(thrown, mode).toMatchObject({ name: "CanvasGenerationDurableAckError" });
-            await flushCanvasStorePersistence();
-
-            const durable = JSON.parse(values.get(`${CANVAS_STORE_KEY}:user:${scope}`)!) as { state: { projects: CanvasProject[] } };
-            const durableProject = durable.state.projects.find((project) => project.id === projectId)!;
-            expect(panelActiveChatId, `${mode} panel`).toBe(sessionCId);
-            expect(activeChatIdRef.current, `${mode} page ref`).toBe(sessionCId);
-            expect(reactActiveChatId, `${mode} react`).toBe(sessionCId);
-            expect(useCanvasStore.getState().projects.find((project) => project.id === projectId)?.activeChatId, `${mode} zustand`).toBe(sessionCId);
-            expect(durableProject.activeChatId, `${mode} durable`).toBe(sessionCId);
-            expect(panelSessions.find((session) => session.id === cinematicSessionId)?.pendingBackendSession?.status, mode).toBe("pending");
-            expect(chatSessionsRef.current.find((session) => session.id === cinematicSessionId)?.pendingBackendSession?.status, mode).toBe("pending");
-            expect(reactSessions.find((session) => session.id === cinematicSessionId)?.pendingBackendSession?.status, mode).toBe("pending");
-
-            unregister();
-            currentEffectKey = "";
-            beforeGenerationWrite = undefined;
-            abortController = undefined;
-        }
-    } finally {
-        setActiveUserScope(previousScope);
-        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
-        localforage.getItem = originalGetItem;
-        localforage.setItem = originalSetItem;
-        if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-        else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
-    }
-});
-
-test("resume cinematic continuation persists the real completed active chat on success", async () => {
-    const originalWindow = (globalThis as { window?: unknown }).window;
-    const originalGetItem = localforage.getItem.bind(localforage);
-    const originalSetItem = localforage.setItem.bind(localforage);
-    const previousScope = getActiveUserScope();
-    const previousProjects = useCanvasStore.getState().projects;
-    const values = new Map<string, string>();
-    const localStorageValues = new Map<string, string>();
-    Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: {
-            localStorage: {
-                getItem: (key: string) => localStorageValues.get(key) ?? null,
-                setItem: (key: string, value: string) => localStorageValues.set(key, value),
-                removeItem: (key: string) => localStorageValues.delete(key),
-            },
-        },
-    });
-    localforage.getItem = (async (key: string) => values.get(key) ?? null) as typeof localforage.getItem;
-    localforage.setItem = (async (key: string, value: string) => {
-        values.set(key, value);
-        return value;
-    }) as typeof localforage.setItem;
-
-    const scope = "resume-active-success";
-    const projectId = "canvas-resume-active-success";
-    const effectKey = "cinematic-effect:resume-active-success";
-    const cinematicSessionId = "session-a-success";
-    const sessionBId = "session-b-success";
-    const pendingSession: CanvasAssistantSession = {
-        id: cinematicSessionId,
-        title: "cinematic pending",
-        pendingBackendSession: { id: "backend-resume-active-success", kind: "cinematic", messageId: "message-a-success", status: "pending", startedAt: "2026-08-14T00:00:00.000Z" },
-        messages: [{ id: "message-a-success", role: "assistant", text: "pending", detail: { kind: "cinematic", backendSessionId: "backend-resume-active-success", status: "pending" } }],
-        createdAt: "2026-08-14T00:00:00.000Z",
-        updatedAt: "2026-08-14T00:00:00.000Z",
-    };
-    const sessionB: CanvasAssistantSession = { id: sessionBId, title: "session B", messages: [], createdAt: "2026-08-14T00:00:00.000Z", updatedAt: "2026-08-14T00:00:00.000Z" };
-    const completedSession: CanvasAssistantSession = {
-        ...pendingSession,
-        pendingBackendSession: undefined,
-        generationEffectKeys: [effectKey],
-        messages: [{ id: "message-a-success", role: "assistant", text: "completed", detail: { kind: "cinematic", backendSessionId: "backend-resume-active-success", status: "completed" } }],
-        updatedAt: "2026-08-14T00:01:00.000Z",
-    };
-    const previousSessions = [pendingSession, sessionB];
-    const completedSessions = [completedSession, sessionB];
-    const baseProject: CanvasProject = { ...storedCanvasProject(projectId, "resume success"), chatSessions: previousSessions, activeChatId: sessionBId };
-
-    try {
-        setActiveUserScope(scope);
-        useCanvasStore.setState({ projects: [baseProject] });
-        await flushCanvasStorePersistence();
-
-        let mountedSessions = previousSessions;
-        let mountedActiveChatId: string | null = sessionBId;
-        const activeChatIdRef = { current: sessionBId as string | null };
-        let reactActiveChatId: string | null = sessionBId;
-        const unregister = registerCanvasGenerationLiveProject({
-            scope,
-            projectId,
-            adapter: createCanvasGenerationLiveProjectAdapter({
-                nodesRef: { current: [] },
-                connectionsRef: { current: [] },
-                chatSessionsRef: { current: previousSessions },
-                activeChatIdRef,
-                setNodes: () => undefined,
-                setConnections: () => undefined,
-                setChatSessions: () => undefined,
-                setActiveChatId: (value) => {
-                    reactActiveChatId = typeof value === "function" ? value(reactActiveChatId) : value;
-                    activeChatIdRef.current = reactActiveChatId;
-                },
-            }),
-        });
-
-        await canvasCinematicContinuationEntryAdapters["resume-cinematic"]({
-            projectId,
-            effectKey,
-            readSnapshot: () => ({ projectId, title: "resume success", nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } }),
-            executeOps: async () => undefined,
-            completeSession: () => {
-                mountedSessions = completedSessions;
-                return completedSessions;
-            },
-            readLiveSessionState: () => ({ sessions: mountedSessions, activeChatId: mountedActiveChatId }),
-            restoreLiveSessions: (sessions, activeChatId) => {
-                mountedSessions = sessions;
-                mountedActiveChatId = activeChatId;
-            },
-            restoreLiveSnapshot: () => undefined,
-            failProvider: () => {
-                throw new Error("provider failure must not run on success");
-            },
-        });
-
-        const durable = JSON.parse(values.get(`${CANVAS_STORE_KEY}:user:${scope}`)!) as { state: { projects: CanvasProject[] } };
-        const durableProject = durable.state.projects.find((project) => project.id === projectId)!;
-        expect(mountedActiveChatId).toBe(sessionBId);
-        expect(activeChatIdRef.current).toBe(sessionBId);
-        expect(reactActiveChatId).toBe(sessionBId);
-        expect(useCanvasStore.getState().projects.find((project) => project.id === projectId)?.activeChatId).toBe(sessionBId);
-        expect(durableProject.activeChatId).toBe(sessionBId);
-        expect(durableProject.chatSessions.find((session) => session.id === cinematicSessionId)?.generationEffectKeys).toContain(effectKey);
-
-        unregister();
-    } finally {
-        setActiveUserScope(previousScope);
-        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
-        localforage.getItem = originalGetItem;
-        localforage.setItem = originalSetItem;
-        if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-        else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
-    }
-});
-
-test("cinematic generation commit point survives an abort fired after the durable setItem resolves", async () => {
-    const originalWindow = (globalThis as { window?: unknown }).window;
-    const originalGetItem = localforage.getItem.bind(localforage);
-    const originalSetItem = localforage.setItem.bind(localforage);
-    const previousScope = getActiveUserScope();
-    const previousProjects = useCanvasStore.getState().projects;
-    const values = new Map<string, string>();
-    const localStorageValues = new Map<string, string>();
-    Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: {
-            localStorage: {
-                getItem: (key: string) => localStorageValues.get(key) ?? null,
-                setItem: (key: string, value: string) => localStorageValues.set(key, value),
-                removeItem: (key: string) => localStorageValues.delete(key),
-            },
-        },
-    });
-
-    let currentEffectKey = "";
-    let postWriteAbortController: AbortController | undefined;
-    let generationWrites = 0;
-    localforage.getItem = (async (key: string) => values.get(key) ?? null) as typeof localforage.getItem;
-    localforage.setItem = (async (key: string, value: string) => {
-        values.set(key, value);
-        if (currentEffectKey && value.includes(currentEffectKey)) {
-            generationWrites += 1;
-            postWriteAbortController?.abort();
-        }
-        return value;
-    }) as typeof localforage.setItem;
-
-    try {
-        for (const entry of ["online-tool", "submit-cinematic", "resume-cinematic"] as const) {
-            const scope = `cinematic-post-write-abort-${entry}`;
-            const projectId = `canvas-post-write-abort-${entry}`;
-            const effectKey = `cinematic-effect:post-write-abort-${entry}`;
-            const sessionId = `session-post-write-abort-${entry}`;
-            const messageId = `message-post-write-abort-${entry}`;
-            const pendingSession: CanvasAssistantSession = {
-                id: sessionId,
-                title: "cinematic pending",
-                pendingBackendSession: { id: `backend-${entry}`, kind: "cinematic", messageId, status: "pending", startedAt: "2026-08-14T00:00:00.000Z" },
-                messages: [{ id: messageId, role: "assistant", text: "pending", detail: { kind: "cinematic", backendSessionId: `backend-${entry}`, status: "pending" } }],
-                createdAt: "2026-08-14T00:00:00.000Z",
-                updatedAt: "2026-08-14T00:00:00.000Z",
-            };
-            const completedSession: CanvasAssistantSession = {
-                ...pendingSession,
-                pendingBackendSession: undefined,
-                generationEffectKeys: [effectKey],
-                messages: [{ id: messageId, role: "assistant", text: "completed", detail: { kind: "cinematic", backendSessionId: `backend-${entry}`, status: "completed" } }],
-                updatedAt: "2026-08-14T00:01:00.000Z",
-            };
-            const baseProject: CanvasProject = { ...storedCanvasProject(projectId, entry), chatSessions: [pendingSession], activeChatId: sessionId };
-            setActiveUserScope(scope);
-            useCanvasStore.setState({ projects: [baseProject] });
-            await flushCanvasStorePersistence();
-
-            let mountedSessions = [pendingSession];
-            let mountedActiveChatId: string | null = sessionId;
-            const chatSessionsRef = { current: mountedSessions };
-            const activeChatIdRef = { current: mountedActiveChatId };
-            let reactSessions = mountedSessions;
-            let reactActiveChatId: string | null = mountedActiveChatId;
-            const unregister = registerCanvasGenerationLiveProject({
-                scope,
-                projectId,
-                adapter: createCanvasGenerationLiveProjectAdapter({
-                    nodesRef: { current: [] },
-                    connectionsRef: { current: [] },
-                    chatSessionsRef,
-                    activeChatIdRef,
-                    setNodes: () => undefined,
-                    setConnections: () => undefined,
-                    setChatSessions: (value) => {
-                        reactSessions = typeof value === "function" ? value(reactSessions) : value;
-                        chatSessionsRef.current = reactSessions;
-                    },
-                    setActiveChatId: (value) => {
-                        reactActiveChatId = typeof value === "function" ? value(reactActiveChatId) : value;
-                        activeChatIdRef.current = reactActiveChatId;
-                    },
-                }),
-            });
-
-            currentEffectKey = effectKey;
-            postWriteAbortController = new AbortController();
-            const writesBefore = generationWrites;
-            let executeCount = 0;
-            let providerFailed = false;
-            const result = await canvasCinematicContinuationEntryAdapters[entry]({
-                projectId,
-                effectKey,
-                signal: postWriteAbortController.signal,
-                readSnapshot: () => ({ projectId, title: entry, nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } }),
-                executeOps: async () => {
-                    executeCount += 1;
-                    return `${entry}-completed`;
-                },
-                completeSession: () => {
-                    mountedSessions = [completedSession];
-                    chatSessionsRef.current = mountedSessions;
-                    reactSessions = mountedSessions;
-                    useCanvasStore.getState().updateProject(projectId, { chatSessions: mountedSessions });
-                    return mountedSessions;
-                },
-                readLiveSessionState: () => ({ sessions: mountedSessions, activeChatId: mountedActiveChatId }),
-                restoreLiveSessions: (sessions, activeChatId) => {
-                    mountedSessions = sessions;
-                    mountedActiveChatId = activeChatId;
-                },
-                restoreLiveSnapshot: () => undefined,
-                failProvider: () => {
-                    providerFailed = true;
-                },
-            });
-
-            expect(result, entry).toBe(`${entry}-completed`);
-            expect(providerFailed, entry).toBe(false);
-            expect(executeCount, entry).toBe(1);
-            expect(generationWrites - writesBefore, entry).toBe(1);
-            const durable = JSON.parse(values.get(`${CANVAS_STORE_KEY}:user:${scope}`)!) as { state: { projects: CanvasProject[] } };
-            const durableSession = durable.state.projects.find((project) => project.id === projectId)?.chatSessions.find((session) => session.id === sessionId);
-            expect(durableSession?.pendingBackendSession, entry).toBeUndefined();
-            expect(durableSession?.generationEffectKeys, entry).toContain(effectKey);
-            expect(durableSession?.messages[0]?.detail).toMatchObject({ status: "completed" });
-            expect(mountedSessions[0]?.pendingBackendSession, entry).toBeUndefined();
-            expect(mountedSessions[0]?.generationEffectKeys, entry).toContain(effectKey);
-            expect(chatSessionsRef.current[0]?.generationEffectKeys, entry).toContain(effectKey);
-            expect(reactSessions[0]?.generationEffectKeys, entry).toContain(effectKey);
-
-            if (!mountedSessions[0]?.generationEffectKeys?.includes(effectKey)) {
-                await canvasCinematicContinuationEntryAdapters[entry]({
-                    projectId,
-                    effectKey,
-                    readSnapshot: () => ({ projectId, title: entry, nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } }),
-                    executeOps: async () => {
-                        executeCount += 1;
-                        return `${entry}-replayed`;
-                    },
-                    completeSession: () => mountedSessions,
-                    readLiveSessionState: () => ({ sessions: mountedSessions, activeChatId: mountedActiveChatId }),
-                    restoreLiveSessions: () => undefined,
-                    restoreLiveSnapshot: () => undefined,
-                    failProvider: () => undefined,
-                });
-            }
-            expect(executeCount, `${entry} replay`).toBe(1);
-
-            unregister();
-            currentEffectKey = "";
-            postWriteAbortController = undefined;
-        }
-    } finally {
-        setActiveUserScope(previousScope);
-        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
-        localforage.getItem = originalGetItem;
-        localforage.setItem = originalSetItem;
-        if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-        else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
-    }
-});
-
-test("cinematic committed generation survives later ordinary persistence and final-read errors", async () => {
-    const originalWindow = (globalThis as { window?: unknown }).window;
-    const originalGetItem = localforage.getItem.bind(localforage);
-    const originalSetItem = localforage.setItem.bind(localforage);
-    const previousScope = getActiveUserScope();
-    const previousProjects = useCanvasStore.getState().projects;
-    const values = new Map<string, string>();
-    const localStorageValues = new Map<string, string>();
-    Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: {
-            localStorage: {
-                getItem: (key: string) => localStorageValues.get(key) ?? null,
-                setItem: (key: string, value: string) => localStorageValues.set(key, value),
-                removeItem: (key: string) => localStorageValues.delete(key),
-            },
-        },
-    });
-
-    let currentEffectKey = "";
-    let generationCommitted = false;
-    let generationWriteHandled = false;
-    let failOrdinaryWrite = false;
-    let failFinalRead = false;
-    let projectIdForLateEdit = "";
-    localforage.getItem = (async (key: string) => {
-        if (generationCommitted && failFinalRead) {
-            failFinalRead = false;
-            throw new Error("post-commit final read failed");
-        }
-        return values.get(key) ?? null;
-    }) as typeof localforage.getItem;
-    localforage.setItem = (async (key: string, value: string) => {
-        if (!generationWriteHandled && currentEffectKey && value.includes(currentEffectKey)) {
-            generationWriteHandled = true;
-            values.set(key, value);
-            generationCommitted = true;
-            if (failOrdinaryWrite) useCanvasStore.getState().updateProject(projectIdForLateEdit, { showImageInfo: true });
-            return value;
-        }
-        if (generationCommitted && failOrdinaryWrite) {
-            failOrdinaryWrite = false;
-            throw new Error("post-commit ordinary write failed");
-        }
-        values.set(key, value);
-        return value;
-    }) as typeof localforage.setItem;
-
-    try {
-        for (const mode of ["ordinary-write-error", "final-read-error"] as const) {
-            const scope = `cinematic-post-commit-${mode}`;
-            const projectId = `canvas-post-commit-${mode}`;
-            const effectKey = `cinematic-effect:post-commit-${mode}`;
-            const sessionId = `session-post-commit-${mode}`;
-            const messageId = `message-post-commit-${mode}`;
-            const pendingSession: CanvasAssistantSession = {
-                id: sessionId,
-                title: "pending",
-                pendingBackendSession: { id: `backend-${mode}`, kind: "cinematic", messageId, status: "pending", startedAt: "2026-08-14T00:00:00.000Z" },
-                messages: [{ id: messageId, role: "assistant", text: "pending", detail: { kind: "cinematic", backendSessionId: `backend-${mode}`, status: "pending" } }],
-                createdAt: "2026-08-14T00:00:00.000Z",
-                updatedAt: "2026-08-14T00:00:00.000Z",
-            };
-            const completedSession: CanvasAssistantSession = {
-                ...pendingSession,
-                pendingBackendSession: undefined,
-                generationEffectKeys: [effectKey],
-                messages: [{ id: messageId, role: "assistant", text: "completed", detail: { kind: "cinematic", backendSessionId: `backend-${mode}`, status: "completed" } }],
-                updatedAt: "2026-08-14T00:01:00.000Z",
-            };
-            const baseProject: CanvasProject = { ...storedCanvasProject(projectId, mode), chatSessions: [pendingSession], activeChatId: sessionId, showImageInfo: false };
-            setActiveUserScope(scope);
-            useCanvasStore.setState({ projects: [baseProject] });
-            await flushCanvasStorePersistence();
-
-            let mountedSessions = [pendingSession];
-            currentEffectKey = effectKey;
-            generationCommitted = false;
-            generationWriteHandled = false;
-            projectIdForLateEdit = projectId;
-            failOrdinaryWrite = mode === "ordinary-write-error";
-            failFinalRead = mode === "final-read-error";
-
-            const result = await canvasCinematicContinuationEntryAdapters["online-tool"]({
-                projectId,
-                effectKey,
-                readSnapshot: () => ({ projectId, title: mode, nodes: [], connections: [], selectedNodeIds: [], viewport: { x: 0, y: 0, k: 1 } }),
-                executeOps: async () => mode,
-                completeSession: () => {
-                    mountedSessions = [completedSession];
-                    useCanvasStore.getState().updateProject(projectId, { chatSessions: mountedSessions });
-                    return mountedSessions;
-                },
-                readLiveSessionState: () => ({ sessions: mountedSessions, activeChatId: sessionId }),
-                restoreLiveSessions: (sessions) => {
-                    mountedSessions = sessions;
-                },
-                restoreLiveSnapshot: () => undefined,
-                failProvider: () => {
-                    throw new Error("post-commit errors must not be classified as provider failures");
-                },
-            });
-
-            expect(result, mode).toBe(mode);
-            const committed = JSON.parse(values.get(`${CANVAS_STORE_KEY}:user:${scope}`)!) as { state: { projects: CanvasProject[] } };
-            const committedProject = committed.state.projects.find((project) => project.id === projectId)!;
-            expect(committedProject.chatSessions[0]?.generationEffectKeys, mode).toContain(effectKey);
-            expect(committedProject.chatSessions[0]?.pendingBackendSession, mode).toBeUndefined();
-
-            if (mode === "ordinary-write-error") {
-                expect(useCanvasStore.getState().projects.find((project) => project.id === projectId)?.showImageInfo).toBe(true);
-                await flushCanvasStorePersistence();
-                const retried = JSON.parse(values.get(`${CANVAS_STORE_KEY}:user:${scope}`)!) as { state: { projects: CanvasProject[] } };
-                const retriedProject = retried.state.projects.find((project) => project.id === projectId)!;
-                expect(retriedProject.showImageInfo).toBe(true);
-                expect(retriedProject.chatSessions[0]?.generationEffectKeys).toContain(effectKey);
-                expect(retriedProject.chatSessions[0]?.pendingBackendSession).toBeUndefined();
-            }
-
-            currentEffectKey = "";
-            generationCommitted = false;
-            generationWriteHandled = false;
-            failOrdinaryWrite = false;
-            failFinalRead = false;
-        }
-    } finally {
         setActiveUserScope(previousScope);
         withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
         localforage.getItem = originalGetItem;
@@ -4089,10 +3144,10 @@ test("account scope transition drains an active remote deletion before entering 
     apiClient.defaults.adapter = async (config) => {
         const url = String(config.url || "");
         requestUrls.push(url);
-        if (config.method === "delete") {
+        if (config.method === "post" && url === "/assets/batch-delete") {
             deleteStarted = true;
             await deleteReleased;
-            return { data: { code: 0, data: { id: "shared-asset" }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+            return { data: { code: 0, data: { ids: ["shared-asset"] }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
         }
         const data = url.includes("user-data/snapshot") ? { projects: [], assets: [] } : url.includes("canvas-projects") ? { projects: [] } : { assets: [] };
         return { data: { code: 0, data, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
@@ -4142,7 +3197,7 @@ test("account scope transition drains an active remote deletion before entering 
             },
         ]);
         const deletion = deleteAssetWithRemoteSync("shared-asset");
-        await new Promise<void>((resolve) => queueMicrotask(resolve));
+        for (let attempt = 0; attempt < 10 && !deleteStarted; attempt += 1) await Promise.resolve();
         expect(deleteStarted).toBe(true);
         let transitionEntered = false;
         const transition = withRemoteUserDataSyncExclusive(async () => {
@@ -4417,6 +3472,14 @@ test("failed remote baseline cannot upload stale local cache", async () => {
 
 test("incremental sessions leave cached entities untouched and fetch only the opened canvas", async () => {
     const originalWindow = (globalThis as { window?: unknown }).window;
+    const originalGetItem = localforage.getItem.bind(localforage);
+    const originalSetItem = localforage.setItem.bind(localforage);
+    const durableValues = new Map<string, string>();
+    localforage.getItem = (async (key: string) => durableValues.get(key) ?? null) as typeof localforage.getItem;
+    localforage.setItem = (async (key: string, value: string) => {
+        durableValues.set(key, value);
+        return value;
+    }) as typeof localforage.setItem;
     Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout: () => 1, clearTimeout: () => undefined, localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined } } });
     const previousAdapter = apiClient.defaults.adapter;
     const previousProjects = useCanvasStore.getState().projects;
@@ -4437,14 +3500,16 @@ test("incremental sessions leave cached entities untouched and fetch only the op
         expect(requests).toEqual([]);
         expect((await loadCanvasProjectForEditing(remote.id))?.title).toBe("Remote");
         await loadCanvasProjectForEditing(remote.id);
-        expect(requests).toEqual(["get /canvas-projects/remote-opened"]);
+        expect(requests).toEqual(["get /canvas-projects/remote-opened", "get /canvas-projects/remote-opened"]);
         expect(useCanvasStore.getState().projects.map((project) => project.id)).toEqual([cached.id, remote.id]);
         useCanvasStore.setState({ projects: [remote] });
         await saveRemoteUserDataNow();
-        expect(requests).toEqual(["get /canvas-projects/remote-opened"]);
+        expect(requests).toEqual(["get /canvas-projects/remote-opened", "get /canvas-projects/remote-opened"]);
     } finally {
         resetRemoteUserDataSync();
         apiClient.defaults.adapter = previousAdapter;
+        localforage.getItem = originalGetItem;
+        localforage.setItem = originalSetItem;
         useCanvasStore.setState({ projects: previousProjects });
         useAssetStore.setState({ assets: previousAssets });
         if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
@@ -4656,7 +3721,7 @@ test("canvas asset repair backfills node and timeline media with one shared asse
     }
 });
 
-test("login repair persists the missing asset before its canvas", async () => {
+test("explicit canvas asset repair persists the missing asset before its canvas", async () => {
     const originalWindow = (globalThis as { window?: unknown }).window;
     const originalGetItem = localforage.getItem.bind(localforage);
     const originalSetItem = localforage.setItem.bind(localforage);
@@ -4666,6 +3731,7 @@ test("login repair persists the missing asset before its canvas", async () => {
     const writes: Array<{ kind: "asset" | "canvas"; body: Record<string, unknown> }> = [];
     const project: CanvasProject = {
         ...storedCanvasProject("canvas-remote-ghost", "待修复画布"),
+        revision: 1,
         nodes: [
             {
                 id: "remote-image",
@@ -4697,14 +3763,20 @@ test("login repair persists the missing asset before its canvas", async () => {
         }
         const body = (typeof config.data === "string" ? JSON.parse(config.data) : config.data) as Record<string, unknown>;
         if (method === "put" && url.startsWith("/assets/")) writes.push({ kind: "asset", body });
-        else if (method === "put" && url.startsWith("/canvas-projects/")) writes.push({ kind: "canvas", body });
-        else throw new Error(`unexpected request: ${method} ${url}`);
+        else if (method === "put" && url.startsWith("/canvas-projects/")) {
+            writes.push({ kind: "canvas", body });
+            const saved = body.project as CanvasProject;
+            return { data: { code: 0, data: { project: { ...saved, revision: (saved.revision || 0) + 1 } }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+        } else throw new Error(`unexpected request: ${method} ${url}`);
         return { data: { code: 0, data: {}, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
     };
 
     try {
         resetRemoteUserDataSync();
         await syncRemoteUserData("account-repair-order");
+        expect(writes).toEqual([]);
+        repairMissingCanvasAssets();
+        await saveRemoteUserDataNow();
         expect(writes.map((item) => item.kind)).toEqual(["asset", "canvas"]);
         const asset = writes[0]?.body.asset as Asset;
         const canvas = writes[1]?.body.project as CanvasProject;

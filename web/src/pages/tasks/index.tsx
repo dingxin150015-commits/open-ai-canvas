@@ -1,5 +1,5 @@
 import { CollectionToolbar } from "@/components/layout/collection-toolbar";
-import { App, Button, Drawer, Form, Input, Modal, Select, Typography } from "antd";
+import { App, Button, Drawer, Form, Input, Modal, Typography } from "antd";
 import { Switch } from "@/components/ui/base/switch";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import { Bug, LayoutGrid, List, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
@@ -10,7 +10,7 @@ import { MediaPreview } from "@/components/media-preview";
 import { PageHeader, PaginationBar, WorkspacePage } from "@/components/layout/workspace-page";
 import { WorkspaceState } from "@/components/layout/workspace-state";
 import { CONTENT_MODERATION_ERROR_CODE, generationErrorMessage, isContentModerationError } from "@/lib/generation-error";
-import { formatTaskKind, operationOptions, statusLabel } from "@/lib/generation-task-display";
+import { formatTaskKind, generationTaskStatusLabel, isGenerationTaskSubmissionUncertain, mediaDeliverySummary, operationOptions, statusLabel } from "@/lib/generation-task-display";
 import { buildVideoOperationPrompt } from "@/lib/prompts";
 import { backendProviderConfig, logicalModelIDForConfig } from "@/services/api/generation-task";
 
@@ -22,6 +22,7 @@ import {
     listTaskLogs,
     queryFailedVideoProviderTask,
     queryGenerationTask,
+    recoverGenerationTaskMedia,
     refreshGenerationTaskStatus,
     retryGenerationTask,
     type CreateTaskInput,
@@ -38,6 +39,7 @@ import { TaskGroupHeader, type TaskGroup } from "./task-group-header";
 import { TaskListRow } from "./task-list-row";
 import { formatModelName, getTaskCanvasContext, isTaskFailed, providerCancelStatusLabel, taskMediaKind } from "./task-shared";
 import { TaskStatusFilterBar, type TaskStatusFilter } from "./task-status-filter";
+import { Select } from "@/components/ui/base/select";
 
 type TaskKindFilter = "all" | "text" | "image" | "video";
 type TaskViewMode = "list" | "grid";
@@ -314,15 +316,26 @@ export default function TasksPage() {
     }, [loadTasks]);
 
     const runAction = async (id: string) => {
-        const currentTask = tasksRef.current.find((task) => task.id === id);
         setActingId(id);
         try {
-            const next = await retryGenerationTask(id);
+            const currentTask = await queryGenerationTask(id);
+            if (currentTask && isGenerationTaskSubmissionUncertain(currentTask)) {
+                message.warning("提交结果待确认，不能自动重试；请先核对官方状态，避免重复生成或扣费");
+                return;
+            }
+            if (currentTask.provider === "dreamina-cli") {
+                message.warning("本机即梦任务不能在任务中心直接重试；请回到创作入口确认后发起新任务");
+                return;
+            }
+            const savingMedia = Boolean(currentTask.mediaStage);
+            const next = currentTask.status === "queued" || currentTask.status === "running" || currentTask.status === "succeeded"
+                ? currentTask
+                : savingMedia ? await recoverGenerationTaskMedia(id) : await retryGenerationTask(id);
             setTasks((items) => items.map((item) => (item.id === id ? next : item)));
             setDetailTask((current) => (current?.id === id ? { ...current, ...next } : current));
             setStatusFilter("active");
             setPage(1);
-            message.success("任务已重新入队");
+            message.success(next.status === "succeeded" ? "任务已完成" : savingMedia ? "正在恢复作品保存，不会重新生成" : "任务已在队列中");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "操作失败");
         } finally {
@@ -335,7 +348,7 @@ export default function TasksPage() {
             message.warning("任务正在执行，不能删除本机记录；请等待任务完成");
             return;
         }
-        Modal.confirm({
+        modal.confirm({
             title: "删除本机任务记录？",
             content: task.receiptRecorded ? "任务已由官方接受；删除本机记录不会取消官方任务，且本应用将不再同步该记录。已生成素材不受影响。" : "这只会删除本机任务记录，不会删除已生成的素材。",
             okText: "删除本机记录",
@@ -558,7 +571,8 @@ export default function TasksPage() {
                 {detailTask ? (
                     <div className="space-y-5">
                         <div className="task-detail-facts grid text-sm sm:grid-cols-2">
-                            <InfoItem label="状态" value={statusLabel[detailTask.status]} />
+                            <InfoItem label="状态" value={generationTaskStatusLabel(detailTask)} />
+                            {detailTask.mediaStage ? <InfoItem label="作品交付" value={mediaDeliverySummary(detailTask.status, detailTask.mediaStage)} /> : null}
                             <InfoItem label="画布名称" value={getTaskCanvasContext(detailTask, canvasById, domainProjectNameById).canvasName} />
                             <InfoItem label="任务类型" value={formatTaskKind(detailTask)} />
                             <InfoItem label="模型" value={formatModelName(effectiveConfig, detailTask)} />
@@ -571,6 +585,7 @@ export default function TasksPage() {
                             {detailTask.providerCancelRequestedAt ? <InfoItem label="请求取消时间" value={formatDate(detailTask.providerCancelRequestedAt)} /> : null}
                         </div>
                         <div className="flex flex-wrap justify-end gap-2">
+                            {detailTask.canRecoverMedia ? <Button icon={<RefreshCw className="size-4" />} loading={actingId === detailTask.id} onClick={() => void runAction(detailTask.id)}>重试保存</Button> : null}
                             {detailTask.provider === "dreamina-cli" && detailTask.receiptRecorded && detailTask.status === "running" ? (
                                 <Button aria-label="更新官方状态" icon={<RefreshCw className="size-4" />} loading={actingId === detailTask.id} onClick={() => void refreshLocalTaskStatus(detailTask)}>
                                     更新官方状态
@@ -595,6 +610,7 @@ export default function TasksPage() {
                                 </Button>
                             ) : null}
                         </div>
+                        {detailTask.provider === "dreamina-cli" ? <p className="text-xs text-foreground/55">官方状态采用最终一致轮询；转入后台后仍会继续等待并同步官方状态。官方即梦 CLI 当前不支持可靠的官方取消。</p> : null}
                         {detailTask.error ? <pre className="task-detail-error max-h-28 overflow-auto whitespace-pre-wrap px-3 py-2 text-xs">{generationErrorMessage(detailTask.error)}</pre> : null}
                         <TaskResultMedia value={detailTask.resultJson} taskType={detailTask.type} />
                         <DetailBlock title="提示词" value={detailLoading ? "详情加载中..." : detailTask.prompt || "无"} tall />
@@ -635,7 +651,7 @@ export default function TasksPage() {
 }
 
 function canQueryProviderTask(task: GenerationTask) {
-    return task.status === "failed" && (task.type.startsWith("canvas_video") || task.type.startsWith("video_")) && Boolean(task.providerRequestId);
+    return task.status === "failed" && !task.mediaStage && (task.type.startsWith("canvas_video") || task.type.startsWith("video_")) && Boolean(task.providerRequestId);
 }
 
 function reconcileTaskSummaries(current: GenerationTask[], next: GenerationTask[]) {

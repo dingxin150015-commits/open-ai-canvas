@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { DEFAULT_CANVAS_COLOR_THEME } from "../src/lib/canvas-theme";
 
 import {
     DEFAULT_CANVAS_BACKGROUND_MODE,
@@ -39,6 +40,29 @@ afterEach(() => {
 describe("canvas custom appearance", () => {
     test("uses point grid as the default for new canvases", () => {
         expect(DEFAULT_CANVAS_BACKGROUND_MODE).toBe("dots");
+        expect(DEFAULT_CANVAS_COLOR_THEME).toBe("dark");
+    });
+
+    test("resolves the dark preset to a visible soft grid", () => {
+        const appearance = canvasAppearanceForTheme(DEFAULT_CANVAS_COLOR_THEME);
+        expect(resolveCanvasAppearance(appearance, "light")).toEqual({
+            baseTheme: "dark",
+            background: "#0b0b0b",
+            grid: "rgba(178,178,178,.14)",
+        });
+        expect(resolveCanvasGridColor(appearance, "light", "dots")).toBe("rgba(210,210,210,.30)");
+        expect(resolveCanvasAppearance(customCanvasAppearanceFromTheme("dark"), "light")).toEqual({
+            baseTheme: "dark",
+            background: "#0B0B0B",
+            grid: "rgba(175,175,175,0.8)",
+        });
+    });
+
+    test("selecting either fixed theme resets the spatial grid to dots", async () => {
+        const source = await Bun.file(new URL("../src/components/canvas/canvas-appearance-controls.tsx", import.meta.url)).text();
+        const fixedThemeSource = source.slice(source.indexOf("const selectFixedTheme"), source.indexOf("const selectCustomTheme"));
+        expect(fixedThemeSource).toContain("onBackgroundModeChange(DEFAULT_CANVAS_BACKGROUND_MODE)");
+        expect(resolveCanvasGridColor(canvasAppearanceForTheme("light"), "dark", "dots")).toBe("rgba(15,23,42,.20)");
     });
 
     test("inherits the active fixed theme the first time custom mode is selected", () => {

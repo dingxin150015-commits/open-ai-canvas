@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { ModelTag } from "@/lib/model-tags";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
@@ -6,6 +7,7 @@ import { nanoid } from "nanoid";
 import { scopedLocalStorage } from "@/lib/user-scope";
 import { modelProtocolCapability, normalizeModelProtocol, type ModelProtocol } from "@/lib/model-protocols";
 import { normalizeVideoDuration, normalizeVideoResolution } from "@/lib/video-generation-options";
+import { projectDesktopLocalChannelRuntime } from "@/lib/desktop-local-channel";
 import { workflowFieldRole, workflowFieldSafeToOverride, workflowVideoFieldsFromJson, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { useUserStore } from "@/stores/use-user-store";
 import { useLocalDreaminaModelStore } from "@/stores/use-local-dreamina-model-store";
@@ -385,6 +387,7 @@ export type ModelChannel = {
         model: string;
         displayName?: string;
         channelLabel?: string;
+        tags?: ModelTag[];
         description?: string;
         icon?: string;
         capability: ModelCapability;
@@ -942,7 +945,7 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
     const model = modelOptionName(value || config.model);
     const modelProtocol = channel.modelCosts?.find((item) => item.model === model)?.protocol;
     const interfaceType = modelProtocol || channel.interfaceType;
-    return {
+    return projectDesktopLocalChannelRuntime({
         ...config,
         model,
         baseUrl: channel.baseUrl,
@@ -953,7 +956,7 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
         apiFormat: interfaceType ? (interfaceType === "gemini-veo" || interfaceType === "gemini-image" ? ("gemini" as const) : interfaceType === "claude-api" ? ("claude" as const) : ("openai" as const)) : channel.apiFormat,
         interfaceType,
         channelId: channel.scope === "system" ? channel.id : "",
-    };
+    });
 }
 
 function normalizeChannels(config: AiConfig, ensureDefault = true) {

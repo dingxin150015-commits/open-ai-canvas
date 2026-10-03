@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { afterAll, afterEach, test } from "bun:test";
-import axios from "axios";
 
 const originalWindow = globalThis.window;
 const originalVersion = globalThis.__APP_VERSION__;
@@ -13,7 +12,8 @@ const userStore = await import("../src/stores/use-user-store.ts");
 const generationTask = await import("../src/services/api/generation-task.ts");
 const relay = await import("../src/services/api/custom-channel-relay.ts");
 const imageApi = await import("../src/services/api/image.ts");
-const originalAxiosPost = axios.post;
+const requestModule = await import("../src/services/api/request.ts");
+const originalAdapter = requestModule.apiClient.defaults.adapter;
 
 afterAll(() => {
     if (originalVersion === undefined) delete globalThis.__APP_VERSION__;
@@ -23,7 +23,7 @@ afterAll(() => {
 });
 
 afterEach(() => {
-    axios.post = originalAxiosPost;
+    requestModule.apiClient.defaults.adapter = originalAdapter;
     userStore.useUserStore.setState({ features: userStore.defaultFeatureAvailability });
     if (originalWindow === undefined) delete globalThis.window;
     else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
@@ -81,9 +81,10 @@ test("actual generation request config reprojects forged persisted local permiss
 
 test("authenticated model fetch reprojects forged persisted local permission before backend request", async () => {
     const bodies = [];
-    axios.post = async (_url, body) => {
-        bodies.push(body);
-        return { data: { code: 0, data: { models: [{ id: "local-model" }] }, msg: "ok" } };
+    requestModule.apiClient.defaults.adapter = async (request) => {
+        assert.equal(request.url, "/ai/models");
+        bodies.push(JSON.parse(String(request.data)));
+        return { config: request, data: { code: 0, data: { models: [{ id: "local-model" }] }, msg: "ok" }, headers: {}, status: 200, statusText: "OK" };
     };
     const channel = forgedConfig().channels[0];
 

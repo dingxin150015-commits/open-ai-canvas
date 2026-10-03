@@ -48,10 +48,10 @@ func TestNormalizeVideoAudioPriceSelector(t *testing.T) {
 
 func TestVideoPriceTierMatchesAudioAndActualReferences(t *testing.T) {
 	channelModel := model.ChannelModel{PriceTiers: []model.ChannelModelPriceTier{
-		{ID: "default", SelectorJSON: `{}`, Enabled: true, PriceConfigured: true},
-		{ID: "reference", SelectorJSON: `{"operation":"video_to_video"}`, Enabled: true, PriceConfigured: true},
-		{ID: "reference-audio", SelectorJSON: `{"operation":"video_to_video","videoGenerateAudio":"true"}`, Enabled: true, PriceConfigured: true},
-		{ID: "reference-silent", SelectorJSON: `{"operation":"video_to_video","videoGenerateAudio":"false"}`, Enabled: true, PriceConfigured: true},
+		{ID: "default", SelectorJSON: `{}`, Enabled: true, PriceConfigured: true, BillingMode: "fixed_request"},
+		{ID: "reference", SelectorJSON: `{"operation":"video_to_video"}`, Enabled: true, PriceConfigured: true, BillingMode: "fixed_request"},
+		{ID: "reference-audio", SelectorJSON: `{"operation":"video_to_video","videoGenerateAudio":"true"}`, Enabled: true, PriceConfigured: true, BillingMode: "fixed_request"},
+		{ID: "reference-silent", SelectorJSON: `{"operation":"video_to_video","videoGenerateAudio":"false"}`, Enabled: true, PriceConfigured: true, BillingMode: "fixed_request"},
 	}}
 	for _, test := range []struct {
 		name  string

@@ -254,8 +254,8 @@ func isProviderTaskNotReadyError(httpErr providerHTTPError) bool {
 	if json.Unmarshal([]byte(httpErr.Body), &payload) != nil {
 		return false
 	}
-	code, message := providerFailureDetails(payload)
-	for _, value := range []string{code, message} {
+	code, _ := providerFailureDetails(payload)
+	for _, value := range []string{code, providerErrorMessageField(payload)} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "task_not_exist", "task_not_found", "task not exist", "task not found":
 			return true

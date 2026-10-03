@@ -16,7 +16,7 @@ test("Director fixtures cover exact read-only dependencies without hiding other 
 test("fork display version maps to a Docker-compatible distinct tag", () => {
     const version = readFileSync(new URL("../../VERSION", import.meta.url), "utf8").trim();
     const tag = version.replace(/^v/, "").replaceAll("+", "-");
-    expect(version).toBe("v1.2.7+dingxin.1");
-    expect(tag).toBe("1.2.7-dingxin.1");
+    expect(version).toBe("v1.5.8+dingxin.1");
+    expect(tag).toBe("1.5.8-dingxin.1");
     expect(tag).toMatch(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$/);
 });

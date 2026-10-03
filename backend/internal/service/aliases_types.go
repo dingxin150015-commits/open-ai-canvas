@@ -9,6 +9,7 @@ type (
 	CloudAgentRequest                      = app.CloudAgentRequest
 	ComfyBridgeCompletion                  = app.ComfyBridgeCompletion
 	CreateComfyBridgeRequest               = app.CreateComfyBridgeRequest
+	CloudAgentRunViewOptions               = app.CloudAgentRunViewOptions
 	CloudAgentMediaSettings                = app.CloudAgentMediaSettings
 	CloudAgentCapabilitySet                = app.CloudAgentCapabilitySet
 	AgentProfileRequest                    = app.AgentProfileRequest
@@ -101,6 +102,7 @@ type (
 	ChannelModelCatalogOptions             = app.ChannelModelCatalogOptions
 	ChannelModelPriceTierRequest           = app.ChannelModelPriceTierRequest
 	ChannelModelRequest                    = app.ChannelModelRequest
+	ChannelModelRepriceRequest             = app.ChannelModelRepriceRequest
 	ChannelModelQuoteRequest               = app.ChannelModelQuoteRequest
 	ChannelModelSortRequest                = app.ChannelModelSortRequest
 	ChannelModelsRequest                   = app.ChannelModelsRequest
@@ -255,7 +257,9 @@ type (
 	ResolveBillingBatchResult              = app.ResolveBillingBatchResult
 	ResolveBillingRequest                  = app.ResolveBillingRequest
 	ResourceDelivery                       = app.ResourceDelivery
-	ResourceDeliveryOptions                = app.ResourceDeliveryOptions
+	ResourceAccessOptions                  = app.ResourceAccessOptions
+	ResourceAccessRequest                  = app.ResourceAccessRequest
+	ResourceAccess                         = app.ResourceAccess
 	ResourceStream                         = app.ResourceStream
 	ResponseInterceptionRule               = app.ResponseInterceptionRule
 	ResponseInterceptionSetting            = app.ResponseInterceptionSetting
@@ -271,6 +275,10 @@ type (
 	Service                                = app.Service
 	ShotRevisionInput                      = app.ShotRevisionInput
 	SkillCategory                          = app.SkillCategory
+	SkillLibraryCategory                   = app.SkillLibraryCategory
+	SkillLibraryCategoryList               = app.SkillLibraryCategoryList
+	SkillLibraryCategoryMutationRequest    = app.SkillLibraryCategoryMutationRequest
+	SkillLibraryCategoryAssignmentRequest  = app.SkillLibraryCategoryAssignmentRequest
 	SkillEffectiveUser                     = app.SkillEffectiveUser
 	SkillFileSearchResult                  = app.SkillFileSearchResult
 	SkillGitHubInstallRequest              = app.SkillGitHubInstallRequest
@@ -283,10 +291,16 @@ type (
 	SkillPackageBundleFile                 = app.SkillPackageBundleFile
 	SkillPackageFileContent                = app.SkillPackageFileContent
 	SkillPackageFileItem                   = app.SkillPackageFileItem
+	SkillPreset                            = app.SkillPreset
 	SkillShowcaseMedia                     = app.SkillShowcaseMedia
 	StorageMigrationSummary                = app.StorageMigrationSummary
 	StyleProfileFavoriteRequest            = app.StyleProfileFavoriteRequest
 	StyleProfileRequest                    = app.StyleProfileRequest
+	ToolItem                               = app.ToolItem
+	ToolList                               = app.ToolList
+	ToolListRequest                        = app.ToolListRequest
+	ToolMutationRequest                    = app.ToolMutationRequest
+	ToolSummary                            = app.ToolSummary
 	SystemPerformanceCacheGroup            = app.SystemPerformanceCacheGroup
 	SystemPerformanceDisk                  = app.SystemPerformanceDisk
 	SystemPerformanceHost                  = app.SystemPerformanceHost

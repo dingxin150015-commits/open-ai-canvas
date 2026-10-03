@@ -28,6 +28,8 @@ web/out
 *.sqlite
 *.sqlite3
 *.exe
+/web/public/OpenAICanvas-ComfyBridge-linux-amd64
+/web/public/OpenAICanvas-ComfyBridge-linux-arm64
 backend/*.exe
 .settings-key
 .env*

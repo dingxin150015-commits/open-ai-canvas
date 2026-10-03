@@ -248,6 +248,13 @@ func loadDeclarativeManifestProvider(manifest Manifest, index int) (Adapter, err
 var manifestVariableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,95}$`)
 
 func ValidateManifest(manifest Manifest) error {
+	seenSMS := map[string]bool{}
+	for _, provider := range manifest.Contributes.SMSProviders {
+		if !validManifestIdentifier(provider.ID) || strings.TrimSpace(provider.Label) == "" || seenSMS[provider.ID] {
+			return fmt.Errorf("invalid or duplicate SMS provider contribution")
+		}
+		seenSMS[provider.ID] = true
+	}
 	if version := strings.TrimSpace(manifest.APIVersion); version != "yingce.plugin/v1" && version != "yingce.plugin/v2" && version != "yingce.plugin/v3" && version != "yingce.plugin/v4" {
 		return fmt.Errorf("unsupported protocol manifest apiVersion %q", manifest.APIVersion)
 	}
@@ -424,6 +431,9 @@ func normalizeManifestForProvider(manifest *Manifest, index int) error {
 }
 
 func hasNonProviderContribution(contributes ManifestContributions) bool {
+	if len(contributes.SMSProviders) > 0 {
+		return true
+	}
 	return len(contributes.PaymentProviders) > 0 || len(contributes.Workflows) > 0 || len(contributes.CanvasNodes) > 0 || len(contributes.Transforms) > 0 || len(contributes.Commands) > 0 || len(contributes.AssetSources) > 0 || len(contributes.UsageObservers) > 0 || len(contributes.AICapabilities) > 0 || len(contributes.Agents) > 0 || len(contributes.ImportExport) > 0
 }
 
@@ -1176,6 +1186,10 @@ func manifestRequestValues(request GenerationRequest) map[string]any {
 	output.GenerateAudio = output.GenerateAudio || request.GenerateAudio
 	output.Watermark = output.Watermark || request.Watermark
 	outputValue, _ := requestAsManifestValue(output)
+	providerOptionsValue, _ := requestAsManifestValue(request.ProviderOptions)
+	if providerOptionsValue == nil {
+		providerOptionsValue = map[string]any{}
+	}
 
 	return map[string]any{
 		"capability":      request.Capability,
@@ -1196,7 +1210,7 @@ func manifestRequestValues(request GenerationRequest) map[string]any {
 		"watermark":       request.Watermark,
 		"operation":       request.Operation,
 		"output":          outputValue,
-		"providerOptions": request.ProviderOptions,
+		"providerOptions": providerOptionsValue,
 		"extra":           request.Extra,
 	}
 }

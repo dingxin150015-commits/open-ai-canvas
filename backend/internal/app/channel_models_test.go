@@ -130,14 +130,25 @@ func TestSanitizeChannelModelAvailabilityRequiresValidPriceTier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if public.Available {
-		t.Fatal("legacy scalar price must not make a system channel model available")
+	if !public.Available {
+		t.Fatal("explicitly configured scalar price must remain available when no tiers exist")
 	}
 
+	channelModel.PriceConfigured = false
+	public, err = svc.sanitizeChannelModel(channelModel)
+	if err != nil || public.Available {
+		t.Fatalf("unconfigured scalar price became available: %#v %v", public, err)
+	}
+	channelModel.PriceConfigured = true
 	channelModel.PriceTiers = []model.ChannelModelPriceTier{{
 		ID: "tier-1", BillingMode: "fixed_request", UnitPriceMicrocredits: 10,
-		Enabled: true, PriceConfigured: true,
+		Enabled: false, PriceConfigured: true,
 	}}
+	public, err = svc.sanitizeChannelModel(channelModel)
+	if err != nil || public.Available {
+		t.Fatalf("disabled tier fell back to scalar price: %#v %v", public, err)
+	}
+	channelModel.PriceTiers[0].Enabled = true
 	public, err = svc.sanitizeChannelModel(channelModel)
 	if err != nil {
 		t.Fatal(err)

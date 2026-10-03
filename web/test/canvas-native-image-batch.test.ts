@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { executeImageGeneration } from "../src/pages/canvas/canvas-image-generation-executor";
 import type { CanvasGenerationExecution } from "../src/pages/canvas/canvas-generation-executor-types";
 import { createModelChannel, defaultConfig, type AiConfig } from "../src/stores/use-config-store";
@@ -9,6 +9,39 @@ import { useAssetStore, type ImageAsset } from "../src/stores/use-asset-store";
 import { createGenerationRetryContext } from "../src/lib/canvas/canvas-project-generation";
 import { CanvasNodeType, type CanvasNodeData } from "../src/types/canvas";
 import type { GenerationTask } from "../src/services/api/task-center";
+import { apiClient } from "../src/services/api/request";
+
+const originalAdapter = apiClient.defaults.adapter;
+beforeEach(() => {
+    apiClient.defaults.adapter = async (request) => {
+        if (request.url !== "/resources/access") throw new Error(`unexpected API request: ${request.url}`);
+        const requested = JSON.parse(String(request.data)) as Array<{ resourceId: string; variant?: "original" | "playback" }>;
+        return {
+            config: request,
+            data: {
+                code: 0,
+                msg: "ok",
+                data: { items: requested.map(({ resourceId, variant = "original" }) => ({
+                    resourceId,
+                    access: {
+                        resourceId,
+                        requestedVariant: variant,
+                        actualVariant: variant,
+                        url: `https://fixture.invalid/resources/${resourceId}`,
+                        delivery: "origin",
+                        issuedAt: new Date().toISOString(),
+                        refreshAt: new Date(Date.now() + 60_000).toISOString(),
+                        revision: "fixture",
+                    },
+                })) },
+            },
+            headers: {},
+            status: 200,
+            statusText: "OK",
+        };
+    };
+});
+afterEach(() => { apiClient.defaults.adapter = originalAdapter; });
 
 const config: AiConfig = { ...defaultConfig, model: "qwen-image-3.0-pro", count: "3", generationOptions: { contractKind: "qwen", nativeBatch: true } };
 const task: GenerationTask = {
@@ -118,8 +151,8 @@ describe("canvas native image batch", () => {
     });
     test("node-local batch options reach the quote configuration after restoring a draft", () => {
         const node: CanvasNodeData = { id: "node", type: CanvasNodeType.Image, title: "", position: { x: 0, y: 0 }, width: 320, height: 240, metadata: { model: config.model, count: 3, generationOptions: config.generationOptions } };
-        const channel = createModelChannel({ id: "qwen", models: [config.model], interfaceType: "dashscope-image" });
-        const resolved = buildNodeConfig({ ...config, channels: [channel] }, node, "image", { capability: "image" });
+        const channel = createModelChannel({ id: "qwen", models: [config.model], interfaceType: "dashscope-image", modelCosts: [{ model: config.model, capability: "image", billingMode: "fixed_request", unitPriceMicrocredits: 1 }] });
+        const resolved = buildNodeConfig({ ...config, imageModel: config.model, channels: [channel] }, node, "image", { capability: "image" });
         expect(resolved.generationOptions).toEqual(config.generationOptions);
         expect(nativeImageBatchEnabled(resolved)).toBe(true);
     });

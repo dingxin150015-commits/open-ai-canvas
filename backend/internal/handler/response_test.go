@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -16,13 +17,29 @@ import (
 )
 
 type failureEnvelope struct {
-	Code          int    `json:"code"`
-	Msg           string `json:"msg"`
-	Reason        string `json:"reason"`
-	ErrorCode     string `json:"errorCode"`
-	ErrorCategory string `json:"errorCategory"`
-	Retryable     bool   `json:"retryable"`
-	RequestID     string `json:"requestId"`
+	Code          int            `json:"code"`
+	Msg           string         `json:"msg"`
+	Reason        string         `json:"reason"`
+	ErrorCode     string         `json:"errorCode"`
+	ErrorCategory string         `json:"errorCategory"`
+	Retryable     bool           `json:"retryable"`
+	RequestID     string         `json:"requestId"`
+	Details       map[string]any `json:"details"`
+}
+
+func TestFailServiceKeepsSafeDetailsAndDiagnosticEnvelope(t *testing.T) {
+	recorder, context := responseTestContext()
+	failService(context, &service.AppError{
+		Status:  http.StatusBadRequest,
+		Code:    http.StatusBadRequest,
+		Reason:  service.ReasonForStatus(http.StatusBadRequest),
+		Message: "参数无效",
+		Details: map[string]any{"field": "duration"},
+	})
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusBadRequest || response.Details["field"] != "duration" || response.ErrorCode == "" || response.RequestID == "" {
+		t.Fatalf("error envelope lost details or diagnostics: %#v", response)
+	}
 }
 
 func TestFailServiceRegistrationCooldown(t *testing.T) {
@@ -43,6 +60,20 @@ func TestFailServiceProjectsAppError(t *testing.T) {
 	response := decodeFailureEnvelope(t, recorder)
 	if recorder.Code != http.StatusTooManyRequests || response.Code != service.CodeRateLimited || response.Reason != string(service.ReasonRateLimited) || response.ErrorCode != "request_throttled" || response.ErrorCategory != service.ErrorCategoryQuota || !response.Retryable || response.Msg != err.Message || !strings.HasPrefix(response.RequestID, "req_") {
 		t.Fatalf("response = status %d, body %#v", recorder.Code, response)
+	}
+}
+
+func TestFailServiceProjectsDNSFailureWithoutTransportDetails(t *testing.T) {
+	recorder, context := responseTestContext()
+	err := service.WrapAppError(http.StatusBadGateway, "外部服务域名解析失败，请检查渠道域名和后端 DNS 配置", errors.New("private-sentinel resolver failure"))
+	err.Reason = service.ReasonUpstreamDNSFailed
+	failService(context, &url.Error{Op: "Post", URL: "https://private-sentinel.invalid?token=private-sentinel", Err: err})
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusBadGateway || response.Code != service.CodeBadGateway || response.Reason != string(service.ReasonUpstreamDNSFailed) || response.Msg != err.Message {
+		t.Fatalf("DNS response contract lost: %d %#v", recorder.Code, response)
+	}
+	if strings.Contains(recorder.Body.String(), "private-sentinel") {
+		t.Fatal("raw transport details leaked into HTTP response")
 	}
 }
 

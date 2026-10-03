@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -39,15 +41,12 @@ func TestCustomRelayForwardsOpenAIRequestWithoutBrowserHeaders(t *testing.T) {
 		_, _ = io.WriteString(w, `{"data":[]}`)
 	}))
 	defer upstream.Close()
-	useCustomRelayTestClient(t, upstream.Client())
-	t.Setenv("CANVAS_ALLOW_PRIVATE_UPSTREAMS", "true")
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	useCustomRelayTestClient(t, upstream)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/ai/custom", nil)
 	request.Header.Set("Authorization", "Bearer "+apiKey)
-	request.Header.Set("X-Canvas-Upstream-URL", upstream.URL+"/v1/models")
+	request.Header.Set("X-Canvas-Upstream-URL", "https://8.8.8.8/v1/models")
 	request.Header.Set("X-Canvas-Upstream-Format", "openai")
-	prepareRelayTestRequest(t, request)
 	request.Header.Set(service.CustomRelayHeadersHeader, base64.StdEncoding.EncodeToString([]byte(`[{"name":"User-Agent","value":"Custom Relay Agent"},{"name":"X-Gateway-Tenant","value":"tenant-a"}]`)))
 	request.Header.Set("Cookie", "browser=session")
 	request.Header.Set("Origin", "https://canvas.example.com")
@@ -74,14 +73,12 @@ func TestCustomRelayReturnsVideoContent(t *testing.T) {
 		_, _ = w.Write([]byte("video-content"))
 	}))
 	defer upstream.Close()
-	useCustomRelayTestClient(t, upstream.Client())
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	useCustomRelayTestClient(t, upstream)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/ai/custom", nil)
 	request.Header.Set("Authorization", "Bearer test-key")
-	request.Header.Set("X-Canvas-Upstream-URL", upstream.URL+"/v1/videos/task-1/content")
+	request.Header.Set("X-Canvas-Upstream-URL", "https://8.8.8.8/v1/videos/task-1/content")
 	request.Header.Set("X-Canvas-Upstream-Format", "openai")
-	prepareRelayTestRequest(t, request)
 	response := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(response)
 	context.Request = request
@@ -106,15 +103,13 @@ func TestCustomRelayConvertsGeminiAuthentication(t *testing.T) {
 		_, _ = io.WriteString(w, `{"candidates":[]}`)
 	}))
 	defer upstream.Close()
-	useCustomRelayTestClient(t, upstream.Client())
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	useCustomRelayTestClient(t, upstream)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/ai/custom", strings.NewReader(`{"contents":[]}`))
 	request.Header.Set("Authorization", "Bearer "+apiKey)
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Canvas-Upstream-URL", upstream.URL+"/v1beta/models/gemini-test:generateContent")
+	request.Header.Set("X-Canvas-Upstream-URL", "https://8.8.8.8/v1beta/models/gemini-test:generateContent")
 	request.Header.Set("X-Canvas-Upstream-Format", "gemini")
-	prepareRelayTestRequest(t, request)
 	response := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(response)
 	context.Request = request
@@ -145,15 +140,13 @@ func TestCustomRelayConvertsClaudeAuthentication(t *testing.T) {
 		_, _ = io.WriteString(w, `{"content":[{"type":"text","text":"claude relay works"}]}`)
 	}))
 	defer upstream.Close()
-	useCustomRelayTestClient(t, upstream.Client())
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	useCustomRelayTestClient(t, upstream)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/ai/custom", strings.NewReader(`{"model":"claude-test","messages":[]}`))
 	request.Header.Set("Authorization", "Bearer "+apiKey)
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Canvas-Upstream-URL", upstream.URL+"/v1/messages")
+	request.Header.Set("X-Canvas-Upstream-URL", "https://8.8.8.8/v1/messages")
 	request.Header.Set("X-Canvas-Upstream-Format", "claude")
-	prepareRelayTestRequest(t, request)
 	response := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(response)
 	context.Request = request
@@ -176,8 +169,7 @@ func TestCustomRelayStreamsBeforeUpstreamCompletes(t *testing.T) {
 		_, _ = io.WriteString(w, "data: second\n\n")
 	}))
 	defer upstream.Close()
-	useCustomRelayTestClient(t, upstream.Client())
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
+	useCustomRelayTestClient(t, upstream)
 
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		context, _ := gin.CreateTestContext(w)
@@ -189,9 +181,8 @@ func TestCustomRelayStreamsBeforeUpstreamCompletes(t *testing.T) {
 	request.Header.Set("Authorization", "Bearer "+apiKey)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "text/event-stream")
-	request.Header.Set("X-Canvas-Upstream-URL", upstream.URL+"/v1/responses")
+	request.Header.Set("X-Canvas-Upstream-URL", "https://8.8.8.8/v1/responses")
 	request.Header.Set("X-Canvas-Upstream-Format", "openai")
-	prepareRelayTestRequest(t, request)
 	client := &http.Client{Timeout: 3 * time.Second}
 	response, err := client.Do(request)
 	if err != nil {
@@ -224,7 +215,6 @@ func TestRelayStreamRedactorHandlesSplitSecret(t *testing.T) {
 
 func TestCustomRelayRejectsOversizedDeclaredBodyBeforeConnecting(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
 	connected := false
 	previous := customRelayClient
 	customRelayClient = func(time.Duration) *http.Client {
@@ -237,9 +227,8 @@ func TestCustomRelayRejectsOversizedDeclaredBodyBeforeConnecting(t *testing.T) {
 	request.ContentLength = (defaultCustomRelayTestPolicy().CustomRelayRequestMB << 20) + 1
 	request.Header.Set("Authorization", "Bearer test-key")
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Canvas-Upstream-URL", "https://127.0.0.1/v1/responses")
+	request.Header.Set("X-Canvas-Upstream-URL", "https://8.8.8.8/v1/responses")
 	request.Header.Set("X-Canvas-Upstream-Format", "openai")
-	prepareRelayTestRequest(t, request)
 	response := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(response)
 	context.Request = request
@@ -253,17 +242,33 @@ func TestCustomRelayRejectsOversizedDeclaredBodyBeforeConnecting(t *testing.T) {
 	}
 }
 
-func useCustomRelayTestClient(t *testing.T, client *http.Client) {
+func useCustomRelayTestClient(t *testing.T, upstream *httptest.Server) {
 	t.Helper()
+	upstreamURL, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := upstream.Client()
+	transport := client.Transport
+	client.Transport = relayTestRoundTripper(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host != "8.8.8.8" {
+			return nil, errors.New("unexpected relay test host")
+		}
+		forwarded := request.Clone(request.Context())
+		forwarded.URL.Scheme = upstreamURL.Scheme
+		forwarded.URL.Host = upstreamURL.Host
+		forwarded.Host = upstreamURL.Host
+		return transport.RoundTrip(forwarded)
+	})
 	previous := customRelayClient
 	customRelayClient = func(time.Duration) *http.Client { return client }
 	t.Cleanup(func() { customRelayClient = previous })
 }
 
-func prepareRelayTestRequest(t *testing.T, request *http.Request) {
-	t.Helper()
-	t.Setenv("CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS", "127.0.0.1")
-	_ = request
+type relayTestRoundTripper func(*http.Request) (*http.Response, error)
+
+func (roundTrip relayTestRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	return roundTrip(request)
 }
 
 func defaultCustomRelayTestPolicy() service.RuntimeRequestPolicy {

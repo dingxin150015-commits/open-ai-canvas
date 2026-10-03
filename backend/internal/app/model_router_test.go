@@ -189,7 +189,7 @@ func TestMatchCapabilityAppliesCombinedVisualConstraint(t *testing.T) {
 	}
 }
 
-func TestChannelModelPriceTierForIntentRejectsUnsupportedTokenProtocol(t *testing.T) {
+func TestChannelModelPriceTierForIntentMatchesVideoTokenProtocol(t *testing.T) {
 	channelModel := model.ChannelModel{
 		Capability: "video",
 		Protocol:   model.ChannelInterfaceVolcengineJiMengVideo,
@@ -197,7 +197,7 @@ func TestChannelModelPriceTierForIntentRejectsUnsupportedTokenProtocol(t *testin
 			SelectorJSON: `{}`, Enabled: true, PriceConfigured: true, BillingMode: "token",
 		}},
 	}
-	if matched := channelModelPriceTierForIntent(channelModel, ModelRequestIntent{Capability: "video"}); matched != nil {
-		t.Fatalf("unsupported Token tier matched: %#v", matched)
+	if matched := channelModelPriceTierForIntent(channelModel, ModelRequestIntent{Capability: "video"}); matched == nil || matched.BillingMode != "token" {
+		t.Fatalf("video Token tier did not match: %#v", matched)
 	}
 }

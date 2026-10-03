@@ -1,10 +1,30 @@
 # 当前状态
 
-## 当前：官方 v1.5.8 增量审计，尚未实际合并
+## 当前任务：固定官方 v1.6.0 增量合并启动（2026-10-03 11:45 CST）
+
+用户批准从未获 Edge 验收的 v1.5.8 A′ 候选制作**仅本地、明确标注 WIP** 的双父检查点，保留原 A′/旧 A/生产服务，再在新隔离分支 A″ 增量合入官方最新稳定 `v1.6.0`。2026-10-03 只读确认 GitHub Release `v1.6.0` 为 `draft=false`、`prerelease=false`，远端 `refs/tags/v1.6.0=42f14cd73eec7c2ded98eb15b6a4f5aa2f3f3b4a`；移动 `official/main=24cba765` 不纳入本轮固定目标。启动前 A′ 为 `HEAD=56e9b124`、`MERGE_HEAD=25842275`、显式未合并路径 0、无未暂存/未跟踪项；其 874 个暂存路径是上一轮候选整体差异，不是本轮新冲突。**当前仅启动准备，尚未制作 WIP 检查点、fetch v1.6.0、创建 A″ 或解决新冲突。** 本轮执行流水见 `UPSTREAM_V160_EXECUTION_20261003.md`，每个里程碑须追加时间与证据。旧 A `6b16d25e`、v1.5.8 A′、两类预览和生产数据均不作晋升/替换；正式提交、push、真实付费调用和删除仍未获准。
+
+## 当前权威快照：v1.5.8 A′ 隔离预览已运行、待用户 Edge（2026-09-29 11:37 CST）
+
+固定官方标签 `v1.5.8@258422757c98467f24381219e90f4809394ec226` 已在隔离 A′ `codex/upstream-v1.5.8-20260927` 的未提交 merge 中解除全部 59 个显式冲突；旧 A `codex/dashscope-system-plugins-20260911@6b16d25e` 保持回退用途。Web 2380 项全量、类型/构建、Canvas Agent 328 项/构建、百炼两包归档一致性、Compose 配置、依赖齐全的 Linux CGO 后端全量与五项 CI 依赖用例均通过；旧 Schema 9→42 与固定官方 Schema 40→42 隔离迁移、重复 up/verify、完整性/外键及关键计数保持通过。候选 Backend/Web 镜像已构建，三平台 Comfy Bridge 二进制和构建身份已核对。2026-09-29 依用户批准另启隔离预览 `http://127.0.0.1:3001`，空数据卷、专用网络，前后端 healthy，HTTP build-info/ready 均为 200、Schema 42/42；生产容器/卷与 `:local` 镜像未替换。**这不是生产部署或用户 Edge 验收**；A′ 未正式提交、推送或晋升，仍为 `NO-GO`。完整接管见 `HANDOFF_V158_20260928.md`，执行证据见 `UPSTREAM_V158_EXECUTION_20260927.md`。
+
+2026-09-29 最近一次只读远端复核：官方 `v1.5.8^{}` 仍为 `25842275`，移动中的 `official/main` 已到 `f9b8c5a4`；Issue #332 为 `closed/completed`、评论 0，不能推断本地百炼架构已获接受。中文上游 PR 提案已改为先给合并大模型省 token 操作卡、后给维护者说明；未对 GitHub 写入。下一次增量/PR 必须重新审计。当前发布状态是 `NO-GO`。
+
+以下为按时间保留的历史快照。各旧段落标题中的“当前”“最新”“待实施”“已部署”只适用于其记录时点，不能覆盖上方 2026-09-28 权威状态。
+
+## 历史快照：v1.5.8 A′ 显式冲突清零（2026-09-27 20:25 CST）
+
+`codex/upstream-v1.5.8-20260927` 已针对固定官方 `25842275` 解除并暂存全部 59 个显式文本冲突；`MERGE_HEAD` 仍打开，未正式提交、推送或部署。Backend 专项包仅编译通过；Web 文件语法解析通过，但 Bun 单测受隔离工作树缺依赖阻断，Linux CGO/前端全量、双谱系克隆、自动合并语义审计和 Edge 均未通过。准确执行记录见 `UPSTREAM_V158_EXECUTION_20260927.md`；下方“59 个冲突”是启动时历史快照。
+
+## 历史快照：A′ 固定 v1.5.8 增量合并启动（2026-09-27 15:27 CST）
+
+旧 A 为干净的 `codex/dashscope-system-plugins-20260911@6b16d25e`，未修改。原 v1.5.6 候选完整工作内容被固化为仅本地双父 WIP 检查点 `56e9b124`（父提交 `6b16d25e`、官方 `v1.5.6@473d535e`）；它不代表测试通过，也未推送。新隔离工作树 `.local/worktrees/upstream-v158` 的分支 `codex/upstream-v1.5.8-20260927` 由此检出，并对官方 `v1.5.8@25842275` 执行 `git merge --no-commit --no-ff`。实际出现 59 个显式文本冲突，正在按 `UPSTREAM_V158_INCREMENT_AUDIT_20260927.md` 分批解决；不得部署、推送或删除旧工作树。
+
+## 历史快照：官方 v1.5.8 增量审计，尚未实际合并
 
 2026-09-27 官方 `main` 和正式标签 `v1.5.8` 固定于 `25842275`。以当前 v1.5.6 候选完整工作内容为一侧进行 `git merge-tree` 模拟：官方增量 830 路径，双方重叠 157，显式新冲突 59，另 98 个自动合并重叠路径待语义审计。真实候选仍为 `HEAD=6b16d25e`、`MERGE_HEAD=473d535e`，本轮未叠加合并、未提交/部署。详见 `UPSTREAM_V158_INCREMENT_AUDIT_20260927.md`。
 
-## 当前：v1.5.6 无提交合并进行中
+## 历史快照：v1.5.6 无提交合并进行中
 
 用户已选择方案 A，保留本机 Agent、Runtime、Codex 插件、本机渠道及人像功能。独立工作树 `codex/upstream-v1.5.6-20260921@6b16d25e` 正在合并固定官方 `v1.5.6@473d535e`，`MERGE_HEAD` 存在，2026-09-23 接管时仍有 197 个未合并路径；尚未完成编译/迁移/浏览器门禁。见 `UPSTREAM_V156_MERGE_20260923.md`。此工作树不得构建部署到真实数据卷。
 
@@ -12,7 +32,7 @@
 
 2026-09-25 增量检查点：Comfy Bridge 已迁入后端 `app` 并接入 Schema31；专项 Linux CGO 的设备鉴权/重启恢复与 `internal/database` 全包通过。网页旧 `/sessions` 调用和旧面板已移除，画布与创作入口接上游 Cloud Agent；独立 `canvas-agent/` 和 Codex 插件仍保留。所有显式 Git 冲突已清零，暂存差异无冲突标记/空白错误，但仍处于 MERGE_HEAD 打开的未提交候选。Backend Linux CGO 全量仍有真实或待分类失败并超时，Web Docker 构建与类型/测试仍在验证，双谱系真实克隆与 Edge 均未验收，禁止部署。详细失败清单与证据见 `UPSTREAM_V156_MERGE_20260923.md`。
 
-## 当前：统一模型目录修复已部署预验证，等待 Edge
+## 历史快照：统一模型目录修复已部署预验证，等待 Edge
 
 详见MODEL_CATALOG_UNIFIED_REPAIR_20260913.md。主程序前后端catalog1/ad3efa10，独立Gemini文本插件4.0.1收尾cc7d0b63；Schema9/9、Backend b7497517、Web1479e358均healthy/restart0。Backend最终全量、Web1645全量/40专项/类型/构建、源码/运行包哈希、两次断网双启动及业务数据摘要保持均通过。未自动启用模型或改价，未执行Edge/真实调用/push。下方“未修复/待实施”为历史。
 
@@ -22,23 +42,23 @@
 
 2026-09-13 用户截图与源码确认：通用发现默认 planned，目录补全只注册百炼，Gemini 条目能力/协议未映射；前后端 planned 只读门禁使管理员无法配置启用。与已采用官方371bc68比对确认：编辑锁死直接来自本地64015db3/62cf5d83，目录字段/分页不足则为上游遗留。页面100条/页只切分本地记录，是否实际漏上游分页仍待nextPageToken证据；同类新渠道也有风险。详见 GEMINI_CATALOG_DIAGNOSIS_20260913.md；本轮仅诊断和记忆更新，未实施修复或模型调用。
 
-## 最新人工反馈：Qwen 配置检查通过，真实生成待验收
+## 历史快照：Qwen 配置检查通过，真实生成待验收
 
 2026-09-13 用户确认截图所列 Edge 配置检查暂无问题，并已自行配置启用 qwen-image-3.0-pro。仅覆盖版本、两类画布节点开关/报价、参数刷新恢复和三种请求模式入口；不覆盖真实多结果、生成中恢复、重试、扣费或其他六模型。代理未独立复测或调用。详见 CANVAS_NATIVE_BATCH_20260912.md 最新反馈；下方 Edge 待确认属于历史交付状态。本轮为未提交的文档更新。
 
-## 当前增量：画布原生单请求多图已补齐
+## 历史快照：画布原生单请求多图已补齐
 
 权威记录 `CANVAS_NATIVE_BATCH_20260912.md`。Web 已部署 cd0b4340 / bailian3，Backend 仍为 5889345a / bailian2，Schema 9/9；本次只替换 Web，前后端版本差异为预期。84 专项、1645 全量、干净类型、构建、9 文件哈希通过，用户 Edge/真实生成均未执行。下方“前后端均为 bailian2”为本次之前的历史状态。
 
-## 当前：百炼七模型已部署预验证，等待 Edge 人工确认
+## 历史快照：百炼七模型已部署预验证，等待 Edge 人工确认
 
 见 `BAILIAN_FULL_CAPABILITIES_20260912.md`。最终源码 5889345a，Backend 全量、Web 1633 全量/类型/构建、58 文件源码一致性、断网克隆双启动及保留卷部署数据核对通过。前后端均为 v1.2.7+dingxin.1.bailian2 / 5889345a，Schema 9/9，两包 3.1.0，默认图片超时 15 分钟；旧价格、启用状态、订单和环境不变。当前停在 Edge 人工门禁，未调用真实模型。
 
-## 最新：百炼完整声明式插件已部署，等待用户 Edge 确认
+## 历史快照：百炼完整声明式插件已部署，等待用户 Edge 确认
 
 正确基线 `d9fec0f4`，部署提交 `8dcdfd5d`，独立修复工作树 `.local/worktrees/dashscope-plugins`。两个协议已通过正式声明式 v3 插件进入统一生命周期；最终 Linux CGO 全量、断网克隆双启动与实际保留卷部署前后数据核对通过。Backend `45b8cc449d3c` 为 `v1.2.7+dingxin.1.bailian / 8dcdfd5d`，healthy、restart 0、schema 8/8；Web 容器未变，模型/价格/启用状态未改写。旧工作树宿主注入补丁已归档撤销。当前 `bailian_declarative_deployed_preverified_edge_pending`，详细证据和 Edge 清单见 `BAILIAN_PLUGIN_MIGRATION_20260911.md`。未执行浏览器步骤或真实付费生成。
 
-## 最新：v1.2.7阶段9稳定晋升完成
+## 历史快照：v1.2.7阶段9稳定晋升完成
 
 用户已在登录态Microsoft Edge完成当前生产环境可安全观察项复验，暂未发现问题。功能检查点37bb2375已通过dry-run后非强制快进推送到候选与stable；`origin/main`保持11931d00，默认分支仍是`codex/dingxin-stable`，未创建PR/Release或触发远程CI。F6因无法在生产环境安全构造保存失败而单列`test_only_pending`，不记为通过。运行Web仍为0d815d15、Backend为ae01c5d6且healthy/restart0。详见`UPSTREAM_V127_STAGE9_20260909.md`。
 
@@ -64,7 +84,7 @@
 
 从8f730ac4选择性适配三个UI来源提交，新代码提交8082e9e2/2aebd53e/d10c5e32；干净类型、默认1278测试、独立23专项及生产构建通过，33个Web改动文件与测试镜像哈希一致。详见 `UPSTREAM_V127_STAGE5_20260908.md`。未push/部署/操作Edge或真实数据；视觉、Runtime真实连接和偶发加载失败仍待后续人工验收。当前停在阶段6批准前，下方为历史检查点。
 
-## 最新源码检查点：v1.2.7阶段3–4
+## 历史快照：v1.2.7阶段3–4
 
 固定371bc68已按阶段2合同与stable5c1203e集成；本提交为独立候选的官方双父merge检查点。Backend隔离Linux CGO全量、Web干净类型/1255测试/生产构建通过。详见 `UPSTREAM_V127_STAGE34_20260908.md`。未重放三个UI留存提交、未push/部署；运行仍为UI2与v1.2.5 Backend。下文为历史状态，不能覆盖此源码检查点；阶段5及以后需新批准。
 
@@ -136,7 +156,7 @@
 - 文档站缺页仍按用户决定暂缓；Server CORS 默认通配符已在阶段 15 移除。Canvas Agent CI 门禁已在阶段 4 补入工作流，但远程尚未触发。
 - `.claude/settings.local.json` 历史上存在大量宽泛写入和破坏性授权，不应继承为 Codex 执行权限。
 
-## 当前验证状态
+## 历史快照：早期验证状态
 
 - 阶段 16 最终门禁：Backend 隔离 Linux CGO 全量、Web 459/459 + 跨 Runtime 1/1、TypeScript、11,022 模块生产构建、Canvas Agent 主机 292/292 和 TypeScript 构建均通过。
 - 阶段 10 已推翻“Canvas Agent Windows 生产进程清理失败”的旧判断：4 个失败由 Codex 受限测试进程调用 `taskkill` 时被系统拒绝访问造成；同一源码在主机权限下真实 `taskkill /T /F` 专项 12/12、Canvas Agent 全量 287/287 和 TypeScript 构建均通过。

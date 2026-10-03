@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 31
+const CurrentSchemaVersion int64 = 42
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -23,6 +23,13 @@ const assetLibraryFoldersChecksum = "sha256:asset-library-folders-v6-20260902"
 const logicalModelActiveCodeChecksum = "sha256:logical-model-active-code-v8-20260905"
 const creationRuntimeChecksum = "sha256:creation-runtime-v10-20260909"
 const providerDurationMeteringChecksum = "sha256:provider-duration-metering-v9-20260912"
+const providerDurationMeteringV41Checksum = "sha256:provider-duration-metering-v41-20260927"
+const authNotificationsChecksum = "sha256:auth-notifications-v35-20260924"
+const cloudAgentGeminiCacheChecksum = "sha256:cloud-agent-gemini-cache-v36-20260924"
+const cloudAgentGeminiCacheIdentityChecksum = "sha256:cloud-agent-gemini-cache-identity-v37-20260925"
+const prefixedIDSequenceReconcileChecksum = "sha256:prefixed-id-sequence-reconcile-v38-20260926"
+const skillLibraryCategoriesChecksum = "sha256:skill-library-categories-v39-20260926"
+const builtinSkillTombstonesChecksum = "sha256:builtin-skill-tombstones-v40-20260927"
 
 const postgresSchemaMigrationLockID int64 = 73123910420260830
 
@@ -100,14 +107,79 @@ var schemaMigrations = []migration{
 	{version: 29, name: "agent_resource_leases", checksum: "sha256:agent-resource-leases-v29-20260919", apply: func(tx *gorm.DB) error {
 		return tx.AutoMigrate(&model.CloudAgentResourceLease{})
 	}},
-	{version: 30, name: "provider_duration_metering", checksum: providerDurationMeteringChecksum, apply: migrateProviderDurationMetering},
-	{version: 31, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v31-20260924", apply: func(tx *gorm.DB) error {
+	{version: 30, name: "builtin_tools", checksum: "sha256:builtin-tools-v30", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.Tool{})
+	}},
+	{version: 31, name: "tool_favorites", checksum: "sha256:tool-favorites-v31", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.ToolFavorite{})
+	}},
+	{version: 32, name: "channel_model_tags", checksum: "sha256:channel-model-tags-v32", apply: migrateChannelModelTags},
+	{version: 33, name: "oauth_state_accepted_terms", checksum: "sha256:oauth-state-accepted-terms-v33", apply: migrateOAuthStateAcceptedTerms},
+	{version: 34, name: "task_media_recovery", checksum: "sha256:task-media-recovery-v34", apply: func(tx *gorm.DB) error {
+		for _, field := range []string{"MediaRecoveryJSON", "MediaStage"} {
+			if !tx.Migrator().HasColumn(&model.Task{}, field) {
+				if err := tx.Migrator().AddColumn(&model.Task{}, field); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}},
+	{version: 35, name: "auth_notifications", checksum: authNotificationsChecksum, apply: migrateSchemaV35},
+	{version: 36, name: "cloud_agent_gemini_cache", checksum: cloudAgentGeminiCacheChecksum, apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.CloudAgentGeminiCache{})
+	}},
+	{version: 37, name: "cloud_agent_gemini_cache_identity", checksum: cloudAgentGeminiCacheIdentityChecksum, apply: migrateCloudAgentGeminiCacheIdentity},
+	{version: 38, name: "prefixed_id_sequence_reconcile", checksum: prefixedIDSequenceReconcileChecksum, apply: migratePrefixedIDSequenceReconcile},
+	{version: 39, name: "skill_library_categories", checksum: skillLibraryCategoriesChecksum, apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.SkillLibraryCategory{}, &model.UserSkillState{})
+	}},
+	{version: 40, name: "builtin_skill_tombstones", checksum: builtinSkillTombstonesChecksum, apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.BuiltinSkillTombstone{})
+	}},
+	{version: 41, name: "provider_duration_metering", checksum: providerDurationMeteringV41Checksum, apply: migrateProviderDurationMetering},
+	{version: 42, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v42-20260927", apply: func(tx *gorm.DB) error {
 		return tx.AutoMigrate(&model.ComfyBridge{}, &model.ComfyBridgeRequest{})
 	}},
 }
 
 func migrateProviderDurationMetering(tx *gorm.DB) error {
 	return tx.AutoMigrate(&model.ApiCallLog{}, &model.BillingOrder{})
+}
+
+func migratePrefixedIDSequenceReconcile(tx *gorm.DB) error {
+	if err := tx.AutoMigrate(&model.IDSequence{}); err != nil {
+		return fmt.Errorf("创建可读 ID 序列表：%w", err)
+	}
+	return reconcilePrefixedIDSequences(tx)
+}
+
+func migrateCloudAgentGeminiCacheIdentity(tx *gorm.DB) error {
+	// v36 accidentally made cache_key globally unique while repository reads and
+	// writes are user-scoped. Remove that index before creating the explicit
+	// (user_id, cache_key) identity used by the model tags.
+	for _, name := range []string{"idx_cloud_agent_gemini_caches_cache_key", "idx_cloud_agent_gemini_cache_cache_key"} {
+		if tx.Migrator().HasIndex(&model.CloudAgentGeminiCache{}, name) {
+			if err := tx.Migrator().DropIndex(&model.CloudAgentGeminiCache{}, name); err != nil {
+				return fmt.Errorf("删除 Gemini 缓存旧唯一索引 %s：%w", name, err)
+			}
+		}
+	}
+	return tx.AutoMigrate(&model.CloudAgentGeminiCache{})
+}
+
+func migrateChannelModelTags(tx *gorm.DB) error {
+	if tx.Migrator().HasColumn(&model.ChannelModel{}, "Tags") {
+		return nil
+	}
+	return tx.Migrator().AddColumn(&model.ChannelModel{}, "Tags")
+}
+
+func migrateOAuthStateAcceptedTerms(tx *gorm.DB) error {
+	if tx.Migrator().HasColumn(&model.OAuthState{}, "AcceptedTerms") {
+		return nil
+	}
+	return tx.Migrator().AddColumn(&model.OAuthState{}, "AcceptedTerms")
 }
 
 func migrateChannelCreditCost(tx *gorm.DB) error {
@@ -241,11 +313,10 @@ func migrationsForDatabase(db *gorm.DB) ([]migration, error) {
 }
 
 // The dingxin v1.2.7 line used migration 9 for provider duration metering
-// before upstream assigned the same number to channel presentation. Keep both
-// histories valid: official/fresh databases apply duration metering at 30,
-// while existing dingxin databases retain their recorded 9 and shift the
-// upstream 9-29 sequence to 10-30. Later fork migrations keep their own
-// version numbers and must run on both lineages.
+// before upstream assigned the same number to channel presentation. Fresh
+// databases apply duration metering at 41. Existing dingxin databases retain
+// their recorded 9, shift upstream 9-40 to 10-41, and skip the duplicate 41.
+// Comfy Bridge runs at 42 on both lineages.
 func migrationsForProviderDurationLineage(db *gorm.DB, plan []migration) ([]migration, error) {
 	var applied schemaMigration
 	err := db.First(&applied, "version = ?", 9).Error
@@ -271,13 +342,13 @@ func migrationsForProviderDurationLineage(db *gorm.DB, plan []migration) ([]migr
 			shifted = append(shifted, legacy)
 			item.version++
 			shifted = append(shifted, item)
-		case item.version <= 29:
+		case item.version <= 40:
 			item.version++
 			shifted = append(shifted, item)
-		case item.version == 30:
+		case item.version == 41:
 			// Already represented by the validated legacy version 9 record.
 			continue
-		case item.version >= 31:
+		case item.version >= 42:
 			shifted = append(shifted, item)
 		}
 	}

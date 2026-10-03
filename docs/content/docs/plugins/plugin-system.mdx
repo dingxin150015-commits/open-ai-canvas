@@ -35,7 +35,7 @@ description: 影策统一插件系统的扩展边界、Manifest 合同与 Eagle 
 - `response.strict`：未知状态或错误的映射表达式直接拒绝，不能因暂存媒体 URL 把 PENDING 升级为成功。
 - `response.resultAnonymous`：结果 URL 下载不转发渠道凭证，包括同源地址；付费创建和轮询仍使用渠道鉴权。
 
-Windows 可运行 `scripts/build-bailian-plugins.ps1` 定向生成两个包；Linux 使用既有目录生成器与打包脚本。新增模型须提供成功/拒绝夹具和保存、报价、执行链验证，不能仅追加模型名称。
+Windows 可运行 `scripts/build-bailian-plugins.ps1` 校验并归档两个百炼 v4 包；旧 v2 目录生成器不会覆盖它们。Linux 打包脚本使用已验证的 v4 Manifest 与接口文档。新增模型须提供成功/拒绝夹具和保存、报价、执行链验证，不能仅追加模型名称。
 
 > 状态：已实现首版（Eagle 外部素材来源 + AI 提示词优化器）
 >

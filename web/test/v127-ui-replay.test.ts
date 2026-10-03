@@ -31,14 +31,15 @@ test("popover horizontal bounds include sidebars and DevTools-sized viewports", 
         }
 });
 
-test("one non-stretching bottom row owns all controls, with explicit focus and labeled assets", () => {
+test("responsive canvas keeps zoom, main dock and asset entry independently reachable", () => {
     const page = source("pages/canvas/project.tsx");
-    expect(page.match(/data-canvas-bottom-bar/g)).toHaveLength(1);
-    for (const component of ["CanvasZoomControls", "CanvasAssetTray", "CanvasToolbar", "CanvasWorkspaceModeSwitch"]) expect(page.match(new RegExp(`<${component}\\s`, "g"))).toHaveLength(1);
-    expect(page).toContain("canvasChromeLayout(size.width)");
+    expect(page.match(/<CanvasZoomControls\s/g)).toHaveLength(1);
+    expect(page.match(/<CanvasToolbar\s/g)).toHaveLength(1);
+    expect(source("lib/canvas/tool-registry/definitions/main-toolbar-tools.tsx")).toContain('label: "素材库"');
+    expect(source("pages/canvas/canvas-project-top-bar.tsx")).toContain('label: `画布模式：${workspaceMode === "simple" ? "简洁" : "专业"}`');
     expect(source("hooks/use-focus-mode.ts")).not.toContain("smallScreen ||");
     expect(source("components/canvas/canvas-asset-tray.tsx")).not.toContain("-right-1.5 -top-1.5");
-    expect(source("components/canvas/canvas-asset-tray.tsx")).toContain("displayLabel:");
+    expect(page).toContain("onOpenMyAssets=");
 });
 
 test("a concurrent connecting caller does not abort the owner handshake", async () => {
@@ -75,13 +76,14 @@ test("a concurrent connecting caller does not abort the owner handshake", async 
 
 test("automatic stream retries have a finite budget", () => {
     expect([1, 2, 3, 4, 5].map(canvasRuntimeRetryDelay)).toEqual([2000, 5000, 15000, null, null]);
-    expect(source("components/canvas/canvas-local-agent-panel.tsx")).toContain("enabled: false");
+    expect(source("pages/canvas/project.tsx")).not.toContain("CanvasLocalAgentPanel");
 });
 
 test("professional canvas exposes a discoverable Director entry in both top bar layouts", () => {
     const topBar = source("pages/canvas/canvas-project-top-bar.tsx");
     const page = source("pages/canvas/project.tsx");
-    expect(topBar.match(/新建 3D 导演台/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(topBar).toContain('label: "新建 3D 导演台"');
+    expect(topBar).toContain('aria-label="更多画布操作"');
     expect(page).toContain('onOpenDirector={workspaceMode === "professional"');
 });
 
@@ -113,7 +115,7 @@ function managedConfig() {
 
 test("logical duration and exact outgoing options gate quotes without rounding the shot", () => {
     const { config, requirements } = managedConfig();
-    expect(modelQuoteRequest(config, config.model, "video", requirements)?.modelID).toBe("LOGICAL_fixture");
+    expect(modelQuoteRequest(config, config.model, "video", requirements)?.logicalModelID).toBe("LOGICAL_fixture");
     for (const seconds of ["0", "3", "5.5", "15"]) {
         expect(modelQuoteValidationError(config, config.model, "video", { ...requirements, videoSeconds: seconds })).toContain("时长");
         expect(modelQuoteRequest(config, config.model, "video", { ...requirements, videoSeconds: seconds })).toBeUndefined();
@@ -132,5 +134,5 @@ test("logical resolution, references, wildcard and legacy channel ID retain thei
     delete cost.logicalModelId;
     delete cost.logicalCapabilitySpec;
     cost.channelModelId = "MODEL_fixture";
-    expect(modelQuoteRequest(config, config.model, "video", requirements)?.modelID).toBe("MODEL_fixture");
+    expect(modelQuoteRequest(config, config.model, "video", requirements)).toMatchObject({ channelId: "fixture", modelKey: "video" });
 });

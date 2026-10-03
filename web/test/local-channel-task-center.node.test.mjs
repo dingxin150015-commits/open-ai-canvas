@@ -12,7 +12,7 @@ function ambiguousChannels(store) {
     return [store.createModelChannel({ ...shared, id: "local-enabled", allowLocalChannel: true }), store.createModelChannel({ ...shared, id: "local-disabled", allowLocalChannel: false })];
 }
 
-test("task-center forwards explicit task/session provider config without inferring a channel from Zustand", async () => {
+test("task-center forwards explicit task provider config without inferring a channel from Zustand", async () => {
     const taskCenter = await import("../src/services/api/task-center");
     const generationTask = await import("../src/services/api/generation-task");
     const requestModule = await import("../src/services/api/request");
@@ -35,37 +35,27 @@ test("task-center forwards explicit task/session provider config without inferri
     assert.equal(generationTask.backendProviderConfig({ ...explicitConfig, model: "local-enabled::same-model" }).allowLocalChannel, true);
 
     const bodies = [];
-    const originalPost = requestModule.apiClient.post;
-    requestModule.apiClient.post = async (url, body) => {
-        bodies.push({ url, body });
-        if (url === "/sessions") {
-            return { data: { code: 0, data: { session: { id: "session", status: "active", prompt: "p", createdAt: "now", updatedAt: "now" }, messages: [], tasks: [], results: [] }, msg: "ok" } };
-        }
-        return { data: { code: 0, data: { id: "task", type: "canvas_text", status: "queued", prompt: "p", attempts: 1, createdAt: "now", updatedAt: "now" }, msg: "ok" } };
+    const originalAdapter = requestModule.apiClient.defaults.adapter;
+    requestModule.apiClient.defaults.adapter = async (request) => {
+        bodies.push({ url: request.url, body: JSON.parse(String(request.data)) });
+        return { config: request, data: { code: 0, data: { id: `task-${bodies.length}`, type: "canvas_text", status: "queued", prompt: "p", attempts: 1, createdAt: "now", updatedAt: "now" }, msg: "ok" }, headers: {}, status: 200, statusText: "OK" };
     };
     try {
-        const providerConfig = {
-            baseUrl: "http://127.0.0.1:8000",
-            apiKey: "same-key",
-            apiFormat: "openai",
-            model: "same-model",
-            allowLocalChannel: false,
-        };
-        await taskCenter.createAgentSession({ prompt: "p", config: providerConfig });
-        await taskCenter.createGenerationTask({
-            prompt: "p",
-            model: "same-model",
-            input: { mode: "text", config: providerConfig },
-        });
+        for (const model of ["local-disabled::same-model", "local-enabled::same-model"]) {
+            const providerConfig = generationTask.backendProviderConfig({ ...explicitConfig, model });
+            await taskCenter.createGenerationTask({ prompt: "p", model: "same-model", input: { mode: "text", config: providerConfig } });
+        }
     } finally {
-        requestModule.apiClient.post = originalPost;
+        requestModule.apiClient.defaults.adapter = originalAdapter;
         userStore.useUserStore.setState({ features: userStore.defaultFeatureAvailability });
         globalThis.window = previousWindow;
         store.useConfigStore.setState({ config: previousConfig });
     }
 
-    assert.equal(bodies[0]?.url, "/sessions");
-    assert.equal(bodies[0]?.body?.config?.allowLocalChannel, false);
-    assert.equal(bodies[1]?.url, "/tasks");
-    assert.equal(bodies[1]?.body?.input?.config?.allowLocalChannel, false);
+    assert.deepEqual(
+        bodies.map((item) => item.url),
+        ["/tasks", "/tasks"],
+    );
+    assert.equal(bodies[0]?.body?.input?.config?.allowLocalChannel, false);
+    assert.equal(bodies[1]?.body?.input?.config?.allowLocalChannel, true);
 });
