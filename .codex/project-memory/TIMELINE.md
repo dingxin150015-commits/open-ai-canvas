@@ -1,5 +1,17 @@
 # 开发历史时间线
 
+## 2026-10-04 04:09 CST：v1.6.0 A″ 候选镜像/HTTP/Compose 门禁闭合
+
+独立标签的 Backend/Web 完整候选镜像构建成功，镜像 ID 分别为 `sha256:ac4f54cf...` / `sha256:c4217b79...`，未覆盖生产 `:local`。在无宿主机端口、无生产挂载的专用网络与空临时数据目录中，Web 版本接口、Nginx 代理后的 Backend ready、首页 HTTP 均通过：`v1.6.0+dingxin.1`、暂存树构建标识 `tree-917414bc4783`、Schema45/45。dev/local/deploy 及 deploy+build Compose 用静态解析（生产配置只用占位值），通过后清理四个专用测试容器和两条专用网络，保留隔离迁移副本和候选镜像。未启动 v1.6.0 Edge 预览；手验清单与 NO-GO 边界见 `HANDOFF_V160_20261004.md`。
+
+## 2026-10-04 03:44 CST：v1.6.0 A″ 自动化与三谱系数据门禁
+
+固定官方 v1.6.0 的 40 个显式冲突已清零。Web 2,406+5 全量/类型/lint/构建、Canvas Agent 328/构建、Backend Linux CGO 全仓及五项真实 PostgreSQL/Redis 依赖用例通过；本地百炼两包 v4 归档与源逐字节一致。旧 Schema9、本地 A′ Schema42、官方 v1.6.0 Schema43 的隔离副本均升级至45/45，二次迁移和 verify、完整性/外键及旧谱系计数/关键文件保持通过。候选应用镜像构建与 HTTP、用户 Edge、正式提交/推送/晋升仍未完成，生产服务/真实卷不变。详见 `UPSTREAM_V160_EXECUTION_20261003.md`。
+
+## 2026-10-03 12:07 CST：A″ 固定 v1.6.0 真实合并启动
+
+原 v1.5.8 A′ 已用不移动分支的 `git commit-tree` 固化为仅本地 WIP 双父 `7419e2b3`，原工作树保持 `HEAD=56e9b124`/`MERGE_HEAD=25842275`。新隔离 A″ `.local/worktrees/upstream-v160` 从 WIP 检出并对官方正式 `v1.6.0@42f14cd7` 执行无提交 merge；实际 40 个文本冲突，正在处理，未测试/提交/推送/部署。详见 `UPSTREAM_V160_EXECUTION_20261003.md`。
+
 ## 2026-10-03 11:45 CST：用户批准从 v1.5.8 WIP 继续固定 v1.6.0
 
 官方 GitHub Release `v1.6.0` 经只读 API 确认为正式版，远端标签为 `42f14cd7`。当前 v1.5.8 A′ 仍是 `HEAD=56e9b124`、`MERGE_HEAD=25842275` 的未提交候选，未通过用户 Edge；用户明确选择先以仅本地 WIP 双父检查点封存该候选，再新建隔离 A″ 合入固定 v1.6.0。旧 A、A′、生产服务与数据不替换；当前记录是启动时事实，后续 SHA/测试/冲突以 `UPSTREAM_V160_EXECUTION_20261003.md` 更新。

@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 42
+const CurrentSchemaVersion int64 = 45
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -30,6 +30,7 @@ const cloudAgentGeminiCacheIdentityChecksum = "sha256:cloud-agent-gemini-cache-i
 const prefixedIDSequenceReconcileChecksum = "sha256:prefixed-id-sequence-reconcile-v38-20260926"
 const skillLibraryCategoriesChecksum = "sha256:skill-library-categories-v39-20260926"
 const builtinSkillTombstonesChecksum = "sha256:builtin-skill-tombstones-v40-20260927"
+const resourceThumbnailChecksum = "sha256:resource-thumbnail-v41-20260927"
 
 const postgresSchemaMigrationLockID int64 = 73123910420260830
 
@@ -137,8 +138,17 @@ var schemaMigrations = []migration{
 	{version: 40, name: "builtin_skill_tombstones", checksum: builtinSkillTombstonesChecksum, apply: func(tx *gorm.DB) error {
 		return tx.AutoMigrate(&model.BuiltinSkillTombstone{})
 	}},
-	{version: 41, name: "provider_duration_metering", checksum: providerDurationMeteringV41Checksum, apply: migrateProviderDurationMetering},
-	{version: 42, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v42-20260927", apply: func(tx *gorm.DB) error {
+	{version: 41, name: "resource_thumbnail", checksum: resourceThumbnailChecksum, apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.Resource{})
+	}},
+	{version: 42, name: "cloud_agent_pi_sessions", checksum: "sha256:cloud-agent-pi-sessions-v42-20260928", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.CloudAgentPiSession{})
+	}},
+	{version: 43, name: "topup_sale_strategies", checksum: "sha256:topup-sale-strategies-v43-20260929", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.TopupProduct{}, &model.PaymentOrder{})
+	}},
+	{version: 44, name: "provider_duration_metering", checksum: "sha256:provider-duration-metering-v44-20261003", apply: migrateProviderDurationMetering},
+	{version: 45, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v45-20261003", apply: func(tx *gorm.DB) error {
 		return tx.AutoMigrate(&model.ComfyBridge{}, &model.ComfyBridgeRequest{})
 	}},
 }
@@ -312,47 +322,67 @@ func migrationsForDatabase(db *gorm.DB) ([]migration, error) {
 	return migrationsForProviderDurationLineage(db, plan)
 }
 
-// The dingxin v1.2.7 line used migration 9 for provider duration metering
-// before upstream assigned the same number to channel presentation. Fresh
-// databases apply duration metering at 41. Existing dingxin databases retain
-// their recorded 9, shift upstream 9-40 to 10-41, and skip the duplicate 41.
-// Comfy Bridge runs at 42 on both lineages.
+// The local version-9 and version-41/42 lineages predate upstream's migration
+// numbers. Preserve their recorded names/checksums while applying the missing
+// upstream migrations at the first free versions in each lineage.
 func migrationsForProviderDurationLineage(db *gorm.DB, plan []migration) ([]migration, error) {
 	var applied schemaMigration
 	err := db.First(&applied, "version = ?", 9).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return plan, nil
-	}
-	if err != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("读取数据库迁移 9：%w", err)
 	}
-	if applied.Name != "provider_duration_metering" {
-		return plan, nil
-	}
-	legacy := migration{version: 9, name: "provider_duration_metering", checksum: providerDurationMeteringChecksum, apply: migrateProviderDurationMetering}
-	if err := validateMigrationRecord(applied, legacy); err != nil {
-		return nil, err
-	}
-	shifted := make([]migration, 0, len(plan))
-	for _, item := range plan {
-		switch {
-		case item.version <= 8:
-			shifted = append(shifted, item)
-		case item.version == 9:
-			shifted = append(shifted, legacy)
-			item.version++
-			shifted = append(shifted, item)
-		case item.version <= 40:
-			item.version++
-			shifted = append(shifted, item)
-		case item.version == 41:
-			// Already represented by the validated legacy version 9 record.
-			continue
-		case item.version >= 42:
+	if err == nil && applied.Name == "provider_duration_metering" {
+		legacy := migration{version: 9, name: "provider_duration_metering", checksum: providerDurationMeteringChecksum, apply: migrateProviderDurationMetering}
+		if err := validateMigrationRecord(applied, legacy); err != nil {
+			return nil, err
+		}
+		shifted := make([]migration, 0, len(plan))
+		for _, item := range plan {
+			switch {
+			case item.version <= 8:
+				shifted = append(shifted, item)
+			case item.version == 9:
+				shifted = append(shifted, legacy)
+				item.version = 10
+				shifted = append(shifted, item)
+			case item.version <= 40:
+				item.version++
+				shifted = append(shifted, item)
+			}
+		}
+		bridge := plan[44]
+		bridge.version = 42
+		bridge.checksum = "sha256:comfy-bridge-runtime-v42-20260927"
+		shifted = append(shifted, bridge)
+		for _, item := range plan[40:43] {
+			item.version += 2
 			shifted = append(shifted, item)
 		}
+		return shifted, nil
 	}
-	return shifted, nil
+	var applied41 schemaMigration
+	err = db.First(&applied41, "version = ?", 41).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("读取数据库迁移 41：%w", err)
+	}
+	if err == nil && applied41.Name == "provider_duration_metering" {
+		oldDuration := migration{version: 41, name: "provider_duration_metering", checksum: providerDurationMeteringV41Checksum, apply: migrateProviderDurationMetering}
+		if err := validateMigrationRecord(applied41, oldDuration); err != nil {
+			return nil, err
+		}
+		shifted := append([]migration(nil), plan[:40]...)
+		shifted = append(shifted, oldDuration)
+		bridge := plan[44]
+		bridge.version = 42
+		bridge.checksum = "sha256:comfy-bridge-runtime-v42-20260927"
+		shifted = append(shifted, bridge)
+		for _, item := range plan[40:43] {
+			item.version += 2
+			shifted = append(shifted, item)
+		}
+		return shifted, nil
+	}
+	return plan, nil
 }
 
 func migrateSchemaV2(tx *gorm.DB) error {

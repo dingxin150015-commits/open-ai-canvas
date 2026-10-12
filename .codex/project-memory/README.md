@@ -1,6 +1,8 @@
 # 影策项目级记忆入口
 
-当前权威入口（2026-09-29 11:37 CST）：先读 `CURRENT_STATE.md` 的首节，再读 `HANDOFF_V158_20260928.md`、`UPSTREAM_V158_EXECUTION_20260927.md` 与 `BRANCH_LIFECYCLE_20260927.md`。A′ v1.5.8 的显式冲突、Web/Agent/Linux CGO 全量、双谱系克隆迁移与候选镜像已通过；用户批准的 `127.0.0.1:3001` 空数据隔离预览已运行且 HTTP 冒烟通过。用户 Edge 手验、正式提交/远端 CI 与晋升未通过。旧运行版本的验证结果不能移用到 A′。
+当前任务入口（2026-10-04 04:09 CST）：**先读 `CURRENT_STATE.md` 顶部、`UPSTREAM_V160_EXECUTION_20261003.md` 和 `HANDOFF_V160_20261004.md`**。仅本地 WIP 双父 `7419e2b3` 封存未验收 v1.5.8 候选；隔离 A″ `.local/worktrees/upstream-v160` 合入固定官方 `v1.6.0@42f14cd7`，40 个文本冲突清零。Backend Linux CGO 全仓及五项依赖用例、Web 2,406+5 全量/类型/lint/构建、Canvas Agent 328/构建、三谱系隔离 Schema45 迁移、独立候选镜像/无宿主端口 HTTP 和 Compose 静态解析均通过。**尚无 v1.6.0 Edge 预览地址**；用户 Edge/正式提交/推送/生产晋升仍未通过。旧 A、v1.5.8 A′、生产服务均保留。
+
+历史权威入口（2026-09-29 11:37 CST）：先读 `CURRENT_STATE.md` 的首节，再读 `HANDOFF_V158_20260928.md`、`UPSTREAM_V158_EXECUTION_20260927.md` 与 `BRANCH_LIFECYCLE_20260927.md`。A′ v1.5.8 的显式冲突、Web/Agent/Linux CGO 全量、双谱系克隆迁移与候选镜像已通过；用户批准的 `127.0.0.1:3001` 空数据隔离预览曾运行且 HTTP 冒烟通过。用户 Edge 手验、正式提交/远端 CI 与晋升未通过。旧运行版本的验证结果不能移用到 A′。
 
 中文百炼上游贡献草案见 `docs/plans/bailian-upstream-pr-v158.md`：第一部分是给合并大模型的省 token 操作卡，第二部分是给维护者的自然语言说明。Issue #332 已在 2026-09-07 关闭但无架构答复，正式 PR 需重新确认维护者意向并使用当时官方最新主线。
 

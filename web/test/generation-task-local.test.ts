@@ -198,13 +198,15 @@ test("Dreamina submission uncertainty is not an accepted background task", () =>
 });
 
 test("Canvas task surfaces route Dreamina uncertainty through shared display semantics without cancellation", async () => {
-    const [nodeSource, detailSource, scriptSource, taskCenterSource, createSource] = await Promise.all([
+    const [nodeSource, canvasSource, detailSource, scriptSource, taskCenterSource, createSource] = await Promise.all([
+        Bun.file(new URL("../src/components/canvas/canvas-node-status-content.tsx", import.meta.url)).text(),
         Bun.file(new URL("../src/components/canvas/canvas-node-content.tsx", import.meta.url)).text(),
         Bun.file(new URL("../src/pages/canvas/canvas-project-status-dialogs.tsx", import.meta.url)).text(),
         Bun.file(new URL("../src/components/canvas/canvas-script-node.tsx", import.meta.url)).text(),
         Bun.file(new URL("../src/pages/tasks/index.tsx", import.meta.url)).text(),
         Bun.file(new URL("../src/pages/create/index.tsx", import.meta.url)).text(),
     ]);
+    expect(canvasSource).toContain('from "./canvas-node-status-content"');
     expect(nodeSource).toContain("generationTaskStageLabel(displayTask)");
     expect(nodeSource).toContain("generationTaskShowsProgress(displayTask)");
     expect(nodeSource).not.toContain("onCancelTask");

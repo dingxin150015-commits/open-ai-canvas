@@ -1,5 +1,12 @@
 # 影策备份登记簿
 
+## 2026-10-04 v1.6.0 A″ 三谱系迁移测试副本（不是生产恢复点）
+
+- `open-ai-canvas-v160-legacy9-clone-20261004`：只读复制已停止的 `open-ai-canvas-catalog-preflight-20260913`，复制时逐字节一致；候选从 Schema9 升 45，二次 up/verify 45/45，完整性 ok、外键违规 0。
+- `open-ai-canvas-v160-local42-clone-20261004`：只读复制已验证的 `open-ai-canvas-v158-a-prime-legacy-clone-20260928`，复制时逐字节一致；候选从本地 Schema42 升 45，二次 up/verify 45/45，完整性 ok、外键违规 0。两份有业务副本脱敏计数均保持 `1/2/370/3/5/5/2/3`（用户/渠道/渠道模型/任务/资源/素材/项目/订单），设置密钥和插件登记与各自来源字节相同。
+- `open-ai-canvas-v160-official43-clone-20261004`：官方正式后端镜像新建的 Schema43 空业务结构源，43/43 ready；`open-ai-canvas-v160-official43-upgrade-20261004`：其逐字节复制后由候选升至 45，二次 up/verify、完整性与外键通过，业务关键表均 0。官方镜像 digest `sha256:0312f1185338656185a68ac64eea312ea86649fe11b31c8a336155eb570a9a1f`。
+- `open-ai-canvas-v160-migrate-gocache-20261004` 仅为隔离编译缓存，不是备份。上述卷都与运行中生产卷 `open-ai-canvas_backend-data` 分离，保留供复核，未登记为 `verified/protected` 生产恢复点；清理须精确核对名称、挂载与授权，禁止 `down -v` 或通配删除。
+
 ## 2026-09-29 隔离预览空数据卷（不是备份）
 
 - `open-ai-canvas-v158-edge-preview-data-20260929` 是用户批准的 A′ Edge 预览新空卷，挂载到 `open-ai-canvas-v158-preview-backend-20260929:/data`；2026-09-29 启动后由候选后端初始化到 Schema42。它不包含生产数据、密钥或素材，不能当作恢复点，也不得与生产卷 `open-ai-canvas_backend-data` 混淆。

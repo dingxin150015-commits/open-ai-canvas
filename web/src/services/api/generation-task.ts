@@ -1,3 +1,4 @@
+import { normalizeAudioFormatForConfig, normalizeAudioVoiceForConfig } from "@/lib/audio-generation";
 import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob } from "@/services/image-storage";
 import { resourceIdFromStorageKey, resourceStorageKey, uploadResourceFile } from "@/services/api/resources";
@@ -27,6 +28,7 @@ export type BackendGenerationResult = {
     images?: Array<{ dataUrl: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string }>;
     video?: { dataUrl: string; storageKey?: string; width?: number; height?: number; durationMs?: number; bytes?: number; mimeType?: string };
     audio?: { dataUrl: string; storageKey?: string; durationMs?: number; bytes?: number; mimeType?: string; format?: string };
+    audios?: Array<{ dataUrl: string; storageKey?: string; durationMs?: number; bytes?: number; mimeType?: string; format?: string }>;
     text?: string;
     toolCalls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string }; thoughtSignature?: string }>;
     reasoning?: string;
@@ -141,7 +143,11 @@ export async function runBackendGenerationTask(
     assertBackendRuntimeConfigured(config, mode);
     const prepared = await prepareGenerationReferences({ config, mode, referenceImages, referenceVideos, referenceAudios, mask });
     throwIfAborted(signal);
-    return createAndWaitGenerationTask({ projectId, mode, prompt, config, referenceImages, referenceVideos, referenceAudios, textHistory, mask, signal, metadata, onTaskUpdate, onTextDelta, streamText, enableThinking, clientOperationId, retryOf, attemptGroupId }, prepared, dependencies);
+    return createAndWaitGenerationTask(
+        { projectId, mode, prompt, config, referenceImages, referenceVideos, referenceAudios, textHistory, mask, signal, metadata, onTaskUpdate, onTextDelta, streamText, enableThinking, clientOperationId, retryOf, attemptGroupId },
+        prepared,
+        dependencies,
+    );
 }
 
 // 分镜等后台生产流程只需要可靠提交任务；任务状态与产物由项目工作区轮询和
@@ -228,18 +234,23 @@ export async function runBackendGenerationTaskBatch(options: BackendGenerationTa
     if (usesLocalDreamina(options.config)) {
         await dependencies.ensureLocalDreaminaReady?.(options.signal);
         throwIfAborted(options.signal);
-        return Promise.allSettled(Array.from({ length: count }, (_, batchIndex) => {
-            const retryContext = options.retryContextsByBatchIndex?.[batchIndex];
-            return runLocalDreaminaGeneration({
-                ...options,
-                config: { ...options.config, count: "1" },
-                metadata: { ...options.metadata, batchIndex, batchCount: count },
-                localIdempotencyKey: options.localIdempotencyKey ? `${options.localIdempotencyKey}:${batchIndex + 1}` : undefined,
-                clientOperationId: retryContext?.clientOperationId ?? (options.clientOperationId ? `${options.clientOperationId}:${batchIndex + 1}` : undefined),
-                retryOf: retryContext?.retryOf ?? options.retryOf,
-                attemptGroupId: retryContext?.attemptGroupId ?? options.attemptGroupId,
-            }, dependencies);
-        }));
+        return Promise.allSettled(
+            Array.from({ length: count }, (_, batchIndex) => {
+                const retryContext = options.retryContextsByBatchIndex?.[batchIndex];
+                return runLocalDreaminaGeneration(
+                    {
+                        ...options,
+                        config: { ...options.config, count: "1" },
+                        metadata: { ...options.metadata, batchIndex, batchCount: count },
+                        localIdempotencyKey: options.localIdempotencyKey ? `${options.localIdempotencyKey}:${batchIndex + 1}` : undefined,
+                        clientOperationId: retryContext?.clientOperationId ?? (options.clientOperationId ? `${options.clientOperationId}:${batchIndex + 1}` : undefined),
+                        retryOf: retryContext?.retryOf ?? options.retryOf,
+                        attemptGroupId: retryContext?.attemptGroupId ?? options.attemptGroupId,
+                    },
+                    dependencies,
+                );
+            }),
+        );
     }
     const prepared = await prepareGenerationReferences(options);
     throwIfAborted(options.signal);
@@ -552,15 +563,16 @@ function generationMetadata(config: AiConfig, metadata?: Record<string, unknown>
     const model = modelOptionName(config.model);
     const modelCost = channel.modelCosts?.find((item) => item.model === model);
     const protocol = modelCost?.protocol || channel.interfaceType;
-    const defaults = modelCost?.defaultOptions;
-    if (!protocol || !defaults || !Object.keys(defaults).length) return metadata;
+    if (!protocol) return metadata;
     const existing = metadata?.providerOptions && typeof metadata.providerOptions === "object" && !Array.isArray(metadata.providerOptions) ? (metadata.providerOptions as Record<string, unknown>) : {};
     const namespace = existing[protocol] && typeof existing[protocol] === "object" && !Array.isArray(existing[protocol]) ? (existing[protocol] as Record<string, unknown>) : {};
+    const defaults = modelCost?.defaultOptions && typeof modelCost.defaultOptions === "object" ? modelCost.defaultOptions : {};
     const explicit = Object.fromEntries(["seed", "negative_prompt", "prompt_extend", "prompt_extend_mode", "enable_thinking", "watermark", "request_mode"].filter((key) => metadata?.[key] !== undefined).map((key) => [key, metadata![key]]));
     if (explicit.prompt_extend === false) {
         explicit.prompt_extend_mode = null;
         explicit.enable_thinking = false;
     }
+    if (!Object.keys(defaults).length && !Object.keys(namespace).length && !Object.keys(explicit).length) return metadata;
     return { ...metadata, providerOptions: { ...existing, [protocol]: { ...defaults, ...namespace, ...explicit } } };
 }
 
@@ -640,9 +652,11 @@ export function backendProviderConfig(config: AiConfig, mode: BackendGenerationM
         videoGenerateAudio: config.videoGenerateAudio,
         videoWatermark: config.videoWatermark,
         videoArkPrivateAssetUpload: config.videoArkPrivateAssetUpload,
-        audioVoice: config.audioVoice,
-        audioFormat: config.audioFormat,
+        audioVoice: normalizeAudioVoiceForConfig(config, config.audioVoice),
+        audioFormat: normalizeAudioFormatForConfig(config, config.audioFormat),
         audioSpeed: config.audioSpeed,
+        audioLanguage: config.audioLanguage,
+        audioDialect: config.audioDialect,
         audioInstructions: config.audioInstructions,
         systemPrompt: config.systemPrompt,
     };
@@ -685,9 +699,11 @@ function workflowProviderConfig(config: AiConfig, requestConfig: ReturnType<type
         videoGenerateAudio: config.videoGenerateAudio,
         videoWatermark: config.videoWatermark,
         videoArkPrivateAssetUpload: config.videoArkPrivateAssetUpload,
-        audioVoice: config.audioVoice,
-        audioFormat: config.audioFormat,
+        audioVoice: normalizeAudioVoiceForConfig(config, config.audioVoice),
+        audioFormat: normalizeAudioFormatForConfig(config, config.audioFormat),
         audioSpeed: config.audioSpeed,
+        audioLanguage: config.audioLanguage,
+        audioDialect: config.audioDialect,
         audioInstructions: config.audioInstructions,
         workflowId: workflow.workflowId,
         webappId: workflow.webappId,
@@ -716,12 +732,13 @@ function workflowPublicExecution(workflow: GenerationWorkflowExecution) {
 function logicalCapabilityOptions(config: AiConfig, mode: BackendGenerationMode) {
     const channel = resolveModelChannel(config, config.model);
     const spec = channel.modelCosts?.find((item) => item.model === modelOptionName(config.model))?.logicalCapabilitySpec;
-    const candidates: Record<string, unknown> = mode === "image"
-        ? { size: config.size, quality: omittedImageQuality(config.quality), transparentBackground: config.transparentBackground === "true", count: Number(config.count) }
-        : mode === "video"
-            ? { size: config.size, videoSeconds: Number(config.videoSeconds), vquality: config.vquality, videoGenerateAudio: config.videoGenerateAudio === "true", videoWatermark: config.videoWatermark === "true" }
-            : mode === "audio"
-                ? { audioVoice: config.audioVoice, audioFormat: config.audioFormat, audioSpeed: Number(config.audioSpeed) }
+    const candidates: Record<string, unknown> =
+        mode === "image"
+            ? { size: config.size, quality: omittedImageQuality(config.quality), transparentBackground: config.transparentBackground === "true", count: Number(config.count) }
+            : mode === "video"
+              ? { size: config.size, videoSeconds: Number(config.videoSeconds), vquality: config.vquality, videoGenerateAudio: config.videoGenerateAudio === "true", videoWatermark: config.videoWatermark === "true" }
+              : mode === "audio"
+                ? { audioVoice: config.audioVoice, audioFormat: config.audioFormat, audioSpeed: Number(config.audioSpeed), audioLanguage: config.audioLanguage, audioDialect: config.audioDialect }
                 : {};
     const contract = declaredGenerationContract(config);
     if (contract && (mode === "image" || mode === "video")) candidates.generationContract = contract;
@@ -732,7 +749,9 @@ function logicalCapabilityOptions(config: AiConfig, mode: BackendGenerationMode)
 }
 
 function omittedImageQuality(value: string | undefined) {
-    const normalized = String(value || "").trim().toLowerCase();
+    const normalized = String(value || "")
+        .trim()
+        .toLowerCase();
     return normalized === "auto" || normalized === "any" ? undefined : value;
 }
 
@@ -747,7 +766,10 @@ function normalizeBackendText(value: unknown): string | undefined {
     if (typeof value === "string") return value;
     if (value === null || value === undefined) return undefined;
     if (Array.isArray(value)) {
-        const text = value.map((item) => normalizeBackendText(item)).filter((item): item is string => Boolean(item)).join("");
+        const text = value
+            .map((item) => normalizeBackendText(item))
+            .filter((item): item is string => Boolean(item))
+            .join("");
         return text || undefined;
     }
     if (typeof value === "object") {

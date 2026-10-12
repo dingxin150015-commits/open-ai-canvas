@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createAdminUser, updateAdminUser, type AdminUser, type LocalUser } from "@/services/api/auth";
 
-type UserFormValues = Pick<LocalUser, "displayName" | "email" | "role" | "status">;
+type UserFormValues = Pick<LocalUser, "displayName" | "email" | "role" | "status"> & { password?: string };
 
 export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user: AdminUser | null; actorId?: string; onClose: () => void; onSaved: (user: LocalUser) => void }) {
     const { message, modal } = App.useApp();
@@ -49,6 +49,7 @@ export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user:
                 email: values.email?.trim() || "",
                 role: values.role,
                 status: values.status,
+                ...(values.password?.trim() ? { password: values.password } : {}),
             });
             onSaved(result.user);
             form.resetFields();
@@ -84,6 +85,9 @@ export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user:
                 </Form.Item>
                 <Form.Item name="email" label="邮箱" rules={[{ type: "email", message: "请输入有效邮箱" }]}>
                     <Input placeholder="name@example.com" />
+                </Form.Item>
+                <Form.Item name="password" label="重置密码" extra="留空表示不修改；保存后该用户已有登录会话会失效。" rules={[{ min: 8, message: "密码至少 8 位" }]}>
+                    <Input.Password placeholder="输入新密码以手动重置" autoComplete="new-password" />
                 </Form.Item>
                 <Form.Item name="role" label="角色" extra={editingSelf ? "不能在此修改当前管理员自己的角色。" : "角色变更会立即影响后台访问权限。"}>
                     <Select

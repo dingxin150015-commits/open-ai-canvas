@@ -414,3 +414,40 @@ func TestMediaRecoveryExpiredLeaseAndStagingLimits(t *testing.T) {
 		t.Fatal("staging budget exceeded")
 	}
 }
+
+func TestMediaRecoveryAudioKeepsAllReturnedResults(t *testing.T) {
+	s, db := newMediaRecoveryTestService(t)
+	s.runtimeCapabilities = RuntimeCapabilities{desktopLocalChannels: true}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("audio-result"))
+	}))
+	defer server.Close()
+	if _, err := s.validateChannelOutboundURL(server.URL, true, false); err != nil {
+		t.Fatalf("test desktop loopback URL was rejected before recovery: %v", err)
+	}
+	expires := time.Now().Add(time.Hour)
+	input, err := json.Marshal(canvasGenerationInput{Mode: "audio", Config: providerConfig{BaseURL: server.URL, AllowLocalChannel: true}, Prompt: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := &model.Task{ID: newID(), UserID: "media-user", Type: "canvas_audio", Status: model.TaskStatusRunning, InputJSON: string(input), LeaseOwner: "worker-a", LeaseExpiresAt: &expires, RouteRun: 1, CreatedAt: time.Now()}
+	if err := db.Create(task).Error; err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.WithValue(withProviderAnalytics(context.Background(), s, *task), mediaExecutionTaskKey{}, *task)
+	result, handled, recoveryErr := recoverProtocolMedia(ctx, providerConfig{BaseURL: server.URL, AllowLocalChannel: true}, "audio", []protocol.MediaReference{
+		{URL: server.URL + "/voice.wav", MIMEType: "audio/mpeg"},
+		{URL: server.URL + "/emotion.wav", MIMEType: "audio/mpeg"},
+	})
+	if !handled || recoveryErr != nil {
+		t.Fatalf("handled=%v err=%v cause=%v", handled, recoveryErr, errors.Unwrap(recoveryErr))
+	}
+	audios, ok := result["audios"].([]interface{})
+	if !ok || len(audios) != 2 {
+		t.Fatalf("audios=%#v result=%#v", result["audios"], result)
+	}
+	if _, ok := result["audio"]; !ok {
+		t.Fatal("legacy singular audio result missing")
+	}
+}

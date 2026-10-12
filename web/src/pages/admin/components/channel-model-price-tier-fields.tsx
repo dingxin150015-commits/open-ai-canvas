@@ -42,6 +42,8 @@ export function PriceTierFields({
     const durationOptions = video?.duration.selection === "enum" ? video.duration.values || [] : [];
     const tokenEnabled = modelProtocolSupportsTokenBilling(capability, protocol);
     const isVideo = capability === "video";
+    const isAudio = capability === "audio";
+    const isDurationPriced = isVideo || isAudio;
     const isImage = capability === "image";
     return (
         <article className="admin-price-tier-card">
@@ -155,12 +157,18 @@ export function PriceTierFields({
                             </div>
                         </div>
                         <div className="admin-price-tier-billing-grid">
-                            <Form.Item className="admin-price-tier-billing-mode mb-0" name={[index, "billingMode"]} label="计费方式" rules={[{ required: true }]} extra={billingMode === "per_second_usage" ? "按实际计费时长结算，先预扣估算额；缺少用量或超出预扣时转人工核对，不自动超额补扣。" : undefined}>
+                            <Form.Item
+                                className="admin-price-tier-billing-mode mb-0"
+                                name={[index, "billingMode"]}
+                                label="计费方式"
+                                rules={[{ required: true }]}
+                                extra={billingMode === "per_second_usage" ? "按实际计费时长结算，先预扣估算额；缺少用量或超出预扣时转人工核对，不自动超额补扣。" : undefined}
+                            >
                                 <Segmented
                                     className="w-full"
                                     options={[
                                         { label: "按次", value: "fixed_request" },
-                                        { label: "按秒", value: "per_second", disabled: !isVideo },
+                                        { label: "按秒", value: "per_second", disabled: !isDurationPriced },
                                         { label: "实际时长", value: "per_second_usage", disabled: !isVideo || protocol !== "dashscope-video" },
                                         { label: isVideo ? "视频 Token" : "Token", value: "token", disabled: !tokenEnabled },
                                     ]}
@@ -185,7 +193,12 @@ export function PriceTierFields({
                                     </div>
                                 )
                             ) : (
-                                <Form.Item className="admin-price-tier-unit-price mb-0" name={[index, "unitPrice"]} label={billingMode === "per_second" || billingMode === "per_second_usage" ? "每秒消耗积分" : "每次消耗积分"} rules={[{ required: true, message: "请输入积分价格" }]}>
+                                <Form.Item
+                                    className="admin-price-tier-unit-price mb-0"
+                                    name={[index, "unitPrice"]}
+                                    label={billingMode === "per_second" || billingMode === "per_second_usage" ? "每秒消耗积分" : "每次消耗积分"}
+                                    rules={[{ required: true, message: "请输入积分价格" }]}
+                                >
                                     <InputNumber className="w-full" min={0} max={1_000_000} precision={6} step={0.1} />
                                 </Form.Item>
                             )}

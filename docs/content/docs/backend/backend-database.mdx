@@ -19,11 +19,13 @@ description: 影策后端核心持久化表与状态边界
 
 ## 结构迁移与版本
 
-当前候选结构版本为 42。版本 41/42 分别追加本地实际视频时长计费和 Comfy Bridge；尚未部署。官方版本 40 `builtin_skill_tombstones` 新增内置技能删除记录，管理员删除平台技能后，后续启动同步不会重新创建该技能；版本 39 `skill_library_categories` 新增 `skill_library_categories` 表，并为 `user_skill_states` 增加 `library_category_id`，保存个人技能库分类及每个用户对技能的归类；分类不改变 `skills.tag` 的技能广场共享分类。版本 38 `prefixed_id_sequence_reconcile` 创建（若缺失）并校准 `id_sequences`：`CHANNEL`、`MODEL`、`PTIER`、`ATTEMPT`、`LMODEL`、`REVISION`、`ROUTE` 按对应业务表的最大有效 ID 前移，包含软删除记录，不回退已有序列、不重写业务 ID。分配新 ID 时再次校准并检查冲突；SQLite → PostgreSQL 迁移完成后也校准序列。
+当前 **v1.6.0 A″ 候选**目标结构版本为 45，尚未在生产部署。官方 v1.6.0 的规范谱系保留版本 41 `resource_thumbnail`（资源缩略图元数据）、42 `cloud_agent_pi_sessions`（Pi 原生会话快照）和 43 `topup_sale_strategies`（充值售卖策略）；本地实际视频时长计费与 Comfy Bridge 顺延为 44/45。Pi 会话正文由 Agent runtime 管理，Go 只将其作为不透明快照读写，不能取代事件、任务与控制检查点。
 
-版本 36 `cloud_agent_gemini_cache` 创建 `cloud_agent_gemini_caches`，保存用户范围内的官方 Gemini 缓存元数据；版本 37 `cloud_agent_gemini_cache_identity` 将缓存标识约束修正为 `(user_id, cache_key)`，移除旧的全局 cache_key 唯一索引。版本 35 `auth_notifications` 为认证通知与组合验证补齐 `auth_verifications`、`notification_quotas`、`sms_channels`、`sms_records` 四张表，并为 `users` 增加 `phone`、`email_verified_at`、`phone_verified_at`，为 `email_verification_codes` 增加 `attempts`；同时创建非空手机号唯一索引。版本 34 `task_media_recovery` 为 `tasks` 增加 `media_recovery_json`（text）和 `media_stage`（最长 24 字）。版本 33 `oauth_state_accepted_terms` 为 `o_auth_states` 增加非空布尔列 `accepted_terms`，默认 `false`，不替历史流程补造同意记录。
+已存在的本地 v1.5.8 Schema 42 采用另一历史编号：41 为 `provider_duration_metering`、42 为 `comfy_bridge_runtime`；原 v1.2.7 本地谱系还曾在版本 9 记录时长计费。迁移代码按已记录的名称与校验和选择各自顺序，在剩余编号补上官方结构，不重写历史记录；官方 Schema 43 和本地旧 Schema 9/42 都必须用隔离克隆验证重复 `up`、`verify`、完整性/外键与关键数据保持，测试通过前不升级真实数据卷。
 
-升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。旧版本二进制不支持候选版本 42，回退需恢复匹配的数据库备份，并评估备份之后的新写入；不能只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。
+此前官方 40 `builtin_skill_tombstones` 防止已删除的内置技能在启动同步后重建；39 `skill_library_categories` 保存个人分类且不改变技能广场共享分类；38 `prefixed_id_sequence_reconcile` 校准可读 ID 序列，包含软删除记录且不回退已有序列。36/37 分别创建用户范围的 Gemini 缓存元数据并把唯一约束改为 `(user_id, cache_key)`；35 增加认证通知表与手机号/验证字段，34 增加任务媒体保存恢复列，33 为 OAuth 同意条款记录加布尔列，不替历史流程补造同意。
+
+升级前必须制作匹配镜像、DB/WAL/SHM 与设置密钥的恢复点，再按既有流程执行 `migrate-schema up` 和 `verify` 后启动新后端。旧二进制不支持候选 Schema 45；回退须恢复匹配版本的备份并评估其后新增写入，不能只切旧镜像或手工改写 `schema_migrations`。
 
 ### 生成成功后的作品保存恢复
 
@@ -50,7 +52,7 @@ description: 影策后端核心持久化表与状态边界
 
 官方版本 30–40 依次新增内置工具、工具收藏、渠道模型标签、OAuth 协议同意标记、任务媒体恢复、认证通知、Gemini 缓存及身份修复、可读 ID 序列校准、技能库分类和内置技能删除记录；名称、版本与校验和以 `backend/internal/database/migrations.go` 为准。
 
-本地候选版本 41 `provider_duration_metering` 为请求日志和订单追加实际视频时长计量；版本 42 `comfy_bridge_runtime` 创建设备与请求表。已应用的旧生产 Schema9 时长迁移保留原校验和，官方 9–40 在该历史谱系顺移并跳过重复时长迁移；正式发布前必须用两谱系脱敏克隆验证。已发布迁移的实现和校验和不得修改。
+历史 v1.5.8 A′ 曾用版本 41 `provider_duration_metering` 为请求日志和订单增加实际视频时长计量、版本 42 `comfy_bridge_runtime` 创建设备与请求表。v1.6.0 A″ 的新库规范顺序改为官方 41–43、本地 44–45；已应用的本地 41/42 和更早版本 9 记录均保留原名称、校验和与时间，按对应谱系补足官方结构。正式发布前必须分别用旧生产、A′ 与官方 v1.6.0 的隔离克隆验证；不得手改已发布迁移记录。
 
 渠道模型的文本能力 JSON 还可声明 `contextWindowTokens` 与 `maxOutputTokens`。这两个字段是模型能力合同，不是数据库或 Agent checkpoint 的容量配置；旧记录读取时补 128K / 16K 默认值。运行状态、journal 和 transcript 的持久化边界仍由既有 runtime 表及其 512KB checkpoint 校验负责，本阶段没有通过扩大 checkpoint 绕过模型上下文限制。
 

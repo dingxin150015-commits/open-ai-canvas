@@ -53,25 +53,6 @@ func (w *taskWorkerCoordinator) start(ctx context.Context) {
 	s.startBillingReviewAudit(ctx)
 	s.startAgentMemoryCompactScheduler()
 	s.runWorkerLoop(func(ctx context.Context) {
-		ticker := time.NewTicker(2 * time.Second)
-		defer ticker.Stop()
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-			if !s.IsDraining() {
-				s.advanceCloudAgents()
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case <-s.agentSchedulerWake:
-				continue
-			case <-ticker.C:
-			}
-		}
-	})
-	s.runWorkerLoop(func(ctx context.Context) {
 		slots := make(chan struct{}, maxChannelConcurrencyLimit)
 		dispatch := func() {
 			if ctx.Err() != nil || s.IsDraining() {
@@ -149,9 +130,6 @@ func (w *taskWorkerCoordinator) processNextTask() error {
 
 func (w *taskWorkerCoordinator) processClaimedTask(task *model.Task, globalSlot *platform.SlotLease) (resultErr error) {
 	s := w.service
-	if task != nil && task.Operation == cloudAgentStepOperation {
-		defer s.wakeCloudAgentScheduler()
-	}
 	terminal := s.terminalCoordinator()
 	startedAt := time.Now()
 	log.Printf("worker task started: task_id=%s", task.ID)
@@ -379,6 +357,9 @@ func taskFailureMessage(err error) string {
 	}
 	if errors.Is(err, context.Canceled) {
 		return "任务已取消"
+	}
+	if denied := speechResourceDeniedUserMessage(err.Error()); denied != "" {
+		return denied
 	}
 	return "任务处理失败，请稍后重试。"
 }

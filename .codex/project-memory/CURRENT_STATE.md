@@ -1,10 +1,10 @@
 # 当前状态
 
-## 当前任务：固定官方 v1.6.0 增量合并启动（2026-10-03 11:45 CST）
+## 当前任务：固定官方 v1.6.0 A″ 自动门禁闭合、待 Edge（2026-10-04 04:09 CST）
 
-用户批准从未获 Edge 验收的 v1.5.8 A′ 候选制作**仅本地、明确标注 WIP** 的双父检查点，保留原 A′/旧 A/生产服务，再在新隔离分支 A″ 增量合入官方最新稳定 `v1.6.0`。2026-10-03 只读确认 GitHub Release `v1.6.0` 为 `draft=false`、`prerelease=false`，远端 `refs/tags/v1.6.0=42f14cd73eec7c2ded98eb15b6a4f5aa2f3f3b4a`；移动 `official/main=24cba765` 不纳入本轮固定目标。启动前 A′ 为 `HEAD=56e9b124`、`MERGE_HEAD=25842275`、显式未合并路径 0、无未暂存/未跟踪项；其 874 个暂存路径是上一轮候选整体差异，不是本轮新冲突。**当前仅启动准备，尚未制作 WIP 检查点、fetch v1.6.0、创建 A″ 或解决新冲突。** 本轮执行流水见 `UPSTREAM_V160_EXECUTION_20261003.md`，每个里程碑须追加时间与证据。旧 A `6b16d25e`、v1.5.8 A′、两类预览和生产数据均不作晋升/替换；正式提交、push、真实付费调用和删除仍未获准。
+用户批准从未获 Edge 验收的 v1.5.8 A′ 候选制作**仅本地、明确标注 WIP** 的双父检查点，保留原 A′/旧 A/生产服务，再在新隔离分支 A″ 增量合入官方最新稳定 `v1.6.0`。官方正式标签固定 `42f14cd73eec7c2ded98eb15b6a4f5aa2f3f3b4a`；移动 `official/main=24cba765` 不纳入目标。A′ WIP 双父 `7419e2b3` 仅本地，原 A′ 未改；A″ `codex/upstream-v1.6.0-20261003` 位于 `.local/worktrees/upstream-v160`，`HEAD=7419e2b3`、`MERGE_HEAD=42f14cd7`，40 个文本冲突已清零。**截至 2026-10-04 04:09 CST：Web 全量 2,406+5、类型/lint/生产构建，Canvas Agent 328/构建、Backend Linux CGO 全仓及五项真实 PostgreSQL/Redis 依赖用例均通过；旧9、本地42、官方43 三谱系隔离迁移至45/45、重复 up/verify、完整性/外键、旧谱系脱敏计数与关键文件保持均通过。前后端独立候选镜像构建和无宿主端口 HTTP 冒烟、四套 Compose 静态解析通过；隔离测试容器/网络已清理。没有 v1.6.0 Edge 预览地址，用户 Edge、正式提交/push、生产部署仍未完成。**详情见 `UPSTREAM_V160_EXECUTION_20261003.md` 和 `HANDOFF_V160_20261004.md`。旧 A、v1.5.8 A′ 与生产数据不晋升/替换；真实付费调用和删除仍未获准。
 
-## 当前权威快照：v1.5.8 A′ 隔离预览已运行、待用户 Edge（2026-09-29 11:37 CST）
+## 历史权威快照：v1.5.8 A′ 隔离预览曾运行、待用户 Edge（2026-09-29 11:37 CST）
 
 固定官方标签 `v1.5.8@258422757c98467f24381219e90f4809394ec226` 已在隔离 A′ `codex/upstream-v1.5.8-20260927` 的未提交 merge 中解除全部 59 个显式冲突；旧 A `codex/dashscope-system-plugins-20260911@6b16d25e` 保持回退用途。Web 2380 项全量、类型/构建、Canvas Agent 328 项/构建、百炼两包归档一致性、Compose 配置、依赖齐全的 Linux CGO 后端全量与五项 CI 依赖用例均通过；旧 Schema 9→42 与固定官方 Schema 40→42 隔离迁移、重复 up/verify、完整性/外键及关键计数保持通过。候选 Backend/Web 镜像已构建，三平台 Comfy Bridge 二进制和构建身份已核对。2026-09-29 依用户批准另启隔离预览 `http://127.0.0.1:3001`，空数据卷、专用网络，前后端 healthy，HTTP build-info/ready 均为 200、Schema 42/42；生产容器/卷与 `:local` 镜像未替换。**这不是生产部署或用户 Edge 验收**；A′ 未正式提交、推送或晋升，仍为 `NO-GO`。完整接管见 `HANDOFF_V158_20260928.md`，执行证据见 `UPSTREAM_V158_EXECUTION_20260927.md`。
 

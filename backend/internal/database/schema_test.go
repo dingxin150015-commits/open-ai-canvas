@@ -137,13 +137,16 @@ func TestMigrationPlanAcceptsProviderDurationVersionNineLineage(t *testing.T) {
 	if plan[40].version != 41 || plan[40].name != "builtin_skill_tombstones" {
 		t.Fatalf("legacy migration 41 = %#v", plan[40])
 	}
+	if plan[41].version != 42 || plan[41].name != "comfy_bridge_runtime" || plan[41].checksum != "sha256:comfy-bridge-runtime-v42-20260927" {
+		t.Fatalf("legacy migration 42 = %#v", plan[41])
+	}
 	for index, item := range plan {
 		if item.version != int64(index+1) {
 			t.Fatalf("legacy migration gap at %d: %#v", index+1, item)
 		}
 	}
 	last := plan[len(plan)-1]
-	if last.version != CurrentSchemaVersion || last.name != "comfy_bridge_runtime" {
+	if last.version != CurrentSchemaVersion || last.name != "topup_sale_strategies" {
 		t.Fatalf("last migration = %#v", last)
 	}
 }
@@ -169,11 +172,50 @@ func TestMigrationPlanKeepsOfficialVersionNineLineage(t *testing.T) {
 	if plan[29].version != 30 || plan[29].name != "builtin_tools" {
 		t.Fatalf("official migration 30 = %#v", plan[29])
 	}
-	if plan[40].version != 41 || plan[40].name != "provider_duration_metering" || plan[40].checksum != providerDurationMeteringV41Checksum {
+	if plan[40].version != 41 || plan[40].name != "resource_thumbnail" || plan[40].checksum != resourceThumbnailChecksum {
 		t.Fatalf("official migration 41 = %#v", plan[40])
+	}
+	if plan[43].version != 44 || plan[43].name != "provider_duration_metering" {
+		t.Fatalf("official migration 44 = %#v", plan[43])
 	}
 	last := plan[len(plan)-1]
 	if last.version != CurrentSchemaVersion || last.name != "comfy_bridge_runtime" {
 		t.Fatalf("last migration = %#v", last)
+	}
+}
+
+func TestMigrationPlanPreservesV158LocalVersionFortyOneLineage(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:v158-local-lineage?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&schemaMigration{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range []schemaMigration{
+		{Version: 9, Name: "channel_presentation", Checksum: "sha256:channel-presentation-v9-20260908"},
+		{Version: 41, Name: "provider_duration_metering", Checksum: providerDurationMeteringV41Checksum},
+		{Version: 42, Name: "comfy_bridge_runtime", Checksum: "sha256:comfy-bridge-runtime-v42-20260927"},
+	} {
+		if err := db.Create(&record).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan, err := migrationsForDatabase(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan) != int(CurrentSchemaVersion) {
+		t.Fatalf("plan length = %d, want %d", len(plan), CurrentSchemaVersion)
+	}
+	for index, item := range plan {
+		if item.version != int64(index+1) {
+			t.Fatalf("migration gap at %d: %#v", index+1, item)
+		}
+	}
+	for index, name := range []string{"provider_duration_metering", "comfy_bridge_runtime", "resource_thumbnail", "cloud_agent_pi_sessions", "topup_sale_strategies"} {
+		if plan[40+index].name != name {
+			t.Fatalf("migration %d = %#v, want %s", 41+index, plan[40+index], name)
+		}
 	}
 }
