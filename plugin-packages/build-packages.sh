@@ -5,21 +5,43 @@ root_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$root_dir/.." && pwd)
 payment_plugins="official-payment-wechat-native official-payment-alipay-page official-payment-xunhupay official-payment-zhifufm official-payment-epay"
 payments_only=false
+provider_only=""
 default_payment_targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
 
 if [ "${1:-}" = "--payments-only" ]; then
   payments_only=true
   shift
 fi
+if [ "${1:-}" = "--provider-only" ]; then
+  provider_only=${2:-}
+  shift 2
+  case "$provider_only" in ''|*[!a-z0-9-]*) echo "invalid provider package id" >&2; exit 2;; esac
+fi
 if [ "$#" -ne 0 ]; then
-  echo "usage: $0 [--payments-only]" >&2
+  echo "usage: $0 [--payments-only | --provider-only PACKAGE_ID]" >&2
   exit 2
 fi
 
-if [ "$payments_only" = true ]; then
+if [ -n "$provider_only" ]; then
+  node "$root_dir/embed-documentation.mjs" "$provider_only"
+elif [ "$payments_only" = true ]; then
   node "$root_dir/embed-documentation.mjs" $payment_plugins
 else
   node "$root_dir/embed-documentation.mjs"
+fi
+
+if [ -n "$provider_only" ]; then
+  package_dir="$root_dir/$provider_only"
+  test -s "$package_dir/manifest.json"
+  temporary_file="$root_dir/.$provider_only.yingce-plugin.tmp"
+  output_file="$root_dir/$provider_only.yingce-plugin"
+  rm -f "$temporary_file"
+  (
+    cd "$package_dir"
+    find manifest.json README.md docs assets web backend LICENSE -type f 2>/dev/null | LC_ALL=C sort | zip -X -q "$temporary_file" -@
+  )
+  mv "$temporary_file" "$output_file"
+  exit 0
 fi
 
 # Payment backends are executable plugin payloads. Unset PAYMENT_PLUGIN_GOOS

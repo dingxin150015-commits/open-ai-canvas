@@ -1,5 +1,17 @@
 # 固定 v1.6.6 增量合并、验证与部署执行记录
 
+## 2026-10-15 13:10 CST：AutoDL音频合包与Schema51恢复验证通过
+
+- 上游2.3.0归档只含视频Provider及15视频工作流，旧2.0.0归档额外含`autodl-comfyui-audio`/`indextts2-v1`，仓库源manifest最初是1.0.3而归档是2.3.0。以官方2.3.0为基底，精确保留旧2.0.0音频合同，生成2.3.1+dingxin.1源码及归档；用仓库`embed-documentation.mjs`、新增`build-packages.sh --provider-only autodl-comfyui`同步内嵌接口定义，避免源码/文档/zip再次分叉。
+- `TestAutoDLPluginArtifact`补验实际包加载、IndexTTS文本/参考音频请求与异步创建/轮询WAV返回。Linux CGO最新全仓`go test -count=1 -timeout 30m ./...`最终退出0。一次全仓中间失败有明确环境原因：为zip生成临时安装的Node24触发原本因无Node跳过的Agent E2E，但隔离测试容器未安装undici；恢复原测试容器工具状态后全仓通过。生产镜像内Node22依赖未因此更改，也未使用真实付费Provider。
+- 生产首轮2a/Schema51仍健康、活动任务0。二次切换前私有恢复点`v166-audio-before-20261015-120957`包含完整数据及Web静态资产，完整性ok/FK0/加密检查失败0；旧2a镜像在无网络`open-ai-canvas-v166-audio-restore-proof-20261015`从该备份实际启动到Schema51/ready且业务摘要、密钥、插件、迁移历史与备份一致。旧v1.2.7/Schema9恢复点与旧镜像标签也保留。尚未二次发布或push。
+
+## 2026-10-15 11:40 CST：生产首轮晋升与打包回归
+
+- 用户明确要求继续生产晋升/推送。正式双父提交`2a71a5f8`（父本地WIP4323c759、官方27c8066e），工作树曾清洁；其应用路径与此前2491+5Web、Backend全仓、Agent328测试树相同。新鲜私有Schema9完整备份`v166-predeploy-20261015-100745`，与先前已迁移/恢复证明的备份在关键业务、密钥、marker、插件、迁移摘要完全一致；任务0、完整性ok。
+- 新Web卷预置旧971个静态资产，后端14个原运行变量与新Compose一致；源目录切到A‴，生产backend/web均升级到2a镜像、ready及Schema51/51。私有postdeploy审计已记录完整性ok/FK0/解密失败0/任务0，关键业务旧字段摘要和密钥一致，旧静态JS/CSS可达。
+- 最后插件合约检查发现旧AutoDL 2.0.0包含`autodl-comfyui-audio`及`indextts2-v1`，上游2.3.0归档仅保留视频；本地源manifest仍含音频但原版本1.0.3，源/归档失配。数据库无AutoDL协议模型行，但潜在能力受损。已以官方2.3.0归档为基底合入旧2.0.0音频块，生成2.3.1+dingxin.1源码、README/docs及归档，添加归档实际加载+创建请求测试。旧归档在忽略的验证目录可恢复；当前定向复测尚在进行。正式修复commit、二次发布和push未完成，不能把首轮2a当作最终版。
+
 ## 2026-10-14 23:41 CST：收尾与根接管入口同步
 
 最终源树与应用路径比对无差异，只有记忆/验收说明变化；61显式冲突清零，最终2491+5全部通过。3001最终身份/Schema核验通过，上一候选静态chunk仍返回200/真实类型。私有恢复点后增审计材料的ACL再次验证，仅授权SID。PG/debug/旧Schema9恢复测试容器停止且保留，生产与预览继续运行。根旧分支只增量更新README/CURRENT_STATE/BACKLOG接管指针，既有内容保留，未作为构建源。跨保护目录多文件patch曾部分写入后失败，造成最新记忆段重复；已按相同完整段机械去重，并经主机授权的native apply_patch完成根入口，未重复更改应用源码。无正式commit/push/晋升/付费生成/卷删除，待Edge。

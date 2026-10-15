@@ -40,6 +40,36 @@ func TestAutoDLPluginArtifact(t *testing.T) {
 	if !adapter.Metadata().RequiresPublicMediaURLs {
 		t.Fatal("AutoDL provider must request public reference media URLs")
 	}
+	var audioAdapter Adapter
+	for _, candidate := range adapters {
+		if candidate.Metadata().ID == "autodl-comfyui-audio" {
+			audioAdapter = candidate
+			break
+		}
+	}
+	if audioAdapter == nil {
+		t.Fatal("AutoDL IndexTTS audio provider was lost from the release package")
+	}
+	audioCreate, err := audioAdapter.BuildCreate(context.Background(), RequestContext{BaseURL: "https://autodl.art", Request: GenerationRequest{
+		Model: "indextts2-v1", Prompt: "test speech", Audios: []MediaReference{{URL: "https://cdn.example/voice.wav"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if audioCreate.Path != "/api/v1/comfyui/comfyui_workflow/indextts2-v1" || audioCreate.Method != "POST" {
+		t.Fatalf("audio create spec = %#v", audioCreate)
+	}
+	if body, ok := audioCreate.Body.(map[string]any); !ok || body["prompt_text"] != "test speech" || body["prompt_simple"] != "https://cdn.example/voice.wav" {
+		t.Fatalf("audio create body = %#v", audioCreate.Body)
+	}
+	audioQueued, err := audioAdapter.ParseCreate(context.Background(), []byte(`{"code":0,"data":{"task_id":"task-audio-1","status":"QUEUED"}}`))
+	if err != nil || audioQueued.TaskID != "task-audio-1" {
+		t.Fatalf("audio create result = %#v, %v", audioQueued, err)
+	}
+	audioDone, err := audioAdapter.ParsePoll(context.Background(), PollContext{TaskID: audioQueued.TaskID}, []byte(`{"code":"Success","data":{"task_id":"task-audio-1","status":"completed","results":[{"url":"https://cdn.example/speech.wav","type":"audio","file_type":"wav"}]}}`))
+	if err != nil || audioDone.Result == nil || len(audioDone.Result.Audios) != 1 || audioDone.Result.Audios[0].URL != "https://cdn.example/speech.wav" {
+		t.Fatalf("audio poll result = %#v, %v", audioDone, err)
+	}
 
 	create, err := adapter.BuildCreate(context.Background(), RequestContext{BaseURL: "https://autodl.art", Request: GenerationRequest{
 		Model: "minimax_h3_lightx2v_no_pic", Prompt: "a cinematic test", Duration: 3, Resolution: "768P竖", Images: []MediaReference{{URL: "https://cdn.example/reference.png"}},

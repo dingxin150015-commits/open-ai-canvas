@@ -1,5 +1,10 @@
 # 影策备份登记簿
 
+## 2026-10-15 生产Schema51热修前恢复点（13:10 CST）
+
+- 私有NTFS目录`C:\Users\DingXin\.codex\backups\open-ai-canvas\v166-audio-before-20261015-120957`：生产首轮2a/Schema51完整`/data`、DB/WAL/SHM/`.settings-key`/迁移marker/插件注册表独立hash一致副本、Web静态资产、私有运行env和容器inspect，ACL仅当前用户/SYSTEM/Administrators。完整性ok、FK0、4项加密检查失败0、任务0。状态`verified/protected`：无网络旧2a镜像克隆`open-ai-canvas-v166-audio-restore-proof-20261015`已实启Schema51/ready且关键表计数/digest、key、marker、plugin与原备份一致，数据卷独立保留。
+- `open-ai-canvas-backend:pre-v166-audio-20261015`和`open-ai-canvas-web:pre-v166-audio-20261015`保留首轮2a镜像；此前`pre-v166-20261014`保留v1.2.7/Schema9镜像。正式二次升级不覆盖这些标签，不对真实生产卷进行“降版本读新Schema”。
+
 ## 2026-10-14 v1.6.6 完整恢复点与隔离验证（23:18 CST）
 
 - `C:\Users\DingXin\.codex\backups\open-ai-canvas\v166-predeploy-20261014-183917`：完整生产/data、独立hash一致的DB/WAL/SHM、settings-key、storage marker、plugin registry、私有runtime.env与容器inspect。ACL限定当前用户/SYSTEM/Administrators；完整性ok、FK0、4项加密检查失败0、任务0。恢复到独立无网络旧镜像容器后Schema9/9/healthy，所有关键计数/digest/key/plugin相同。状态 **verified/protected**；不是授权覆盖生产卷。

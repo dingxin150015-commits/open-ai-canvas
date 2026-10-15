@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-10-15 13:10 CST：插件能力回归修复验证通过，待二次发布
+
+生产首轮正式提交`2a71a5f8`当前运行v1.6.6/Schema51/healthy。AutoDL包从上游2.3.0合入旧2.0.0音频Provider与`indextts2-v1`为`2.3.1+dingxin.1`，源码manifest/README/interface.md/zip归档由`build-packages.sh --provider-only autodl-comfyui`同步，视频15+音频1工作流。后端Linux CGO全仓`go test -count=1 -timeout 30m ./...`通过，音频请求文本与音色参考、任务ID和WAV轮询由包加载专项验证；没有真实付费模型调用。当前生产Schema51完整备份`v166-audio-before-20261015-120957`完整性ok/FK0/密钥失败0/任务0；旧2a镜像恢复克隆Schema51/healthy、关键业务摘要/插件状态/密钥不变。待增量commit、同SHA镜像和二次发布/最终审计，再推送用户fork。先前Root“生产未晋升”仅属历史，正式最终版本尚未推送。
+
+## 2026-10-15 11:40 CST：生产首轮晋升完成，插件回归修复中
+
+用户已直接要求晋升/推送。A‴正式双父commit`2a71a5f8d26370764b80584969b71e761bc96609`已落本地，生产backend/web切到同SHA镜像，Schema51/51/healthy；前后端身份、业务旧字段摘要、密钥、迁移历史、971个旧静态资产核验完成，但最终插件合约校验尚未通过，因此未推送/未宣称交付完成。唯一差异：AutoDL官方2.3.0归档移除了旧`autodl-comfyui-audio` Provider及`indextts2-v1`，旧2.0.0和本地源清单都有；现有`channel_models`没有AutoDL记录，仍须保留入口能力。已合成上游2.3视频与旧2.0音频为2.3.1+dingxin.1包/源码、添加实际打包测试并定向复测中。下一步完成包测试→增量commit→同SHA镜像→保留卷复部署/插件与数据验证→非强制push；旧A/旧镜像/私有恢复点不删。现有3000是首轮2a版本，不能把“healthy”当作最终插件通过。
+
 ## 当前权威状态：候选验证通过，待 Edge（2026-10-14 23:18 CST）
 
 详见 `HANDOFF_V166_20261014.md`。实际A‴分支仍 `codex/upstream-v1.6.6-20261012@4323c759` 无正式提交merge，固定v1.6.6@27c8066e，61显式冲突为0；源码构建树 `cbf3ebd381531e887c295931b45a408af8cec501`。最终Web2491+5/0 fail、持久化45项、typecheck/lint及Docker构建通过；Backend Linux CGO全仓与实际PG/Redis集成、Agent328/构建、生产9/三种本地45/官方43与50六谱系up/up/verify→51通过。恢复点真实还原旧Schema9健康/空闲且业务摘要、密钥和插件状态一致。
