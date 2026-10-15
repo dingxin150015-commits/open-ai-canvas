@@ -2,8 +2,8 @@ package app
 
 import (
 	"encoding/json"
-	"infinite-canvas/backend/internal/model"
-	"infinite-canvas/backend/internal/protocol"
+	"yingce/backend/internal/model"
+	"yingce/backend/internal/protocol"
 	"testing"
 )
 

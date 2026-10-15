@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 45
+const CurrentSchemaVersion int64 = 51
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -57,6 +57,9 @@ type migration struct {
 }
 
 var schemaMigrations = []migration{
+	// Official v1.6.6 leaves 44 free; preserve the local duration migration there.
+	// A database that already used local 45 for Comfy Bridge receives the official
+	// upload migration at 51 instead of rewriting its recorded version 45.
 	{version: 1, name: "baseline_gorm_schema", checksum: baselineSchemaChecksum, apply: migrateSchemaV1},
 	{version: 2, name: "schema_migrations_applied_at_index", checksum: schemaMigrationAppliedAtIndexChecksum, apply: migrateSchemaV2},
 	{version: 3, name: "asset_taxonomy_candidate_identity", checksum: assetTaxonomyCandidateIdentityChecksum, apply: migrateSchemaV3},
@@ -148,13 +151,35 @@ var schemaMigrations = []migration{
 		return tx.AutoMigrate(&model.TopupProduct{}, &model.PaymentOrder{})
 	}},
 	{version: 44, name: "provider_duration_metering", checksum: "sha256:provider-duration-metering-v44-20261003", apply: migrateProviderDurationMetering},
-	{version: 45, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v45-20261003", apply: func(tx *gorm.DB) error {
-		return tx.AutoMigrate(&model.ComfyBridge{}, &model.ComfyBridgeRequest{})
+	{version: 45, name: "upload_reservations", checksum: "sha256:upload-reservations-v45-20261005", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.UploadReservation{})
 	}},
+	{version: 46, name: "skill_curation", checksum: "sha256:skill-curation-v46-20261005", apply: migrateSkillCuration},
+	{version: 47, name: "skill_curation_roots", checksum: "sha256:skill-curation-roots-v47-20261005", apply: migrateSkillCurationRoots},
+	{version: 48, name: "channel_proxy_url", checksum: "sha256:channel-proxy-url-v48-20261009", apply: func(tx *gorm.DB) error {
+		if !tx.Migrator().HasColumn(&model.ModelChannel{}, "ProxyURL") {
+			return tx.Migrator().AddColumn(&model.ModelChannel{}, "ProxyURL")
+		}
+		return nil
+	}},
+	{version: 49, name: "banner_sort_order", checksum: "sha256:banner-sort-order-v49-20261010", apply: func(tx *gorm.DB) error {
+		if !tx.Migrator().HasColumn(&model.BannerAnnouncement{}, "SortOrder") {
+			return tx.Migrator().AddColumn(&model.BannerAnnouncement{}, "SortOrder")
+		}
+		return nil
+	}},
+	{version: 50, name: "canvas_mutation_receipts", checksum: "sha256:canvas-mutation-receipts-v50-20261011", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.CanvasMutationReceipt{})
+	}},
+	{version: 51, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v51-20261012", apply: migrateComfyBridgeRuntime},
 }
 
 func migrateProviderDurationMetering(tx *gorm.DB) error {
 	return tx.AutoMigrate(&model.ApiCallLog{}, &model.BillingOrder{})
+}
+
+func migrateComfyBridgeRuntime(tx *gorm.DB) error {
+	return tx.AutoMigrate(&model.ComfyBridge{}, &model.ComfyBridgeRequest{})
 }
 
 func migratePrefixedIDSequenceReconcile(tx *gorm.DB) error {
@@ -350,15 +375,12 @@ func migrationsForProviderDurationLineage(db *gorm.DB, plan []migration) ([]migr
 				shifted = append(shifted, item)
 			}
 		}
-		bridge := plan[44]
-		bridge.version = 42
-		bridge.checksum = "sha256:comfy-bridge-runtime-v42-20260927"
-		shifted = append(shifted, bridge)
+		shifted = append(shifted, migration{version: 42, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v42-20260927", apply: migrateComfyBridgeRuntime})
 		for _, item := range plan[40:43] {
 			item.version += 2
 			shifted = append(shifted, item)
 		}
-		return shifted, nil
+		return appendLegacyPost43Migrations(shifted, plan), nil
 	}
 	var applied41 schemaMigration
 	err = db.First(&applied41, "version = ?", 41).Error
@@ -372,17 +394,41 @@ func migrationsForProviderDurationLineage(db *gorm.DB, plan []migration) ([]migr
 		}
 		shifted := append([]migration(nil), plan[:40]...)
 		shifted = append(shifted, oldDuration)
-		bridge := plan[44]
-		bridge.version = 42
-		bridge.checksum = "sha256:comfy-bridge-runtime-v42-20260927"
-		shifted = append(shifted, bridge)
+		shifted = append(shifted, migration{version: 42, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v42-20260927", apply: migrateComfyBridgeRuntime})
 		for _, item := range plan[40:43] {
 			item.version += 2
 			shifted = append(shifted, item)
 		}
-		return shifted, nil
+		return appendLegacyPost43Migrations(shifted, plan), nil
+	}
+	var applied45 schemaMigration
+	err = db.First(&applied45, "version = ?", 45).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("读取数据库迁移 45：%w", err)
+	}
+	if err == nil && applied45.Name == "comfy_bridge_runtime" {
+		legacy := migration{version: 45, name: "comfy_bridge_runtime", checksum: "sha256:comfy-bridge-runtime-v45-20261003", apply: migrateComfyBridgeRuntime}
+		if err := validateMigrationRecord(applied45, legacy); err != nil {
+			return nil, err
+		}
+		plan[44] = legacy
+		plan[len(plan)-1] = migration{version: 51, name: "upload_reservations", checksum: "sha256:upload-reservations-v51-local45-20261012", apply: func(tx *gorm.DB) error {
+			return tx.AutoMigrate(&model.UploadReservation{})
+		}}
 	}
 	return plan, nil
+}
+
+func appendLegacyPost43Migrations(shifted []migration, plan []migration) []migration {
+	for _, item := range plan {
+		if item.version >= 46 && item.version <= 50 {
+			shifted = append(shifted, item)
+		}
+	}
+	shifted = append(shifted, migration{version: 51, name: "upload_reservations", checksum: "sha256:upload-reservations-v51-legacy-20261012", apply: func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&model.UploadReservation{})
+	}})
+	return shifted
 }
 
 func migrateSchemaV2(tx *gorm.DB) error {

@@ -37,7 +37,7 @@ describe("canvas visual contrast", () => {
         expect(canvasThemes.dark.canvas.dot).toBe("rgba(210,210,210,.30)");
         expect(canvasThemes.dark.canvas.line).toBe("rgba(178,178,178,.14)");
 
-        const source = await Bun.file(new URL("../src/components/canvas/infinite-canvas.tsx", import.meta.url)).text();
+        const source = await Bun.file(new URL("../src/components/canvas/canvas-viewport.tsx", import.meta.url)).text();
         expect(source).not.toContain('opacity: mode === "dots"');
         expect(source).toContain("resolveCanvasGridColor(appearance, colorTheme, mode)");
         expect(source).toContain('backgroundSize: "48px 48px"');

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 )
 
 func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, channelID string, req ChannelModelRequest) (*AdminChannelModelTestResult, error) {
@@ -121,7 +121,7 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	defer cancel()
 	testCtx = context.WithValue(testCtx, providerAnalyticsKey{}, providerAnalyticsContext{
 		Service: s, Billing: s.taskBilling(), UserID: actor.ID, ChannelID: channel.ID, Capability: capability,
-		Operation: "admin_model_test", Model: modelKey, VideoSeconds: videoSecondsValue,
+		Operation: "admin_model_test", Model: modelKey, VideoSeconds: videoSecondsValue, ProxyURL: channel.ProxyURL,
 	})
 	testCtx = withProtocolRegistry(testCtx, s.protocolRegistry())
 	startedAt := time.Now()

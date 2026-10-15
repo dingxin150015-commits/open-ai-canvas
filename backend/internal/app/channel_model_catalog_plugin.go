@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"infinite-canvas/backend/internal/model"
-	"infinite-canvas/backend/internal/protocol"
-	"infinite-canvas/backend/internal/provider"
+	"yingce/backend/internal/model"
+	"yingce/backend/internal/protocol"
+	"yingce/backend/internal/provider"
 )
 
 // extendChannelModelCatalog 在已通过统一安全出站链路获取的标准目录上补充厂商条目。

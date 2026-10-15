@@ -79,12 +79,12 @@ test("automatic stream retries have a finite budget", () => {
     expect(source("pages/canvas/project.tsx")).not.toContain("CanvasLocalAgentPanel");
 });
 
-test("professional canvas exposes a discoverable Director entry in both top bar layouts", () => {
+test("professional canvas exposes a discoverable Previs entry in both top bar layouts", () => {
     const topBar = source("pages/canvas/canvas-project-top-bar.tsx");
     const page = source("pages/canvas/project.tsx");
-    expect(topBar).toContain('label: "新建 3D 导演台"');
+    expect(topBar).toContain('label: "新建 3D 预演台"');
     expect(topBar).toContain('aria-label="更多画布操作"');
-    expect(page).toContain('onOpenDirector={workspaceMode === "professional"');
+    expect(page).toContain('onOpenPrevis={workspaceMode === "professional"');
 });
 
 function managedConfig() {

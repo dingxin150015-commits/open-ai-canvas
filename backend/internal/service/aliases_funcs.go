@@ -1,6 +1,6 @@
 package service
 
-import "infinite-canvas/backend/internal/app"
+import "yingce/backend/internal/app"
 
 var (
 	ErrPlaybackNotReady                        = app.ErrPlaybackNotReady
@@ -48,6 +48,7 @@ var (
 	NormalizeOutboundHeaders                   = app.NormalizeOutboundHeaders
 	NotFound                                   = app.NotFound
 	OutboundHTTPClient                         = app.OutboundHTTPClient
+	OutboundHTTPClientWithProxy                = app.OutboundHTTPClientWithProxy
 	ParseOutboundHeadersJSON                   = app.ParseOutboundHeadersJSON
 	PaymentNotificationResponseFor             = app.PaymentNotificationResponseFor
 	PaymentNotificationResponseForWithRegistry = app.PaymentNotificationResponseForWithRegistry
@@ -61,6 +62,7 @@ var (
 	ValidateChannelModelPrice                  = app.ValidateChannelModelPrice
 	ValidateCustomRelayURL                     = app.ValidateCustomRelayURL
 	ValidateCustomRelayChannelURL              = app.ValidateCustomRelayChannelURL
+	ValidateProxyURL                           = app.ValidateProxyURL
 	ValidateLogicalModelPrice                  = app.ValidateLogicalModelPrice
 	ValidateOutboundHost                       = app.ValidateOutboundHost
 	ValidateOutboundURL                        = app.ValidateOutboundURL

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"infinite-canvas/backend/internal/provider"
+	"yingce/backend/internal/provider"
 )
 
 //go:embed catalog.generated.json

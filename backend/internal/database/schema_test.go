@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -146,7 +146,7 @@ func TestMigrationPlanAcceptsProviderDurationVersionNineLineage(t *testing.T) {
 		}
 	}
 	last := plan[len(plan)-1]
-	if last.version != CurrentSchemaVersion || last.name != "topup_sale_strategies" {
+	if last.version != CurrentSchemaVersion || last.name != "upload_reservations" {
 		t.Fatalf("last migration = %#v", last)
 	}
 }
@@ -217,5 +217,53 @@ func TestMigrationPlanPreservesV158LocalVersionFortyOneLineage(t *testing.T) {
 		if plan[40+index].name != name {
 			t.Fatalf("migration %d = %#v, want %s", 41+index, plan[40+index], name)
 		}
+	}
+	if last := plan[len(plan)-1]; last.version != CurrentSchemaVersion || last.name != "upload_reservations" {
+		t.Fatalf("last legacy migration = %#v", last)
+	}
+}
+
+func TestMigrationPlanPreservesV160LocalVersionFortyFiveLineage(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:v160-local45-lineage?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&schemaMigration{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&schemaMigration{Version: 45, Name: "comfy_bridge_runtime", Checksum: "sha256:comfy-bridge-runtime-v45-20261003"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan, err := migrationsForDatabase(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan) != int(CurrentSchemaVersion) || plan[44].name != "comfy_bridge_runtime" || plan[50].name != "upload_reservations" {
+		t.Fatalf("local45 plan = %#v", plan)
+	}
+	for index, item := range plan {
+		if item.version != int64(index+1) {
+			t.Fatalf("local45 migration gap at %d: %#v", index+1, item)
+		}
+	}
+}
+
+func TestMigrationPlanKeepsOfficialVersionFortyFiveLineage(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:official45-lineage?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&schemaMigration{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&schemaMigration{Version: 45, Name: "upload_reservations", Checksum: "sha256:upload-reservations-v45-20261005"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan, err := migrationsForDatabase(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan) != int(CurrentSchemaVersion) || plan[43].name != "provider_duration_metering" || plan[44].name != "upload_reservations" || plan[50].name != "comfy_bridge_runtime" {
+		t.Fatalf("official45 plan = %#v", plan)
 	}
 }

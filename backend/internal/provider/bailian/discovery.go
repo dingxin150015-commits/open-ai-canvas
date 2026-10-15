@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"infinite-canvas/backend/internal/provider"
+	"yingce/backend/internal/provider"
 )
 
 // Discovery 阿里云百炼官方模型目录扩展。

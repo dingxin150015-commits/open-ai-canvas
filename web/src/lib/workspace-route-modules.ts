@@ -3,6 +3,7 @@ const workspaceRouteLoaders = {
     assets: () => import("@/pages/assets"),
     canvas: () => import("@/pages/canvas"),
     create: () => import("@/pages/create"),
+    inspirations: () => import("@/pages/inspirations"),
     projects: () => import("@/pages/projects"),
     projectDetail: () => import("@/pages/projects/detail"),
 };
@@ -11,12 +12,15 @@ export const loadAssetsPage = workspaceRouteLoaders.assets;
 export const loadCanvasPage = workspaceRouteLoaders.canvas;
 export const loadCanvasProjectPage = () => import("@/pages/canvas/project");
 export const loadCreatePage = workspaceRouteLoaders.create;
+export const loadInspirationsPage = workspaceRouteLoaders.inspirations;
 export const loadProjectDetailPage = workspaceRouteLoaders.projectDetail;
 export const loadProjectsPage = workspaceRouteLoaders.projects;
 
 export function preloadWorkspaceRoute(pathnameOrSlug: string) {
     const segments = pathnameOrSlug.replace(/^\//, "").split("/").filter(Boolean);
     const slug = segments[0] || "home";
+    // 具体画布项目由 /canvas/:id 自己加载；不要在认证恢复阶段额外预加载画布列表。
+    if (slug === "canvas" && segments.length > 1) return;
     if (slug === "projects" && segments.length > 1) {
         void workspaceRouteLoaders.projectDetail();
         return;

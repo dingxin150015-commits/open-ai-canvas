@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"infinite-canvas/backend/internal/model"
-	"infinite-canvas/backend/internal/repository"
+	"yingce/backend/internal/model"
+	"yingce/backend/internal/repository"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -255,7 +255,7 @@ func TestSystemChannelOutboundClientUsesStoredLocalFlagAndCapability(t *testing.
 		t.Fatalf("ValidateChannelOutboundURL() error = %v", err)
 	}
 	request, _ := http.NewRequest(http.MethodGet, target.String(), nil)
-	response, err := open.OutboundHTTPClientForChannel(time.Second, target, true).Do(request)
+	response, err := open.OutboundHTTPClientForChannel(time.Second, target, true, "").Do(request)
 	if err != nil {
 		t.Fatalf("OutboundHTTPClientForChannel() error = %v", err)
 	}

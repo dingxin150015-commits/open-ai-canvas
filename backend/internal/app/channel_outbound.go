@@ -19,9 +19,11 @@ func (s *Service) ValidateChannelOutboundURL(rawURL string, flags ...bool) (*url
 	return s.validateChannelOutboundURL(rawURL, requestedLocal, customRelay)
 }
 
-func (s *Service) OutboundHTTPClientForChannel(timeout time.Duration, target *url.URL, flags ...bool) *http.Client {
-	if len(flags) > 0 && s.effectiveAllowLocalChannel(flags[0]) && target != nil && isExactDesktopLoopbackHost(target.Hostname()) {
+// OutboundHTTPClientForChannel keeps the explicit desktop loopback policy
+// separate from administrator-configured channel proxies.
+func (s *Service) OutboundHTTPClientForChannel(timeout time.Duration, target *url.URL, allowLocal bool, proxyURL string) *http.Client {
+	if s.effectiveAllowLocalChannel(allowLocal) && target != nil && isExactDesktopLoopbackHost(target.Hostname()) {
 		return outboundHTTPClientWithPolicy(timeout, desktopLoopbackOutboundPolicy(nil))
 	}
-	return OutboundHTTPClient(timeout)
+	return OutboundHTTPClientWithProxy(timeout, proxyURL)
 }

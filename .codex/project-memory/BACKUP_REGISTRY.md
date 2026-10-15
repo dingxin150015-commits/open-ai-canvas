@@ -1,5 +1,13 @@
 # 影策备份登记簿
 
+## 2026-10-14 v1.6.6 完整恢复点与隔离验证（23:18 CST）
+
+- `C:\Users\DingXin\.codex\backups\open-ai-canvas\v166-predeploy-20261014-183917`：完整生产/data、独立hash一致的DB/WAL/SHM、settings-key、storage marker、plugin registry、私有runtime.env与容器inspect。ACL限定当前用户/SYSTEM/Administrators；完整性ok、FK0、4项加密检查失败0、任务0。恢复到独立无网络旧镜像容器后Schema9/9/healthy，所有关键计数/digest/key/plugin相同。状态 **verified/protected**；不是授权覆盖生产卷。
+- 旧镜像保护标签 `open-ai-canvas-backend:pre-v166-20261014`、`open-ai-canvas-web:pre-v166-20261014`，分别d67ee794/9bfc9c67。Schema51后不能只回切旧binary；必须配套旧快照，先验证副本。
+- 新迁移副本卷 `open-ai-canvas-v166-{production9,legacy45,local45,canonical45,official43,official50}-20261014` 分别up/up/verify→51；正式名称见 `migration-results.json`。旧源卷只读挂载保留，官方50源 `open-ai-canvas-v166-official50-source-20261014` 是空夹具，不是生产备份。
+- `open-ai-canvas-v166-restore9-proof-20261014` 是真实旧镜像恢复证明副本。预览使用 `open-ai-canvas-v166-production9-20261014`、新静态资产卷 `open-ai-canvas-v166-preview-web-20261014`；这些副本将有用户手验编辑，不回写生产，不能替代原私有快照。
+- 生产卷 `open-ai-canvas_backend-data` 未替换。发布前必须再做新鲜恢复点，因为3000仍可继续编辑。旧恢复材料、所有旧A/工作树/卷保留；无明确删除批准不清理。
+
 ## 2026-10-04 v1.6.0 A″ 三谱系迁移测试副本（不是生产恢复点）
 
 - `open-ai-canvas-v160-legacy9-clone-20261004`：只读复制已停止的 `open-ai-canvas-catalog-preflight-20260913`，复制时逐字节一致；候选从 Schema9 升 45，二次 up/verify 45/45，完整性 ok、外键违规 0。

@@ -292,7 +292,11 @@ test("admin CSS stays scoped and its regression test remains inside panic guard"
     expect(drawerLightOverrides).not.toMatch(/#[0-9a-f]{3,8}\b|\brgba?\(/i);
     expect(packageSource.scripts).not.toHaveProperty("pretest");
     expect(packageSource.scripts["test:admin-ui"]).toBe("bun test test/admin-ui-regressions.test.ts");
-    expect(packageSource.scripts.test).toContain("run-with-panic-guard.mjs -- bun run test:admin-ui");
+    expect(packageSource.scripts.test).toBe("bun run test:all");
+    const runnerSource = await Bun.file(new URL("../scripts/run-all-tests.mjs", import.meta.url)).text();
+    expect(packageSource.scripts["test:all"]).toBe("bun scripts/run-all-tests.mjs");
+    expect(runnerSource).toContain('"scripts/run-with-panic-guard.mjs", "--"');
+    expect(runnerSource).toContain('["test", "src"]');
 });
 
 test("banner announcement editor keeps title styles through edit, save and status toggle", async () => {

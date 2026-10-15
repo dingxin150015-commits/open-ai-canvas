@@ -15,6 +15,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ModelPicker } from "@/components/model-picker";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationOptions } from "@/lib/model-capabilities";
+import { imageQualityLabel } from "@/lib/image-quality";
 import { modelQuoteDescription, modelQuoteValidationError, modelQuoteRequest } from "@/lib/model-pricing";
 import { customShotTitle, formatShotOrdinal, normalizeDefaultShotTitle } from "@/lib/shot-label";
 import { modelCompatibilityError, resolveCompatibleModel, resolveModelVideoBooleanOptions, type ModelRequirements } from "@/lib/model-selection";
@@ -602,7 +603,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                                             </Form.Item>
                                         ) : imageProfile?.quality.supported && !imageResolutionUsesQuality(imageProfile) ? (
                                             <Form.Item label="生成画质">
-                                                <Select value={imageQuality} onChange={setImageQuality} options={imageProfile.quality.values.map((value) => ({ value, label: value.toUpperCase() }))} />
+                                                <Select value={imageQuality} onChange={setImageQuality} options={imageProfile.quality.values.map((value) => ({ value, label: imageQualityLabel(value) }))} />
                                             </Form.Item>
                                         ) : (
                                             <div />

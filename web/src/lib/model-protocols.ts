@@ -1,28 +1,8 @@
 export type ModelProtocol = string;
 export type ProtocolCapability = "text" | "image" | "video" | "audio";
-
-export type ModelProtocolWorkflow = {
-    id: string;
-    label: string;
-    providerId: string;
-    capability: ProtocolCapability;
-    parameters: Array<{ name: string; type: string; required?: boolean; description?: string; values?: string[]; mapping?: string }>;
-    defaults?: Record<string, string | number | boolean>;
-};
-
-export type ModelProtocolDefinition = {
-    value: ModelProtocol;
-    label: string;
-    vendor?: string;
-    capability: ProtocolCapability;
-    create: string;
-    contentType: string;
-    poll?: string;
-    media: string;
-    enabled?: boolean;
-    baseUrl?: string;
-    workflows?: ModelProtocolWorkflow[];
-};
+export type ModelProtocolParameter = { name: string; type: string; required?: boolean; description?: string; values?: string[]; mapping?: string };
+export type ModelProtocolWorkflow = { id: string; label: string; providerId: string; capability: ProtocolCapability; parameters: ModelProtocolParameter[]; defaults?: Record<string, string | number | boolean> };
+export type ModelProtocolDefinition = { value: ModelProtocol; label: string; vendor?: string; capability: ProtocolCapability; create: string; contentType: string; poll?: string; media: string; enabled?: boolean; baseUrl?: string; parameters?: ModelProtocolParameter[]; workflows?: ModelProtocolWorkflow[] };
 
 export function protocolGroups(protocols: ModelProtocolDefinition[]) {
     const labels: Record<ProtocolCapability, string> = { text: "文本", image: "图片", video: "视频", audio: "音频" };

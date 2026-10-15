@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 )
 
 func TestDesktopLocalChannelModeRejectsPublicAcrossProductionDispatch(t *testing.T) {

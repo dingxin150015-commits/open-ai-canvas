@@ -1,7 +1,8 @@
 import { logicalIntentCompatibilityError, modelCompatibilityError, modelRequestOptions, resolveVideoOperation, type ModelRequirements } from "@/lib/model-selection";
 import { videoResolutionComparisonKey } from "@/lib/video-generation-options";
 import { bailianVideoOperation, declaredGenerationContract } from "@/lib/bailian-generation";
-import { buildImageResolutionOptions, imageResolutionOption } from "@/lib/image-resolution-tiers";
+import { imagePriceSelector, normalizeImagePriceSelector } from "@/lib/image-pricing";
+import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
 import type { LogicalModelQuote, ModelQuoteRequest, ModelRequestIntent } from "@/services/api/logical-models";
 import { modelOptionName, resolveModelChannel, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
@@ -188,16 +189,7 @@ function priceSelectorForRequest(capability: ModelCapability | undefined, config
             .trim()
             .toLowerCase();
         const imageSize = String(options.size ?? "").trim();
-        if ((imageQuality === "" || imageQuality === "auto" || imageQuality === "any") && imageSize) {
-            const resolution = imageResolutionOption(buildImageResolutionOptions([imageSize]), imageSize)?.tier;
-            if (resolution) requested.quality = resolution;
-        }
-        for (const key of ["quality", "size"] as const) {
-            const value = String(options[key] ?? "")
-                .trim()
-                .toLowerCase();
-            if (value && value !== "auto" && value !== "any" && !requested[key]) requested[key] = value;
-        }
+        Object.assign(requested, imagePriceSelector(imageQuality, imageSize, modelCapabilityConfigFor(config, config.model || config.imageModel)?.image));
     }
     return requested;
 }
@@ -208,7 +200,7 @@ function imagePriceOperation(requirements?: ModelRequirements) {
 }
 
 function priceSelectorForTier(tier: ModelPriceTier) {
-    const selector = { ...(tier.selector || {}) };
+    const selector = normalizeImagePriceSelector({ ...(tier.selector || {}) });
     if (!Object.keys(selector).length) {
         const resolution = normalizeTierResolution(tier.resolution);
         if (resolution !== "*") selector.vquality = resolution;

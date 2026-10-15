@@ -40,7 +40,7 @@ import {
 } from "@/lib/model-capabilities";
 import { defaultImageParamsForModel, modelCompatibilityError, modelRequestOptions, resolveCompatibleModel, resolveModelGenerationDefaults, type ModelRequirements } from "@/lib/model-selection";
 import { resolveCanvasWorkflowProvider } from "@/lib/canvas/canvas-workflow";
-import { canonicalGenerationMetadata } from "@/lib/canvas/generation-contract";
+import { canonicalGenerationMetadata, nodeGenerationPrompt } from "@/lib/canvas/generation-contract";
 import type { CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { workflowProviderPluginEnabled } from "@/lib/plugins/builtin/workflows";
@@ -203,7 +203,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const comfyBridgeOptions: WorkflowSelectOption[] = comfyBridgeEntries.length ? [{ label: <WorkflowOptionGroupLabel label="工作流" count={comfyBridgeEntries.length} />, options: comfyBridgeEntries }] : [];
     const chipStyle = { background: theme.node.fill, color: theme.node.text };
     const hasAnyInput = Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount || inputSummary.characterCount);
-    const hasComposerContent = Boolean((node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim());
+    const hasComposerContent = Boolean(nodeGenerationPrompt(node).trim());
     const workflowParameterError = firstWorkflowParameterError(dynamicWorkflowFields, node.metadata?.workflowParameters || {});
     const capabilityError =
         workflowParameterError ||

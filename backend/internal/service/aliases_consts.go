@@ -1,6 +1,6 @@
 package service
 
-import "infinite-canvas/backend/internal/app"
+import "yingce/backend/internal/app"
 
 const (
 	Live2DMaxBytes                     = app.Live2DMaxBytes
@@ -56,6 +56,7 @@ const (
 	FeaturePluginCenter                = app.FeaturePluginCenter
 	FeatureShortDrama                  = app.FeatureShortDrama
 	FeatureSystemPlugins               = app.FeatureSystemPlugins
+	FeatureInspirationSources          = app.FeatureInspirationSources
 	FeatureTaskCenter                  = app.FeatureTaskCenter
 	FeatureTimelineTranscription       = app.FeatureTimelineTranscription
 	ModelCatalogSourceSystem           = app.ModelCatalogSourceSystem
@@ -82,6 +83,7 @@ const (
 	ReasonBadGateway                   = app.ReasonBadGateway
 	ReasonUpstreamDNSFailed            = app.ReasonUpstreamDNSFailed
 	ReasonConflict                     = app.ReasonConflict
+	ReasonProjectNameConflict          = app.ReasonProjectNameConflict
 	ReasonFailedPrecondition           = app.ReasonFailedPrecondition
 	ReasonForbidden                    = app.ReasonForbidden
 	ReasonInternal                     = app.ReasonInternal

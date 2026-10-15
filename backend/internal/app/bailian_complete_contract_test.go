@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"infinite-canvas/backend/internal/model"
-	"infinite-canvas/backend/internal/protocol"
+	"yingce/backend/internal/model"
+	"yingce/backend/internal/protocol"
 	"net/http"
 	"net/http/httptest"
 	"strings"

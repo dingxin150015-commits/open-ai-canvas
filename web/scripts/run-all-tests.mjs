@@ -9,6 +9,6 @@ const files = ["test", "src"]
 // registry's empty-initial-state contract in a separate process, not disabled.
 const isolated = ["test/editor-slot-registry.test.ts"];
 for (const group of [files.filter((name) => !isolated.includes(name)), ...isolated.map((name) => [name])]) {
-    const result = spawnSync(process.execPath, ["scripts/run-with-panic-guard.mjs", "--", process.execPath, "test", ...group.map((name) => `./${name}`)], { stdio: "inherit" });
+    const result = spawnSync(process.execPath, ["scripts/run-with-panic-guard.mjs", "--", process.execPath, "test", ...process.argv.slice(2), ...group.map((name) => `./${name}`)], { stdio: "inherit" });
     if (result.error || result.status !== 0) process.exit(result.status || 1);
 }

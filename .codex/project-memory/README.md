@@ -1,5 +1,13 @@
 # 影策项目级记忆入口
 
+当前权威交接（2026-10-14 23:18 CST）：先读 `HANDOFF_V166_20261014.md`。固定 v1.6.6 A‴ 冲突清零，最终Web2491+5全量/类型/lint/镜像、Backend Linux CGO全仓及PG/Redis实测、Agent328/构建、六谱系Schema51迁移和旧Schema9真实恢复均通过。独立预览 http://localhost:3001 已更新为 `v1.6.6+dingxin.1/candidate-cbf3ebd38153`，Schema51/51、healthy/任务0；生产3000仍旧版本/Schema9。停在用户Edge手验，未正式commit/push/晋升；旧A/候选/卷不删。下方旧“测试运行中/尚未有预览”仅为历史。
+
+当前接管入口（2026-10-14 17:43 CST）：A‴ 固定 v1.6.6 显式冲突为零。Backend Linux CGO 全仓、Agent 328 项/构建通过；Web 首轮 2467 pass/23 fail，修复后全量 2486 pass/4 fail。多输出序号、旧存储标识保留、生成连接回滚、本地/远端状态分离已修复；44 项持久化、48 项物化/刷新、22 项多图/入口专项通过。剩四项是静态脚本/命名断言和跨套件夹具污染，正在收口。真实副本迁移、PG/Redis 依赖用例、最终镜像和 Edge/生产/推送未完成。以下旧检查点均为历史。
+
+当前接管入口（2026-10-14 15:21 CST）：固定官方 v1.6.6 A‴ 的 61 个显式冲突已清零，Web 固定依赖/类型/lint、旧导演场景转换与预演接线专项通过；Web 全量（60 秒默认测试超时）、Backend Linux CGO 修复夹具后的全仓、Agent 全量/构建正在跑。用户已明确采用上游删除画布版本历史 UI；百炼、Comfy、独立 Agent 与人像能力保留。尚未完成 Schema9/45/官方谱系真实迁移副本、候选镜像、生产恢复点、本地部署或 GitHub 推送。先读 `UPSTREAM_V166_EXECUTION_20261012.md` 最新段，以下旧“61 未解”仅为历史。
+
+当前任务入口（2026-10-13 01:31 CST）：先读 `CURRENT_STATE.md` 首节与 `UPSTREAM_V166_EXECUTION_20261012.md`。用户要求把固定官方正式 `v1.6.6@27c8066e` 增量合入本地、验证后更新本地生产并非强制推送自己的 GitHub fork。原 v1.6.0 A″ 仅以本地 WIP `4323c759` 封存；新隔离 A‴ `codex/upstream-v1.6.6-20261012` 在无提交 merge 中有 61 个未解冲突。旧 A/A′/A″ 与生产 `v1.2.7+dingxin.1.catalog1`/Schema9/9 均保留，尚无新版本测试、Edge/生产部署或远端推送。
+
 当前任务入口（2026-10-04 04:09 CST）：**先读 `CURRENT_STATE.md` 顶部、`UPSTREAM_V160_EXECUTION_20261003.md` 和 `HANDOFF_V160_20261004.md`**。仅本地 WIP 双父 `7419e2b3` 封存未验收 v1.5.8 候选；隔离 A″ `.local/worktrees/upstream-v160` 合入固定官方 `v1.6.0@42f14cd7`，40 个文本冲突清零。Backend Linux CGO 全仓及五项依赖用例、Web 2,406+5 全量/类型/lint/构建、Canvas Agent 328/构建、三谱系隔离 Schema45 迁移、独立候选镜像/无宿主端口 HTTP 和 Compose 静态解析均通过。**尚无 v1.6.0 Edge 预览地址**；用户 Edge/正式提交/推送/生产晋升仍未通过。旧 A、v1.5.8 A′、生产服务均保留。
 
 历史权威入口（2026-09-29 11:37 CST）：先读 `CURRENT_STATE.md` 的首节，再读 `HANDOFF_V158_20260928.md`、`UPSTREAM_V158_EXECUTION_20260927.md` 与 `BRANCH_LIFECYCLE_20260927.md`。A′ v1.5.8 的显式冲突、Web/Agent/Linux CGO 全量、双谱系克隆迁移与候选镜像已通过；用户批准的 `127.0.0.1:3001` 空数据隔离预览曾运行且 HTTP 冒烟通过。用户 Edge 手验、正式提交/远端 CI 与晋升未通过。旧运行版本的验证结果不能移用到 A′。

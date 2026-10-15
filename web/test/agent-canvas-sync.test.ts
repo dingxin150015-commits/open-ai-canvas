@@ -60,7 +60,7 @@ test("cleanup and other-canvas events cannot update the new canvas", async () =>
 
 test("fallback snapshots obey the configured minimum refresh interval", async () => {
     const times: number[] = [];
-    const sync = createAgentCanvasSync({ canvasId: "canvas", applyPatches: async () => {}, refresh: async () => { times.push(Date.now()); }, onError: () => {}, batchMs: 0, refreshIntervalMs: 100 });
+    const sync = createAgentCanvasSync({ canvasId: "canvas", applyPatches: async () => {}, refresh: async () => { times.push(performance.now()); }, onError: () => {}, batchMs: 0, refreshIntervalMs: 100 });
     sync.reconcile();
     await sleep(15);
     for (let index = 0; index < 50; index++) sync.reconcile();

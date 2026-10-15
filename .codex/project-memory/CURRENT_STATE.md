@@ -1,5 +1,25 @@
 # 当前状态
 
+## 当前权威状态：候选验证通过，待 Edge（2026-10-14 23:18 CST）
+
+详见 `HANDOFF_V166_20261014.md`。实际A‴分支仍 `codex/upstream-v1.6.6-20261012@4323c759` 无正式提交merge，固定v1.6.6@27c8066e，61显式冲突为0；源码构建树 `cbf3ebd381531e887c295931b45a408af8cec501`。最终Web2491+5/0 fail、持久化45项、typecheck/lint及Docker构建通过；Backend Linux CGO全仓与实际PG/Redis集成、Agent328/构建、生产9/三种本地45/官方43与50六谱系up/up/verify→51通过。恢复点真实还原旧Schema9健康/空闲且业务摘要、密钥和插件状态一致。
+
+预览 http://localhost:3001 是独立生产副本、backend禁止外联，最终前后端版本/标识一致 `v1.6.6+dingxin.1/candidate-cbf3ebd38153`，Schema51/51、任务0。生产3000原镜像与Schema9未变。人工Edge、正式提交、生产晋升、远端push/CI及真实付费生成未完成；后续不要重复询问已授予的发布权限，但须等既定Edge门禁并重新做新鲜恢复点。旧A/工作树/卷保留，未经单独删除批准不清理。以下旧状态是日期化历史，不能覆写本节。
+
+## 最新检查点：验证收口，未部署/推送（2026-10-14 17:43 CST）
+
+固定官方 v1.6.6@27c8066e A‴ 显式冲突为零。Backend Linux CGO 全仓退出 0，Agent 328/328 与构建通过，Web 类型/lint/首轮构建通过。Web 首轮 2467/23，经修复后重跑 2486/4；最后四项正在收口。持久化 44、物化/刷新 48、多图/入口22 专项通过。保留 upstream 的本地冲突恢复副本，不自动重建远端删除画布。生产仍旧 A/Schema9，尚无 v1.6.6 部署、推送、真实付费调用或 Edge 验收。见执行记录及 `.local/validation/` 本轮日志。
+
+## 最新检查点：v1.6.6 显式冲突清零、全量验证中（2026-10-14 15:21 CST）
+
+A‴ 仍为 `codex/upstream-v1.6.6-20261012@4323c759` 上的未提交 merge。应用路径冲突标记与未合并索引均 0；Web frozen 依赖安装、typecheck、lint 通过，旧导演场景转换与新预演台接线专项通过。Backend 首轮三项失败均为夹具/安全错误比较口径，定向 Linux CGO 复测通过；最终全仓、Web 全量、Agent 全量/构建运行中。项目画布已采用新预演调用，保留人像和百炼高级参数；按用户明确选择移除旧版本历史 UI/调用链，源数据与备份不清除。Docker Engine 已重新启动，运行版本与真实卷将在部署前再次核对；候选未部署、未推送。
+
+## 当前任务：固定官方 v1.6.6 A‴ 冲突解决中（2026-10-13 01:31 CST）
+
+2026-10-13 13:53 CST 用户已明确选择采用上游删除画布版本历史/预览/恢复 UI 的方案；这是有意的功能取舍，旧持久数据和备份不得随之删除。旧导演台到上游预演台仍需旧场景转换及 UI 验证，详见 `UPSTREAM_V166_EXECUTION_20261012.md`。
+
+官方最新正式 Release 经实时 API 与远端标签核实为 `v1.6.6@27c8066e6da9f0d4754dc0e5c40097049fe730cf`，不追移动 main。原未验收 v1.6.0 A″ 暂存树封存成仅本地 WIP 双父 `4323c759`，原分支/工作树不动；新隔离工作树 `C:\Users\DingXin\.codex\worktrees\upstream-v166\open-ai-canvas` 在分支 `codex/upstream-v1.6.6-20261012` 上执行无提交 merge，实际 **61 个未合并路径**（含 2 个删除/修改），尚未解冲突或测试。生产仍是旧 A 的 `open-ai-canvas-backend:local`/`open-ai-canvas-web:local`，Backend ready 报 `v1.2.7+dingxin.1.catalog1`、Schema9/9、Worker0，容器 healthy/restart0，卷 `open-ai-canvas_backend-data` 未触碰。用户本轮授权目标包括最终本地部署及自己 fork 非强制推送，但必须先完成合并、全量、隔离迁移、私有恢复点和 Edge 手工验收门禁；不以旧 v1.6.0 测试冒充 v1.6.6 结果。执行证据见 `UPSTREAM_V166_EXECUTION_20261012.md`。
+
 ## 当前任务：固定官方 v1.6.0 A″ 自动门禁闭合、待 Edge（2026-10-04 04:09 CST）
 
 用户批准从未获 Edge 验收的 v1.5.8 A′ 候选制作**仅本地、明确标注 WIP** 的双父检查点，保留原 A′/旧 A/生产服务，再在新隔离分支 A″ 增量合入官方最新稳定 `v1.6.0`。官方正式标签固定 `42f14cd73eec7c2ded98eb15b6a4f5aa2f3f3b4a`；移动 `official/main=24cba765` 不纳入目标。A′ WIP 双父 `7419e2b3` 仅本地，原 A′ 未改；A″ `codex/upstream-v1.6.0-20261003` 位于 `.local/worktrees/upstream-v160`，`HEAD=7419e2b3`、`MERGE_HEAD=42f14cd7`，40 个文本冲突已清零。**截至 2026-10-04 04:09 CST：Web 全量 2,406+5、类型/lint/生产构建，Canvas Agent 328/构建、Backend Linux CGO 全仓及五项真实 PostgreSQL/Redis 依赖用例均通过；旧9、本地42、官方43 三谱系隔离迁移至45/45、重复 up/verify、完整性/外键、旧谱系脱敏计数与关键文件保持均通过。前后端独立候选镜像构建和无宿主端口 HTTP 冒烟、四套 Compose 静态解析通过；隔离测试容器/网络已清理。没有 v1.6.0 Edge 预览地址，用户 Edge、正式提交/push、生产部署仍未完成。**详情见 `UPSTREAM_V160_EXECUTION_20261003.md` 和 `HANDOFF_V160_20261004.md`。旧 A、v1.5.8 A′ 与生产数据不晋升/替换；真实付费调用和删除仍未获准。

@@ -49,7 +49,7 @@ test("invalid themes cannot corrupt the workspace or canvas display", () => {
 test("canvas appearance reaches the renderer and grid strength is not multiplied twice", () => {
     const page = source("pages/canvas/project.tsx");
     expect(page).toContain("appearance={canvasAppearance}");
-    expect(source("components/canvas/infinite-canvas.tsx")).not.toContain('opacity: mode === "dots"');
+    expect(source("components/canvas/canvas-viewport.tsx")).not.toContain('opacity: mode === "dots"');
     expect(page).toContain("useCanvasThemeScope()");
     expect(source("stores/canvas/use-canvas-theme-store.ts")).toContain("useCanvasThemeStore.setState({ active: false })");
     expect(source("pages/canvas/use-canvas-project-lifecycle.ts")).not.toContain("useThemeStore.getState().setTheme(");

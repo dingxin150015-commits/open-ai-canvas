@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 )
 
 func TestLocalExecutionPathsApplyLoopbackPolicyBeyondConfigResolution(t *testing.T) {

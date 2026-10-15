@@ -31,17 +31,21 @@ describe("workspace route loading", () => {
         expect(navigation).toContain("onFocus={() => preloadWorkspaceRoute(linkTo)}");
     });
 
-    test("keeps home and creation as distinct authenticated routes", () => {
+    test("keeps home distinct while preserving guest creation and inspirations", () => {
         const router = source("../src/router.tsx");
         const navigation = source("../src/components/layout/workspace-sidebar-nav.tsx");
 
         expect(router).toContain('{ path: "/", element: <RequireAuth>{deferred(<HomePage />)}</RequireAuth> }');
-        expect(router).toContain('{ path: "/create", element: <RequireAuth>{deferred(<CreatePage />)}</RequireAuth> }');
+        expect(router).toContain('{ path: "/create", element: deferred(<CreatePage />) }');
         expect(router).toContain('{ path: "/home", element: <RequireAuth>{deferred(<HomePage />)}</RequireAuth> }');
+        expect(router).toContain('{ path: "/inspirations", element: deferred(<InspirationsPage />) }');
         expect(router).toContain("HomePage");
         expect(navigation).toContain('{ id: "home", title: "首页", icon: Home, to: "/" }');
         expect(navigation).toContain('toolItem("create", "/create")');
-        expect(navigation).not.toContain('to: "/home"');
+        expect(router).toContain("<RequireAuth allowAnonymous={isGuestWorkspacePath(pathname)}>");
+        expect(router).toContain('{ path: "/assets", element: <RequireAuth>{deferred(<AssetsPage />)}</RequireAuth> }');
+        expect(router).toContain('{ path: "/canvas/:id", element: <RequireAuth><CanvasProjectPage /></RequireAuth> }');
+        expect(navigation).toContain('toolItem("inspirations", "/inspirations")');
     });
 
     test("preloads canvas detail and paints opening feedback before navigation", () => {

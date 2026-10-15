@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
 import localforage from "localforage";
 
 import { rebaseCanvasProjects } from "../src/lib/canvas/canvas-storage-revision";
@@ -29,6 +29,18 @@ import { apiClient } from "../src/services/api/request";
 import { useUserStore } from "../src/stores/use-user-store";
 import { CANVAS_HISTORY_STORE_KEY, useCanvasHistoryStore } from "../src/stores/canvas/use-canvas-history-store";
 import { repairMissingCanvasAssets } from "../src/services/canvas-asset-repair";
+import { useSyncProgressStore } from "../src/stores/use-sync-progress-store";
+
+const originalJournalGet = localforage.getItem.bind(localforage);
+const originalJournalRemove = localforage.removeItem.bind(localforage);
+beforeEach(() => {
+    localforage.getItem = (async () => null) as typeof localforage.getItem;
+    localforage.removeItem = (async () => undefined) as typeof localforage.removeItem;
+});
+afterEach(() => {
+    localforage.getItem = originalJournalGet;
+    localforage.removeItem = originalJournalRemove;
+});
 
 test("creation recovery observes streaming text tasks after reload", () => {
     const conversations = [
@@ -210,7 +222,9 @@ test("Canvas flush rejects a failed catalog write and retries the retained C1 sn
         const afterFailure = JSON.parse(durableValues.get(key)!) as { state: { projects: CanvasProject[] }; storageRevision: number };
         expect(afterFailure.state.projects[0]?.title).toBe("C0");
         expect(afterFailure.storageRevision).toBe(baseline.storageRevision);
-        expect(localStorageCalls).toEqual([]);
+        expect(localStorageCalls.length).toBeGreaterThan(0);
+        expect(localStorageCalls.every((call) => call.includes(`${CANVAS_STORE_KEY}_journal:user:`))).toBe(true);
+        expect([...localStorageValues.values()].every((value) => new TextEncoder().encode(value).byteLength <= 450_000)).toBe(true);
 
         failWrites = false;
         await flushCanvasStorePersistence();
@@ -1242,7 +1256,7 @@ test("Canvas generation final read preserves an ordinary edit queued after the q
     }
 });
 
-test("late Canvas snapshots rebase field deltas and preserve explicit deletions through IndexedDB", async () => {
+test("late Canvas snapshots rebase field deltas and retain conflicting local recreations for recovery", async () => {
     const originalWindow = (globalThis as { window?: unknown }).window;
     const originalGetItem = localforage.getItem.bind(localforage);
     const originalSetItem = localforage.setItem.bind(localforage);
@@ -1370,10 +1384,11 @@ test("late Canvas snapshots rebase field deltas and preserve explicit deletions 
         expect(keptNode?.metadata).toMatchObject({ content: "base", remoteNote: "tab B node edit" });
         expect(keptSession?.title).toBe("tab A session title");
         expect(keptSession?.messages[0]).toMatchObject({ text: "tab A message", meta: "tab B message edit" });
-        expect(main?.nodes.some((candidate) => candidate.id === "node-deleted")).toBe(false);
-        expect(main?.connections.some((candidate) => candidate.id === "connection-deleted")).toBe(false);
-        expect(main?.chatSessions.some((candidate) => candidate.id === "session-deleted")).toBe(false);
-        expect(durable.state.projects.some((candidate) => candidate.id === "project-deleted")).toBe(false);
+        expect(main?.nodes.find((candidate) => candidate.id === "node-deleted")?.title).toBe("tab A stale edit");
+        expect(main?.connections.find((candidate) => candidate.id === "connection-deleted")?.fromAnchorRatio).toBe(0.75);
+        expect(main?.chatSessions.find((candidate) => candidate.id === "session-deleted")?.title).toBe("tab A stale session");
+        expect(durable.state.projects.find((candidate) => candidate.id === "project-deleted")?.title).toBe("tab A stale project");
+        expect(useSyncProgressStore.getState().syncingProjects["canvas-main"]?.errorKind).toBe("conflict");
         expect(durable.storageRevision).toBeGreaterThan(2);
     } finally {
         await flushCanvasStorePersistence();
@@ -1740,7 +1755,7 @@ test("Canvas storage rebase reports concurrent field conflicts for every non-nod
     }
 });
 
-test("ordinary Canvas queue flush cannot publish a losing generation stamp before the dedicated conflict check", async () => {
+test.each([false, true])("ordinary Canvas queue flush rejects losing generation fields even with a deleted connection: %s", async (connectionDeleted) => {
     const originalWindow = (globalThis as { window?: unknown }).window;
     const originalGetItem = localforage.getItem.bind(localforage);
     const originalSetItem = localforage.setItem.bind(localforage);
@@ -1820,6 +1835,7 @@ test("ordinary Canvas queue flush cannot publish a losing generation stamp befor
         await flushCanvasStorePersistence();
         const baseline = JSON.parse(values.get(key)!) as { storageRevision: number };
         const durableA = project(node(effectA), { ...baseConnection, fromAnchorRatio: 0.25 }, session(effectA, "winner session"));
+        if (connectionDeleted) durableA.connections = [];
         values.set(
             key,
             JSON.stringify({
@@ -1851,13 +1867,13 @@ test("ordinary Canvas queue flush cannot publish a losing generation stamp befor
         ).rejects.toThrow("画布生成副作用与并发修改冲突");
 
         const conflictDurable = JSON.parse(values.get(key)!) as { state: { projects: CanvasProject[] } };
-        expect(conflictDurable.state.projects[0]?.connections[0]?.fromAnchorRatio).toBe(0.25);
+        expect(conflictDurable.state.projects[0]?.connections[0]?.fromAnchorRatio).toBe(connectionDeleted ? undefined : 0.25);
         expect(conflictDurable.state.projects[0]?.showImageInfo).toBe(true);
         expect(conflictDurable.state.projects[0]?.nodes[0]?.metadata?.generationEffectKeys).toEqual([effectA]);
         expect(conflictDurable.state.projects[0]?.chatSessions[0]?.generationEffectKeys).toEqual([effectA]);
 
         const conflictLive = useCanvasStore.getState().projects.find((candidate) => candidate.id === "canvas-connection-conflict")!;
-        expect(conflictLive.connections[0]?.fromAnchorRatio).toBe(0.25);
+        expect(conflictLive.connections[0]?.fromAnchorRatio).toBe(connectionDeleted ? undefined : 0.25);
         expect(conflictLive.chatSessions[0]?.title).toBe("winner session");
         expect(conflictLive.nodes[0]?.metadata?.generationEffectKeys).toEqual([effectA]);
         expect(conflictLive.chatSessions[0]?.generationEffectKeys).toEqual([effectA]);
@@ -1878,7 +1894,7 @@ test("ordinary Canvas queue flush cannot publish a losing generation stamp befor
         const durable = JSON.parse(values.get(key)!) as { state: { projects: CanvasProject[] } };
         const ordinaryDurableNode = durable.state.projects[0]?.nodes.find((candidate) => candidate.id === "node-ordinary-edit");
         const ordinaryDurableSession = durable.state.projects[0]?.chatSessions.find((candidate) => candidate.id === "session-ordinary-edit");
-        expect(durable.state.projects[0]?.connections[0]?.fromAnchorRatio).toBe(0.25);
+        expect(durable.state.projects[0]?.connections[0]?.fromAnchorRatio).toBe(connectionDeleted ? undefined : 0.25);
         expect(durable.state.projects[0]?.chatSessions[0]?.title).toBe("winner session");
         expect(durable.state.projects[0]?.chatSessions[0]?.messages[0]?.text).toBe("generation failed after conflict");
         expect(durable.state.projects[0]?.showImageInfo).toBe(false);
@@ -3275,14 +3291,14 @@ test("canvas deletion removes the remote project before updating local state", a
     }
 });
 
-test("login replaces stale local entities instead of resurrecting remote deletions", async () => {
+test("login preserves a remotely deleted canvas as a visible conflict without recreating it remotely", async () => {
     const originalWindow = (globalThis as { window?: unknown }).window;
     const originalGetItem = localforage.getItem.bind(localforage);
     const originalSetItem = localforage.setItem.bind(localforage);
     const previousAdapter = apiClient.defaults.adapter;
     const previousProjects = useCanvasStore.getState().projects;
     const requestUrls: string[] = [];
-    const staleProject = storedCanvasProject("canvas-stale-after-delete", "服务端已删除");
+    const staleProject = { ...storedCanvasProject("canvas-stale-after-delete", "服务端已删除"), revision: 1 };
 
     apiClient.defaults.adapter = async (config) => {
         const url = String(config.url || "");
@@ -3304,8 +3320,10 @@ test("login replaces stale local entities instead of resurrecting remote deletio
         resetRemoteUserDataSync();
         useCanvasStore.setState({ projects: [staleProject] });
         await syncRemoteUserData("account-A");
-        expect(useCanvasStore.getState().projects).toEqual([]);
-        expect(requestUrls.some((url) => url.startsWith("put ") || url.startsWith("post "))).toBe(false);
+        expect(useCanvasStore.getState().projects).toMatchObject([{ id: staleProject.id, revision: 1 }]);
+        expect(useSyncProgressStore.getState().syncingProjects[staleProject.id]?.errorKind).toBe("conflict");
+        await saveRemoteUserDataNow();
+        expect(requestUrls.some((url) => /^(put|post|patch) /.test(url))).toBe(false);
     } finally {
         resetRemoteUserDataSync();
         useCanvasStore.setState({ projects: previousProjects });
@@ -3323,6 +3341,7 @@ test("remote resource preparation never overwrites an edit made while upload is 
     const originalSetItem = localforage.setItem.bind(localforage);
     const previousAdapter = apiClient.defaults.adapter;
     const previousAssets = useAssetStore.getState().assets;
+    const previousProjects = useCanvasStore.getState().projects;
     const indexedValues = new Map<string, string>();
     const remoteWrites: Asset[] = [];
     let resourceUploads = 0;
@@ -3353,6 +3372,9 @@ test("remote resource preparation never overwrites an edit made while upload is 
         const method = String(config.method || "get").toLowerCase();
         if (url.includes("user-data/snapshot")) {
             return { data: { code: 0, data: { projects: [], assets: [] }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+        }
+        if (method === "get" && url === "/assets/asset-sync-edit") {
+            return { data: { code: 404, data: null, msg: "not found" }, status: 404, statusText: "Not Found", headers: {}, config };
         }
         if (method === "post" && url === "/resources") {
             resourceUploads += 1;
@@ -3397,6 +3419,8 @@ test("remote resource preparation never overwrites an edit made while upload is 
     try {
         resetRemoteUserDataSync();
         installRemoteUserDataAutoSync();
+        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: [] }));
+        useAssetStore.getState().replaceAssets([]);
         await syncRemoteUserData("account-sync-edit");
         const asset = {
             ...storedAsset("asset-sync-edit", "before upload"),
@@ -3424,6 +3448,7 @@ test("remote resource preparation never overwrites an edit made while upload is 
         releaseUpload();
         resetRemoteUserDataSync();
         useAssetStore.getState().replaceAssets(previousAssets);
+        withCanvasStorePersistenceSuppressed(() => useCanvasStore.setState({ projects: previousProjects }));
         await flushAssetStorePersistence();
         localforage.getItem = originalGetItem;
         localforage.setItem = originalSetItem;
@@ -3761,12 +3786,21 @@ test("explicit canvas asset repair persists the missing asset before its canvas"
         if (url.includes("user-data/snapshot")) {
             return { data: { code: 0, data: { projects: [project], assets: [] }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
         }
+        if (method === "get" && url.startsWith("/assets/")) {
+            return { data: { code: 404, data: null, msg: "not found" }, status: 404, statusText: "Not Found", headers: {}, config };
+        }
+        if (method === "get" && url === `/canvas-projects/${project.id}`) {
+            const saved = writes.some((write) => write.kind === "canvas") ? { ...useCanvasStore.getState().openProject(project.id)!, revision: 2 } : project;
+            return { data: { code: 0, data: { project: saved }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+        }
         const body = (typeof config.data === "string" ? JSON.parse(config.data) : config.data) as Record<string, unknown>;
         if (method === "put" && url.startsWith("/assets/")) writes.push({ kind: "asset", body });
-        else if (method === "put" && url.startsWith("/canvas-projects/")) {
-            writes.push({ kind: "canvas", body });
-            const saved = body.project as CanvasProject;
-            return { data: { code: 0, data: { project: { ...saved, revision: (saved.revision || 0) + 1 } }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
+        else if (method === "patch" && url === `/canvas-projects/${project.id}/operations`) {
+            const operations = body.operations as Array<{ type: string; id: string; patch?: Record<string, unknown> }>;
+            expect(operations).toMatchObject([{ type: "patch_node", id: "remote-image", before: { "metadata.assetId": null } }]);
+            const patch = operations.find((operation) => operation.id === "remote-image")?.patch;
+            writes.push({ kind: "canvas", body: { project: { ...project, nodes: [{ ...project.nodes[0], metadata: { ...project.nodes[0]?.metadata, assetId: patch?.["metadata.assetId"] } }] } } });
+            return { data: { code: 0, data: { project: { id: project.id, revision: 2 }, mutationId: body.mutationId }, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
         } else throw new Error(`unexpected request: ${method} ${url}`);
         return { data: { code: 0, data: {}, msg: "" }, status: 200, statusText: "OK", headers: {}, config };
     };

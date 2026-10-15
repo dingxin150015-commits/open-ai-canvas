@@ -1,5 +1,6 @@
 import type { ModelCapabilityChoice } from "@/components/model-protocol-picker";
 import { defaultModelCapabilityConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
+import { imagePresetForRatio, imageSizePresets } from "@/lib/image-size-presets";
 import { modelProtocolSupportsTokenBilling, type ModelProtocolDefinition } from "@/lib/model-protocols";
 import type { ChannelModel } from "@/services/api/wallet";
 import type { ModelTag } from "@/lib/model-tags";
@@ -67,6 +68,25 @@ export function changeChannelModelCapability(values: ChannelModelFormValues, pro
     };
 }
 
+export function updateChannelModelUpstreamCapabilities(values: ChannelModelFormValues): ChannelModelFormValues {
+    if (values.capability !== "image" || values.protocol !== "cangyuan-midjourney-v82") return values;
+    const defaults = defaultModelCapabilityConfig(values.protocol, values.providerModelKey?.trim() || values.modelKey.trim());
+    const image = values.capabilityConfig?.image;
+    if (!image) return { ...values, capabilityConfig: defaults };
+    if (image.size.parameter !== "aspect_ratio") return values;
+    const tier = defaults.image!.size.presets![0].tier;
+    const presets = imageSizePresets(image);
+    if (presets.length && presets.every((preset) => preset.tier === tier)) return values;
+    const ratios = Array.from(new Set(presets.map((preset) => preset.ratio)));
+    return {
+        ...values,
+        capabilityConfig: {
+            ...values.capabilityConfig!,
+            image: { ...image, size: { ...image.size, presets: ratios.length ? ratios.map((ratio) => imagePresetForRatio(tier, ratio)) : defaults.image!.size.presets } },
+        },
+    };
+}
+
 export function validateChannelModelProtocol(capability: string, protocol: string | undefined, protocols: ModelProtocolDefinition[]) {
     if (!protocols.some((p) => p.value === protocol && p.capability === capability && p.enabled !== false)) {
         throw new Error("请选择当前能力下已启用的请求协议");
@@ -94,7 +114,7 @@ export function validateChannelModelPrices(values: Pick<ChannelModelFormValues, 
         if (tier.matchMode === "advanced") {
             if (tier.operation && tier.operation !== "*" && !operations[capability]?.includes(tier.operation)) fail("生成方式与模型能力不匹配");
             const specific = (value: string | undefined) => Boolean(value && value !== "*");
-            if (!(specific(tier.operation) || (capability === "image" && (specific(tier.quality) || specific(tier.size))) || (capability === "video" && specific(tier.resolution)))) fail("规格价格至少需要一个匹配条件；统一价格请选择默认价格");
+            if (!(specific(tier.operation) || (capability === "image" && (specific(tier.quality) || specific(tier.resolution) || specific(tier.size))) || (capability === "video" && specific(tier.resolution)))) fail("规格价格至少需要一个匹配条件；统一价格请选择默认价格");
         }
         const prices = tier.billingMode !== "token" ? [tier.unitPrice] : capability === "video" ? [tier.outputTokenPrice] : [tier.inputTokenPrice, tier.outputTokenPrice, tier.cachedTokenPrice];
         if (prices.some((price) => typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 1_000_000)) fail("积分价格必须是 0 到 1000000 之间的有效数值");

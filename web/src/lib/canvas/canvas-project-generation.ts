@@ -2,7 +2,7 @@ import { type GenerationTask } from "@/services/api/task-center";
 import { backendProviderConfig, logicalModelIDForConfig, runBackendGenerationTask, type GenerationTaskDependencies } from "@/services/api/generation-task";
 import { configuredModelMatchesCapability, defaultConfig, normalizeModelOptionValue, normalizeRunningHubCapability, resolveModelRequestConfig, type AiConfig, type WorkflowFieldMapping } from "@/stores/use-config-store";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { resolveMediaUrl } from "@/services/file-storage";
+import { resolveMediaUrl, resolveVideoMediaUrl } from "@/services/file-storage";
 import { resourceIdFromStorageKey } from "@/services/api/resources";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { normalizeVideoDuration, normalizeVideoResolution } from "@/lib/video-generation-options";
@@ -211,6 +211,7 @@ export function buildImageGenerationMetadata(type: CanvasImageGenerationType, co
 }
 
 export function nodeReferenceImage(node: CanvasNodeData): ReferenceImage | null {
+    if (node.metadata?.imageLayerGroup?.compositeStatus && node.metadata.imageLayerGroup.compositeStatus !== "ready") return null;
     if (node.type === CanvasNodeType.MediaConversion) {
         // 转换结果只在成功物化后作为生成参考；运行中、跳过和失败状态都不能透传旧结果。
         const conversion = node.metadata?.mediaConversion;
@@ -364,7 +365,8 @@ export async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
                 node.type === CanvasNodeType.Video && node.metadata?.videoPreview?.storageKey
                     ? { ...node.metadata.videoPreview, content: await resolveImageUrl(node.metadata.videoPreview.storageKey, node.metadata.videoPreview.content, { cacheMiss: true }) }
                     : node.metadata?.videoPreview;
-            if ((node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveMediaUrl(node.metadata.storageKey, content), videoPreview } };
+            if ((node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.storageKey)
+                return { ...node, metadata: { ...node.metadata, content: node.type === CanvasNodeType.Video ? await resolveVideoMediaUrl(node.metadata.storageKey, content) : await resolveMediaUrl(node.metadata.storageKey, content), videoPreview } };
             if (videoPreview !== node.metadata?.videoPreview) return { ...node, metadata: { ...node.metadata, videoPreview } };
             if (node.type === CanvasNodeType.Image && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveImageUrl(node.metadata.storageKey, content, { cacheMiss: true }) } };
             if (node.type !== CanvasNodeType.Image || !content) return node;

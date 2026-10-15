@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 )
 
 func TestV127BatchDeleteAllowsUnreferencedDiscoveryCandidates(t *testing.T) {

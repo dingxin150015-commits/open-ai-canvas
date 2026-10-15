@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"infinite-canvas/backend/internal/service"
+	"yingce/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -60,6 +60,19 @@ func TestFailServiceProjectsAppError(t *testing.T) {
 	response := decodeFailureEnvelope(t, recorder)
 	if recorder.Code != http.StatusTooManyRequests || response.Code != service.CodeRateLimited || response.Reason != string(service.ReasonRateLimited) || response.ErrorCode != "request_throttled" || response.ErrorCategory != service.ErrorCategoryQuota || !response.Retryable || response.Msg != err.Message || !strings.HasPrefix(response.RequestID, "req_") {
 		t.Fatalf("response = status %d, body %#v", recorder.Code, response)
+	}
+}
+
+func TestFailServiceProjectsProjectNameConflictReason(t *testing.T) {
+	recorder, context := responseTestContext()
+	err := service.NewAppError(http.StatusConflict, "项目名称已存在")
+	err.Reason = service.ReasonProjectNameConflict
+
+	failService(context, err)
+
+	response := decodeFailureEnvelope(t, recorder)
+	if recorder.Code != http.StatusConflict || response.Code != service.CodeConflict || response.Reason != string(service.ReasonProjectNameConflict) || response.Msg != err.Message {
+		t.Fatalf("project name conflict response: status=%d body=%#v", recorder.Code, response)
 	}
 }
 

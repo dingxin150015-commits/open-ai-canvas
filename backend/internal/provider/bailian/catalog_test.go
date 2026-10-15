@@ -3,7 +3,7 @@ package bailian
 import (
 	"testing"
 
-	"infinite-canvas/backend/internal/provider"
+	"yingce/backend/internal/provider"
 )
 
 func TestOfficialCatalogManifest(t *testing.T) {

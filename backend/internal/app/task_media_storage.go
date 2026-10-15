@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"infinite-canvas/backend/internal/model"
+	"yingce/backend/internal/model"
 )
 
 const mediaStagingBudget int64 = 512 << 20
@@ -135,7 +135,18 @@ func (s *Service) downloadTaskMedia(ctx context.Context, config providerConfig, 
 		ApplyOutboundHeaders(req, config.Headers)
 	}
 	ApplyDefaultOutboundHeaders(req)
-	client := OutboundHTTPClient(3 * time.Minute)
+	// 结果文件可能托管在渠道同域（sameProviderOrigin 时还带渠道鉴权），
+	// 渠道配置了出站代理时下载必须走同一代理，否则配代理渠道的结果无法取回。
+	proxyURL := ""
+	if metadata, ok := ctx.Value(providerAnalyticsKey{}).(providerAnalyticsContext); ok {
+		proxyURL = metadata.ProxyURL
+	}
+	if strings.TrimSpace(proxyURL) == "" && strings.TrimSpace(config.ChannelID) != "" {
+		if ch, err := s.repo.SystemChannel(config.ChannelID); err == nil {
+			proxyURL = ch.ProxyURL
+		}
+	}
+	client := OutboundHTTPClientWithProxy(3*time.Minute, proxyURL)
 	if loopback && s.DesktopLocalChannelsEnabled() {
 		client = outboundHTTPClientWithPolicy(3*time.Minute, loopbackPolicy)
 	}
@@ -275,7 +286,7 @@ func (s *Service) storeTaskMediaFile(task *model.Task, index int, path, mimeType
 		resource.ETag, err = s.storeTaskMediaObject(resource, "generated."+extensionFromMimeType(mimeType), file)
 		if err == nil {
 			resource.Status, resource.Error, resource.UpdatedAt = model.ResourceStatusReady, "", time.Now()
-			err = s.repo.SaveResource(resource)
+			err = s.saveResourceWithinStorageLimit(resource, "")
 		}
 	}
 	if err != nil {

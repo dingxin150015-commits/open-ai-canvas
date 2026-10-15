@@ -1,5 +1,9 @@
 # 开发历史时间线
 
+## 2026-10-14：v1.6.6 候选验证/隔离预览完成（23:18 CST）
+
+61显式冲突清零，Web2491+5/Backend Linux CGO全仓/PG与Redis实测/Agent328通过，六谱系Schema51迁移与旧Schema9真实恢复通过，最终同标识候选镜像部署到隔离3001。保留百炼、Comfy、人像与缓存连续性；按用户选择移除旧版本历史UI，旧场景转上游预演。生产3000/Schema9与旧A保留，未正式提交/push/晋升，待用户Edge手验。详见HANDOFF_V166_20261014.md；旧状态保持历史身份。
+
 ## 2026-10-04 04:09 CST：v1.6.0 A″ 候选镜像/HTTP/Compose 门禁闭合
 
 独立标签的 Backend/Web 完整候选镜像构建成功，镜像 ID 分别为 `sha256:ac4f54cf...` / `sha256:c4217b79...`，未覆盖生产 `:local`。在无宿主机端口、无生产挂载的专用网络与空临时数据目录中，Web 版本接口、Nginx 代理后的 Backend ready、首页 HTTP 均通过：`v1.6.0+dingxin.1`、暂存树构建标识 `tree-917414bc4783`、Schema45/45。dev/local/deploy 及 deploy+build Compose 用静态解析（生产配置只用占位值），通过后清理四个专用测试容器和两条专用网络，保留隔离迁移副本和候选镜像。未启动 v1.6.0 Edge 预览；手验清单与 NO-GO 边界见 `HANDOFF_V160_20261004.md`。

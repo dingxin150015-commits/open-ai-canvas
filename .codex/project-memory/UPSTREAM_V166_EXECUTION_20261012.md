@@ -1,5 +1,28 @@
 # 固定 v1.6.6 增量合并、验证与部署执行记录
 
+## 2026-10-14 23:41 CST：收尾与根接管入口同步
+
+最终源树与应用路径比对无差异，只有记忆/验收说明变化；61显式冲突清零，最终2491+5全部通过。3001最终身份/Schema核验通过，上一候选静态chunk仍返回200/真实类型。私有恢复点后增审计材料的ACL再次验证，仅授权SID。PG/debug/旧Schema9恢复测试容器停止且保留，生产与预览继续运行。根旧分支只增量更新README/CURRENT_STATE/BACKLOG接管指针，既有内容保留，未作为构建源。跨保护目录多文件patch曾部分写入后失败，造成最新记忆段重复；已按相同完整段机械去重，并经主机授权的native apply_patch完成根入口，未重复更改应用源码。无正式commit/push/晋升/付费生成/卷删除，待Edge。
+
+## 2026-10-14 23:18 CST：候选验证完成，交付 Edge 门禁
+
+- 最终Web `bun scripts/run-all-tests.mjs --timeout 60000`：2491/2491主套件＋5/5独立注册表，0 fail；最后一轮1645.48秒，45项持久化专项/类型/lint通过。补了“并发删除连接时回滚不生成undefined记录”保护和双情形用例。`web-full-release.log`、`web-persistence-release.log`、`web-typecheck-release.log`、`web-lint-release.log`为最终证据。
+- Backend Linux CGO全仓、实际独立PG16/Redis（不连接生产）用例通过；Agent328/构建通过。未跑Chrome浏览器runner、真实供应商/扣费，不宣称全部端到端。
+- 六谱系：生产9、legacy45/local45/canonical45、官方43、固定官方v1.6.6原生50，均独立副本up/up/verify→51，旧迁移身份、业务摘要、key/marker/plugin状态保留。Windows tar对官方中文路径报错，改同一Git归档在隔离Linux解包/编译；官方50夹具本来没有key/registry，审计明确null，不制造密钥、不掩盖有加密记录时的解密失败。
+- 私有完整恢复点 `v166-predeploy-20261014-183917` 在NTFS受限ACL；旧镜像保护标签 `pre-v166-20261014`。真实恢复至无网络 `open-ai-canvas-v166-restore9-proof-20261014` 后Schema9/9/healthy/任务0，关键计数/digest/key/plugin全部一致，恢复点登记verified/protected。生产3000没有替换镜像或卷。
+- 候选启动业务摘要不变；内置技能33→71、旧33版本与文件记录保留，registry84→109；仅旧三包随上游升版本，启用状态无变化，七个本地关键插件审计摘要一致。其他运行验证与数据变化在handoff明确区分。
+- 最终镜像源树 `cbf3ebd381531e887c295931b45a408af8cec501`，构建标识 `candidate-cbf3ebd38153`，版本v1.6.6+dingxin.1。Backend镜像15cc1a2c、Web0d06c840；Compose仅更新独立预览，Schema51/51/healthy/活动0。7路由和入口8静态资源HTTP通过，不等于浏览器UI验收。
+- Preview第一次只读DB因root离线迁移属主，精确副本卷chown为候选app解决；Docker internal网络未发布宿主端口，只给Web加frontend网络，backend仍无默认外网路由。PowerShell单次HTTP用-NoProxy，系统/Clash配置未改。
+- 交付 `HANDOFF_V166_20261014.md` 与Edge清单。待用户手验确认后继续已获授权的正式发布/push，需新鲜恢复点和运行复核。无正式commit/force/push/生产晋升/数据删除/真实付费调用。
+
+## 2026-10-14 17:43 CST：全量结果与语义回归修复
+
+- Backend Linux CGO `go test -count=1 -timeout 30m ./...` 全仓退出0；Agent `npm test` 328/328、`npm run build`通过。Web 首轮构建、typecheck、lint通过；首轮完整测试2467/23，修复后重跑2486/4，尚非发布通过。
+- 本地原生单请求多图和上游展开堆栈冲突：已有 `taskOutputIndex` 的结果节点不再重复展开、不再覆写为主输出；12 项多图及10项版本/入口专项通过。生成连接尝试增加来源快照，回滚只撤销本次生成字段并保留后续普通编辑，44项持久化专项通过。
+- 上游 `yingce:`/IndexedDB名称更名会使旧浏览器缓存不可见；精确保留本地 `infinite-canvas:`/数据库名（实现标识，非产品名称），继续使用上游新同步/恢复算法。不添加平行存储兼容层。48项物化/刷新专项通过，刷新节流使用单调时钟。
+- 上游新持久日志及删除冲突恢复是有意语义变化，已同步旧夹具：保留本地未确认工作作为冲突副本，禁止其自动重建云端已删除画布；本地成功写入不能清掉远端冲突状态。最后四项为静态运行器/存储命名断言及跨套件残留资产夹具，正在修复；不跳过断言。
+- 尚未完成真实副本Schema迁移、PG/Redis依赖测试、最终镜像、Edge、生产晋升或push。旧服务/卷、回退工作树保留，无付费模型调用。
+
 更新时间：2026-10-12 23:14 CST。当前是启动事实，不是完成报告；每个关键动作后追加证据和时间。此任务获用户明确要求：合入最新上游、解决冲突、全量验证后更新本地部署，并非强制推送到自己的 GitHub fork。用户此前的 Edge 手工验收、恢复点和旧 A 保留规则仍须按当前风险执行；真实付费模型调用没有获准。
 
 ## 已确认基线
@@ -15,3 +38,41 @@
 2. 验证 Web/Backend Linux CGO/Canvas Agent、锁与生成插件包、Compose、镜像、无端口 HTTP；对生产 Schema9 和 A″ Schema45 分别用隔离副本演练到候选目标，并校验重复迁移、完整性、外键、脱敏计数与匹配密钥。不得在此步骤写生产卷。
 3. 生产发布前重新确认当前服务、运行任务、卷和 GitHub 目标；制作新的私有 `verified/protected` 完整恢复点，保留旧镜像标签和旧 A。先用户 Microsoft Edge 隔离预览验收；若测试失败或不满足安全门禁，停在候选，不宣称“测试无误”。
 4. 只有前述门禁通过，才以保留卷、明确 Compose 工作目录升级本地部署，并验证 build-info、ready、Schema、业务计数/密钥合同和 Edge；然后正式提交、非强制推送到核实的用户 fork 分支、核对远端 SHA/CI。绝不 force，绝不删除旧工作树/数据/卷。若 Edge 手验缺失，报告并等待用户，不替其声称通过。
+
+## 2026-10-13 约 00:00 CST：隔离 A‴ 已建立并开始固定合并
+
+- A″ 的全部暂存内容连同本记录启动段写成树 `04de369256a308373eb6b8036dccc61d459672b8`，`git commit-tree` 生成仅本地 WIP 双父 `4323c7592471ba04481f696b1052f55f183ff05c`（父 `7419e2b3` 和官方 v1.6.0 `42f14cd7`）；A″ 原 HEAD/MERGE_HEAD 未动，未 push。
+- 新隔离工作树 `C:\Users\DingXin\.codex\worktrees\upstream-v166\open-ai-canvas` 创建在该 WIP SHA，分支 `codex/upstream-v1.6.6-20261012`。`git fetch` 后标签 peeled SHA 与远端一致：`27c8066e6da9f0d4754dc0e5c40097049fe730cf`。相对 v1.6.0，官方 1,606 路径，本地 732 路径，重叠 195。
+- `git merge-tree` 预判冲突；实际 `git merge --no-commit --no-ff v1.6.6` 的 `MERGE_HEAD` 为标签对象 `8cd7da6d`（应进一步核实剥离到 `27c8066e`），`git diff --name-only --diff-filter=U` 为 61 路径。包含一个上游删除 vs 本地修改的画布版本比较弹窗，其余以文本冲突为主；不能简单整文件 ours/theirs。尚未解决或测试，不得部署/push。
+
+## 2026-10-13 01:31 CST：冲突分批边界
+
+- 逐文件计数确定 61 个未合并路径；`web/src/components/canvas/canvas-version-compare-modal.tsx` 与 `web/src/components/canvas/director/canvas-director-workbench.tsx` 是 2 个 modify/delete（无文本标记），`web/src/pages/canvas/project.tsx` 有 27 个文本冲突块。其余模块多为 1–4 块，但不能只按块数决定风险。
+- 处理顺序：基础 `VERSION`/CI/依赖；Backend 模型、数据库、协议和资源/任务；Web 模型合同、状态及路由；画布、导演/预演、创作/分镜；对应测试；最后专题文档与项目记忆。每批复核调用点及双方阶段内容，允许 synthesize、保留一侧或标 needs-human；未理解互斥产品目标不自动赌。
+- 当前没有运行 v1.6.6 编译、迁移、镜像或 Edge。生产 v1.2.7/Schema9 是实测现状，不可从旧 v1.6.0 A″ 的 Schema45 克隆结果推断实际部署安全。
+
+## 2026-10-13 03:26 CST：基础/Backend 第一批合成中
+
+- `VERSION` 合成为 `v1.6.6+dingxin.1`；质量流程与 `web/package.json` 同时保留本地完整测试/Director E2E 和上游预演 E2E。当前机器遵守 Edge-only，不在此处运行 Chrome 脚本。首三文件 JSON 语法检查通过，仍未跑全部 CI。
+- 上游 Go module 改为 `yingce/backend`；逐项确认后，对 26 个本地 Go 源文件的旧 `infinite-canvas/backend/` 导入做精确机械替换，生成二进制 `backend/server` 未触碰。此项是独立的自动合并语义风险，必须用 Linux CGO 编译/测试复验。
+- Backend 已合成数据库连接（上游 PostgreSQL 连接前配置 + 本地脱敏 GORM logger）、渠道结构/管理视图（上游 `ProxyURL` + 本地 `AllowLocalChannel`）、调用链（本机回环安全直连优先，普通渠道代理）、资源/结果下载和视频能力约束。上游 Bailian 补充目录 20 个 ID 与本地受版本管理的 80 项 manifest 比较，20 个均已包含；保留本地逐模型支持状态与文档合同，不降级为泛化插件目录。
+- 数据库新候选暂定 Schema 51：canonical 44 本地时长、官方 45–50、51 本地 Comfy；历史本地 45 已是 Comfy 时，保留该记录并把官方上传预留迁移移到 51；更早本地 v9 与 v41/42 谱系保留旧名称/校验和，官方 46–50 再接 51 上传预留。新添计划测试，但 Windows `go test -run '^TestMigrationPlan' ./internal/database` 因 `CGO_ENABLED=0` 的 go-sqlite3 stub 全部无法运行，属于环境阻断而非通过/失败结论；独立 Linux CGO 测试镜像构建中，尚未验证这些计划或真实克隆，**生产迁移仍 NO-GO**。
+- 当前仅暂存已解决的冲突文件，仍有约 43 个未合并路径；主要为画布、预演台、模型/页面/样式与文档。未正式提交、推送、生产部署或真实付费调用。
+
+## 2026-10-13 09:47 CST：Backend 专项回归与画布底层收口
+
+- Linux CGO 无卷容器 `go test -run '^TestMigrationPlan' -count=1 ./internal/database` 通过；Windows 同一组因 CGO stub 未运行，不能把后者计入代码失败。Backend 全仓首轮未通过，仅 `internal/app` 两项（图片质量/分辨率档位测试夹具缺 BillingMode；排队任务测试误把应脱敏的持久化错误要求成原始异常）及 `internal/handler` 一项（登录身份防枚举测试误把每次随机 requestId 当作相等字段）。修正的是三个测试夹具/断言，未放宽实际价格校验或错误脱敏。三项在隔离 Linux CGO 调试容器中定向复测 `app`、`handler` 均通过；全仓最终重跑仍待。
+- 前端模型合同、主题和入口：上游图片价格选择器与 `1.5k` 能力接入，保留本地百炼 video generationContract；用户切换使用上游先恢复缓存再开放工作区，保留本地账号清缓存；主题保留旧持久 key 和画布临时覆盖，首屏读取旧/新 key；本地首页独立、上游 `/inspirations` 加入导航、`/create` 保留上游游客能力；管理员插件中心继续有本地权限旁路。以上尚未运行 Web 类型/浏览器验证。
+- 画布底层：新 `CanvasSettingsPopover` 替换旧视频专用 Portal（旧文件可由 Git WIP 恢复）；上游 `CanvasViewport`/预演 Dock 名称、缩略图和 MediaPackage 导出采纳，导出仍支持本地绘图；本地 Comfy Bridge workflow 配置、单任务多图节点输出序号与上游逐层提取/素材保存前合成检查已合成。未解路径降至 19，剩项目画布 27 块、导演→预演数据/组件删除与其他页面、样式、测试和文档。不可把这一阶段称为 UI 通过。
+
+## 2026-10-13 13:53 CST：用户选择上游版本历史移除行为
+
+- 用户对“官方 v1.6.6 删除本地画布版本历史/预览/恢复 UI 及调用链”的明确回复是：**采用上游删除方案**。因此在 A‴ 中清除旧 UI/调用方和先前暂存保留的旧比较弹窗；历史代码仍可从本地 WIP `4323c759` 恢复，旧持久版本数据/备份不得因本决策删除。最终交付须把这是有意接受的功能变化说清楚，而非误报为无影响。
+- 原导演台→上游预演台是另一项独立数据边界：已增加纯转换 helper，将有效旧 `directorScenes`/节点关联映射到 `previsScenes`，保留原字段并对不完整结构拒绝强转；上游新预演台已有保存失败可留在界面的关闭流程。相关单测待 Web 依赖/类型与 Edge 验证，不能先宣称旧场景运行验收完成。
+
+## 2026-10-14 15:21 CST：冲突清零与全量启动
+
+- A‴ 61 个显式冲突已全部解开/暂存，应用路径无残留标记。项目画布 27 块按用户版本历史决策采用上游新布局/预演调用，同时保留本地人像筛选/Modal、百炼配置模型和参数；旧版本比较弹窗已移除，旧版本数据/备份不删。提示词编辑器采用上游引用组件并补回百炼专属参数面板；资产标签编辑保留本地读写规则。
+- 样式仅按冲突精确合成；上游 `globals-*.css` 分片目前未被实际 import，没有据此盲删主 CSS。新视口的本地网格强度只乘一次，回归路径同步为 `canvas-viewport.tsx`。文档保留上游新功能并明确候选 Schema51 和历史迁移身份。
+- Windows 沙箱查询 `.git` 曾报 not a git repository，升级为只读主机权限后确认工作树登记/分支/对象完整，未修复或重建 Git 元数据。Docker Engine 当时未运行，按已授权测试/部署目标启动 Docker Desktop；旧生产容器随其恢复，当前尚未替换镜像。
+- Web `bun install --frozen-lockfile` 1440 包成功，Agent 冻结安装 152 包成功，无锁改动；Web typecheck/lint 通过。七文件专项 75 pass/4 fail：三项 Windows worker 超出默认5秒（非断言失败），一项旧 infinite-canvas 文件名静态断言已修正。新场景转换2项与预演接线34项已通过。测试运行器增加参数透传，以 `bun scripts/run-all-tests.mjs --timeout 60000` 跑完整清单，断言未跳过；Agent npm test/build、Backend Linux CGO 全仓同时运行，尚未有最终退出码。

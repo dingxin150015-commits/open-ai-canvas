@@ -252,7 +252,7 @@ describe("readImageMeta", () => {
             expect(harness.images[0]?.onerror).toBeNull();
             expect(harness.timers.size).toBe(0);
             expect(abort.listenerCount()).toBe(0);
-            expect(harness.srcAssignments).toEqual(["data:image/png;base64,AA=="]);
+            expect(harness.srcAssignments).toEqual(["data:image/png;base64,AA==", ""]);
         } finally {
             harness.restore();
         }
@@ -286,9 +286,9 @@ describe("readImageMeta", () => {
                 (error: DOMException) => error.name,
             );
             abort.abort();
-            const promptOutcome = await Promise.race([outcome, new Promise<string>((resolve) => queueMicrotask(() => resolve("pending")))]);
-            if (promptOutcome === "pending") harness.fireNextTimer();
-            await outcome;
+            expect(harness.images[0]?.onload).toBeNull();
+            expect(harness.images[0]?.onerror).toBeNull();
+            const promptOutcome = await Promise.race([outcome, new Promise<string>((resolve) => setImmediate(() => resolve("pending")))]);
 
             expect(promptOutcome).toBe("AbortError");
             expect(harness.images[0]?.onload).toBeNull();

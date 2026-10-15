@@ -1,6 +1,6 @@
 package app
 
-import "infinite-canvas/backend/internal/kernel"
+import "yingce/backend/internal/kernel"
 
 const (
 	ErrorCategoryValidation     = "validation"

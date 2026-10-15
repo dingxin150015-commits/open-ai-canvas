@@ -42,7 +42,7 @@ export function CanvasToolbar({
     onAddDrawing,
     onAddExtensionNode,
     onAddWorkflow,
-    onOpenDirector,
+    onOpenPrevis,
     onUndo,
     onRedo,
     onUpload,
@@ -80,7 +80,7 @@ export function CanvasToolbar({
     onAddDrawing: () => void;
     onAddExtensionNode: (type: CanvasNodeTypeId) => void;
     onAddWorkflow: () => void;
-    onOpenDirector: () => void;
+    onOpenPrevis: () => void;
     onUndo: () => void;
     onRedo: () => void;
     onUpload: () => void;
@@ -154,7 +154,7 @@ export function CanvasToolbar({
         onAddExtensionNode,
         onAddWorkflow,
         onChooseStyle,
-        onOpenDirector,
+        onOpenPrevis,
         onUpload,
         onOpenWorkspace,
     onOpenMyAssets,

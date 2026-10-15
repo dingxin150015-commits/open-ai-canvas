@@ -5,8 +5,6 @@ import {
     ArrowLeft,
     BarChart3,
     BellRing,
-    ChevronLeft,
-    ChevronRight,
     ChevronDown,
     CloudUpload,
     Coins,
@@ -24,6 +22,8 @@ import {
     Moon,
     Palette,
     Paintbrush,
+    PanelLeftClose,
+    PanelLeftOpen,
     PlugZap,
     RadioTower,
     RefreshCw,
@@ -96,6 +96,7 @@ const adminNavigation: Array<{ label: string; items: AdminNavigationItem[] }> = 
         label: "平台配置",
         items: [
             { path: "/admin/plugins", label: "插件管理", description: "平台可用性、上传与卸载", icon: <PlugZap className="size-4" /> },
+            { path: "/admin/skill-curation", label: "技能分类", description: "平台策展与分类维护", icon: <PlugZap className="size-4" /> },
             { path: "/admin/settings/appearance", label: "站点及外观", description: "品牌、SEO、备案与皮肤", icon: <Palette className="size-4" /> },
             { path: "/admin/settings/features", label: "功能开放", description: "工作台、插件与模型能力", icon: <ToggleLeft className="size-4" /> },
             { path: "/admin/settings/drawing-engine", label: "绘图工具", description: "画布绘图节点默认引擎", icon: <Paintbrush className="size-4" /> },
@@ -158,7 +159,7 @@ function AdminShellLayout() {
                 <main id="admin-root" data-admin-root data-admin-density={density} className="admin-shell flex h-full min-h-0 overflow-hidden">
                     <aside className={cn("admin-sidebar hidden shrink-0 flex-col overflow-hidden lg:flex", collapsed && "is-collapsed")}>
                         <div className="admin-sidebar-identity shrink-0">
-                            <AdminTooltip title={collapsed ? "查看更新日志" : undefined} placement="right">
+                            <AdminTooltip title={collapsed ? (appearance.updates?.enabled ? "查看更新公告" : "查看更新日志") : undefined} placement="right">
                                 <AppChangelogButton
                                     className={cn("admin-sidebar-brand-button", collapsed && "is-collapsed")}
                                     icon={<BrandLogoFrame className="admin-sidebar-brand-mark grid shrink-0 place-items-center bg-foreground text-background" logoClassName="size-5 object-contain" alt="" fallback={<InfinityIcon className="size-4" />} />}
@@ -171,20 +172,27 @@ function AdminShellLayout() {
                             </AdminTooltip>
                         </div>
                         <AdminNavigation collapsed={collapsed} />
-                        <div className="admin-sidebar-footer shrink-0">
-                            <AdminTooltip title={collapsed ? "返回创作台" : undefined} placement="right">
-                                <NavLink to="/" aria-label={collapsed ? "返回创作台" : undefined} className={cn("admin-nav-link", collapsed && "is-collapsed")}>
-                                    <Home className="size-4" strokeWidth={1.6} />
-                                    {!collapsed ? <span>返回创作台</span> : null}
-                                </NavLink>
-                            </AdminTooltip>
+                        <div className={cn("admin-sidebar-footer shrink-0", collapsed && "is-collapsed")}>
+                            <div className="admin-sidebar-footer-row">
+                                <AdminTooltip title={collapsed ? "返回创作台" : undefined} placement="right">
+                                    <NavLink to="/" aria-label={collapsed ? "返回创作台" : undefined} className={cn("admin-nav-link", collapsed && "is-collapsed")}>
+                                        <Home className="size-4" strokeWidth={1.6} />
+                                        {!collapsed ? <span>返回创作台</span> : null}
+                                    </NavLink>
+                                </AdminTooltip>
+                                {!collapsed ? (
+                                    <button type="button" className="admin-sidebar-collapse-toggle" onClick={toggleCollapsed} aria-label="收起侧栏" title="收起侧栏" aria-expanded={!collapsed}>
+                                        <PanelLeftClose className="size-4" strokeWidth={1.7} />
+                                    </button>
+                                ) : null}
+                            </div>
+                            {collapsed ? (
+                                <button type="button" className="admin-sidebar-collapse-toggle is-collapsed" onClick={toggleCollapsed} aria-label="展开侧栏" title="展开侧栏">
+                                    <PanelLeftOpen className="size-4" strokeWidth={1.7} />
+                                </button>
+                            ) : null}
                         </div>
                     </aside>
-                    <AdminTooltip title={collapsed ? "展开侧栏" : "收起侧栏"} placement="right">
-                        <button type="button" className={cn("admin-sidebar-edge-toggle hidden lg:grid", collapsed && "is-collapsed")} onClick={toggleCollapsed} aria-label={collapsed ? "展开侧栏" : "收起侧栏"} aria-expanded={!collapsed}>
-                            {collapsed ? <ChevronRight className="size-3.5" aria-hidden="true" /> : <ChevronLeft className="size-3.5" aria-hidden="true" />}
-                        </button>
-                    </AdminTooltip>
                     <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
                         <MobileAdminNavigation />
                         <Suspense
