@@ -1,5 +1,10 @@
 # 影策备份登记簿
 
+## 2026-10-15 二次发布新鲜Schema51恢复点（14:00 CST）
+
+- `C:\Users\DingXin\.codex\backups\open-ai-canvas\v166-audio-before-20261015-132809`：二次切换前Schema51完整生产`/data`、独立hash一致的DB/WAL/SHM/`.settings-key`/marker/插件注册表、Web静态文件、私有runtime.env及容器inspect；ACL仅当前用户/SYSTEM/Administrators。完整性ok、FK0、4项加密检查失败0、任务0。与之前已在无网络旧2a镜像真实恢复的12:09快照在关键业务、密钥、marker、插件、迁移摘要完全一致；状态`verified/protected`，保留该恢复证明与独立卷。
+- 二次发布后私有`post-audio-audit.json`与新鲜快照的业务关键摘要、表计数、密钥和迁移历史一致；仅AutoDL插件升级到保留视频/音频的2.3.1+dingxin.1。`pre-v166-audio-20261015`标签保留首轮2a镜像，`pre-v166-20261014`仍保留v1.2.7/Schema9镜像；不同Schema需要匹配备份回退，不直接以旧binary读取真实Schema51卷。所有旧分支、恢复点与独立克隆卷保留。
+
 ## 2026-10-15 生产Schema51热修前恢复点（13:10 CST）
 
 - 私有NTFS目录`C:\Users\DingXin\.codex\backups\open-ai-canvas\v166-audio-before-20261015-120957`：生产首轮2a/Schema51完整`/data`、DB/WAL/SHM/`.settings-key`/迁移marker/插件注册表独立hash一致副本、Web静态资产、私有运行env和容器inspect，ACL仅当前用户/SYSTEM/Administrators。完整性ok、FK0、4项加密检查失败0、任务0。状态`verified/protected`：无网络旧2a镜像克隆`open-ai-canvas-v166-audio-restore-proof-20261015`已实启Schema51/ready且关键表计数/digest、key、marker、plugin与原备份一致，数据卷独立保留。

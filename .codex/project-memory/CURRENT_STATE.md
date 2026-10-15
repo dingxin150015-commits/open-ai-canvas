@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-15 14:00 CST：v1.6.6生产最终运行核验通过，推送中
+
+用户直接要求晋升/推送。生产backend/web运行源码提交`00351b4f3c922b5acf73e6d17a029a049ef01af9`、版本v1.6.6+dingxin.1、Schema51/51/ready/活动任务0；Compose工作目录为A‴。Backend镜像`sha256:979477e3...`，Web镜像`sha256:df2182bb...`。AutoDL上游2.3视频＋旧IndexTTS2音频合包`2.3.1+dingxin.1`已在生产注册，109插件中旧启用状态保持。对二次切换前私有备份`v166-audio-before-20261015-132809`比对：关键表计数和旧字段摘要、密钥hash、加密检查(失败0)、迁移历史均一致，完整性ok/FK0；用户1、渠道模型473、素材9、画布3。首轮2a Web的1615条静态资产清单与内容可达，旧v1.2.7代表性JS/CSS仍200非HTML。原v1.2.7/Schema9及首轮2a/Schema51旧镜像和恢复点保留；后者用无网络旧镜像克隆实启Schema51/ready且数据一致。最新Backend Linux CGO全仓通过，Web2491+5/类型/lint/镜像、Agent328/构建已通过。当前待文档提交与非强制push/远端核验；Edge登录态人工及真实收费调用未验证。
+
 ## 2026-10-15 13:10 CST：插件能力回归修复验证通过，待二次发布
 
 生产首轮正式提交`2a71a5f8`当前运行v1.6.6/Schema51/healthy。AutoDL包从上游2.3.0合入旧2.0.0音频Provider与`indextts2-v1`为`2.3.1+dingxin.1`，源码manifest/README/interface.md/zip归档由`build-packages.sh --provider-only autodl-comfyui`同步，视频15+音频1工作流。后端Linux CGO全仓`go test -count=1 -timeout 30m ./...`通过，音频请求文本与音色参考、任务ID和WAV轮询由包加载专项验证；没有真实付费模型调用。当前生产Schema51完整备份`v166-audio-before-20261015-120957`完整性ok/FK0/密钥失败0/任务0；旧2a镜像恢复克隆Schema51/healthy、关键业务摘要/插件状态/密钥不变。待增量commit、同SHA镜像和二次发布/最终审计，再推送用户fork。先前Root“生产未晋升”仅属历史，正式最终版本尚未推送。

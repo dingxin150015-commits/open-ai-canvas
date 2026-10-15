@@ -1,5 +1,12 @@
 # 固定 v1.6.6 增量合并、验证与部署执行记录
 
+## 2026-10-15 14:00 CST：最终生产二次发布核验完成
+
+- 增量修复提交`00351b4f`从上游AutoDL2.3.0视频归档合入旧2.0.0音频Provider和`indextts2-v1`，同步v2 Manifest/README/interface内嵌合同/zip；新增`build-packages.sh --provider-only`精确生成入口。实际归档加载、音色参考请求、任务创建与WAV轮询单测以及Backend Linux CGO最终全仓通过。Web、Agent和PG/Redis原专项按应用代码无变更继续有效，无真实付费模型调用。
+- 最终Backend/Web镜像按代码提交`00351b4f3c922b5acf73e6d17a029a049ef01af9`构建，Backend内插件包SHA与仓库一致。二次切换前Schema51完整备份`v166-audio-before-20261015-132809`相较此前真实恢复证明源没有关键数据变化；保留卷重建backend/web后两者healthy、build提交一致、Schema51/51/任务0。插件109、AutoDL2.3.1+dingxin.1视频＋音频二Provider和IndexTTS2工作流存在，其余旧插件合同与启用状态不变。
+- 私有post-audio审计：完整性ok/FK0、解密失败0，关键表计数/旧字段摘要/密钥hash/marker/迁移51项同新鲜备份；旧2a Web静态清单1615项保留，旧v1.2.7代表性JS/CSS仍200且非SPA回退。原v1.2.7和首轮2a镜像、备份、克隆、旧A均未删；当前待交接文档commit/非强制push与远端复核。
+- Microsoft Edge未出现在当前电脑控制工具的可用浏览器列表；本轮无登录态页面视觉/交互验收，未回退到其他浏览器。手工指南`docs/plans/edge-v166-production-20261015.md`；F6和真实收费调用继续待验证。
+
 ## 2026-10-15 13:10 CST：AutoDL音频合包与Schema51恢复验证通过
 
 - 上游2.3.0归档只含视频Provider及15视频工作流，旧2.0.0归档额外含`autodl-comfyui-audio`/`indextts2-v1`，仓库源manifest最初是1.0.3而归档是2.3.0。以官方2.3.0为基底，精确保留旧2.0.0音频合同，生成2.3.1+dingxin.1源码及归档；用仓库`embed-documentation.mjs`、新增`build-packages.sh --provider-only autodl-comfyui`同步内嵌接口定义，避免源码/文档/zip再次分叉。

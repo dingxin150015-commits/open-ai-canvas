@@ -5,6 +5,11 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 # 待测试
 
+## 2026-10-15 最终生产发布后的手验边界
+
+`v1.6.6+dingxin.1` 已运行在本地生产3000，应用构建提交`00351b4f3c922b5acf73e6d17a029a049ef01af9`；AutoDL合包`2.3.1+dingxin.1`在生产注册表中恢复视频和IndexTTS2音频Provider。最新Schema51完整恢复点及无网络恢复、Backend Linux全仓/Web2491+5/Agent328、业务旧字段摘要/密钥/旧静态JS/CSS均已验证。浏览器视觉与交互、旧导演真实场景、F6保存失败、真实收费供应商调用仍未由用户确认；Edge步骤见`docs/plans/edge-v166-production-20261015.md`。下面的候选“未部署”描述仅为2026-10-14历史检查点。
+
+
 ## 2026-10-15 发布检查点
 
 正式v1.6.6首轮提交`2a71a5f8`已升级生产到Schema51并健康，业务旧字段摘要、密钥与旧静态JS/CSS已核验。最后插件审计发现上游AutoDL 2.3.0归档漏旧音频Provider/IndexTTS2；2.3.1+dingxin.1合包已通过完整Backend Linux CGO和旧Schema51真实恢复证明，正在准备增量提交与二次发布。此节不代表实际AutoDL付费生成、旧导演数据UI或用户Edge验收已通过；下方候选描述为前一检查点历史。
